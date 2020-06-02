@@ -1,0 +1,10 @@
+[package]
+name = "immuxsys"
+version = "2.0.0"
+authors = ["Immux Network Technology Company, Limited"]
+edition = "2018"
+
+[dependencies]
+
+[dev-dependencies]
+

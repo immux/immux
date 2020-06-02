@@ -1,0 +1,12 @@
+.idea
+.DS_Store
+
+/target
+**/*.rs.bk
+node_modules
+build
+tmp*
+foldr.json
+data-raw
+
+tests/coverage-report
