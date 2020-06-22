@@ -131,24 +131,24 @@ impl LogKeyValueStore {
                         Command::RevertOne { key, height } => {
                             self.get_revert_value(&key, &height)
                         }
-                        Command::RemoveOne { key } => return Ok(None),
+                        Command::RemoveOne { key: _ } => return Ok(None),
                         Command::TransactionalSet {
-                            key,
+                            key: _,
                             value,
-                            transaction_id,
+                            transaction_id: _,
                         } => {
                             return Ok(Some(value));
                         }
                         Command::TransactionalRevertOne {
                             key,
                             height,
-                            transaction_id,
+                            transaction_id: _,
                         } => {
                             self.get_revert_value(&key, &height)
                         }
                         Command::TransactionalRemoveOne {
-                            key,
-                            transaction_id,
+                            key: _,
+                            transaction_id: _,
                         } => return Ok(None),
                         _ => Err(KVError::PointToUnexpectedCommand),
                     }
@@ -327,33 +327,33 @@ impl LogKeyValueStore {
                                 return None;
                             }
                         }
-                        Command::TransactionStart { transaction_id } => {
+                        Command::TransactionStart { transaction_id: _ } => {
                             return None;
                         }
                         Command::TransactionalSet {
-                            key,
-                            value,
-                            transaction_id,
+                            key: _,
+                            value: _,
+                            transaction_id: _,
                         } => {
                             return None;
                         }
                         Command::TransactionalRevertOne {
-                            key,
-                            height,
-                            transaction_id,
+                            key: _,
+                            height: _,
+                            transaction_id: _,
                         } => {
                             return None;
                         }
                         Command::TransactionalRemoveOne {
-                            key,
-                            transaction_id,
+                            key: _,
+                            transaction_id: _,
                         } => {
                             return None;
                         }
-                        Command::TransactionCommit { transaction_id } => {
+                        Command::TransactionCommit { transaction_id: _ } => {
                             return None;
                         }
-                        Command::TransactionAbort { transaction_id } => {
+                        Command::TransactionAbort { transaction_id: _ } => {
                             return None;
                         }
                     })
@@ -366,7 +366,7 @@ impl LogKeyValueStore {
     pub fn start_transaction(&mut self) -> KVResult<TransactionId> {
         let transaction_id = self.transaction_manager.generate_new_transaction_id()?;
         let command = Command::TransactionStart { transaction_id };
-        let log_pointer = append_command(command, &mut self.writer)?;
+        append_command(command, &mut self.writer)?;
 
         self.transaction_manager
             .update_transaction_id_to_keys(transaction_id, None);
@@ -379,7 +379,7 @@ impl LogKeyValueStore {
             .is_transaction_alive(&transaction_id)?;
 
         let command = Command::TransactionCommit { transaction_id };
-        let log_pointer = append_command(command, &mut self.writer)?;
+        append_command(command, &mut self.writer)?;
 
         if let Some(affected_keys) = self.transaction_manager.get_affected_keys(&transaction_id) {
             for key in affected_keys {
@@ -404,7 +404,7 @@ impl LogKeyValueStore {
             .is_transaction_alive(&transaction_id)?;
 
         let command = Command::TransactionAbort { transaction_id };
-        let log_pointer = append_command(command, &mut self.writer)?;
+        append_command(command, &mut self.writer)?;
 
         if let Some(affected_keys) = self.transaction_manager.get_affected_keys(&transaction_id) {
             for key in affected_keys {
@@ -471,38 +471,38 @@ fn recursive_find(
         Command::RemoveAll => {
             return Ok(None);
         }
-        Command::TransactionStart { transaction_id } => {
+        Command::TransactionStart { transaction_id: _ } => {
             let next_target_height = &target_height.clone().decrement()?;
             return recursive_find(&target_key, &commands, &next_target_height);
         }
         Command::TransactionalSet {
-            key,
-            value,
-            transaction_id,
+            key: _,
+            value: _,
+            transaction_id: _,
         } => {
             let next_target_height = &target_height.clone().decrement()?;
             return recursive_find(&target_key, &commands, &next_target_height);
         }
         Command::TransactionalRemoveOne {
-            key,
-            transaction_id,
+            key: _,
+            transaction_id: _,
         } => {
             let next_target_height = &target_height.clone().decrement()?;
             return recursive_find(&target_key, &commands, &next_target_height);
         }
         Command::TransactionalRevertOne {
-            key,
-            height,
-            transaction_id,
+            key: _,
+            height: _,
+            transaction_id: _,
         } => {
             let next_target_height = &target_height.clone().decrement()?;
             return recursive_find(&target_key, &commands, &next_target_height);
         }
-        Command::TransactionCommit { transaction_id } => {
+        Command::TransactionCommit { transaction_id: _ } => {
             let next_target_height = &target_height.clone().decrement()?;
             return recursive_find(&target_key, &commands, &next_target_height);
         }
-        Command::TransactionAbort { transaction_id } => {
+        Command::TransactionAbort { transaction_id: _ } => {
             let next_target_height = &target_height.clone().decrement()?;
             return recursive_find(&target_key, &commands, &next_target_height);
         }
@@ -559,7 +559,7 @@ fn load_key_pointer_map(
             }
             Command::TransactionalSet {
                 key,
-                value,
+                value: _,
                 transaction_id,
             } => {
                 let log_pointer = LogPointer::new(current_position, command_length);
@@ -573,7 +573,7 @@ fn load_key_pointer_map(
             }
             Command::TransactionalRevertOne {
                 key,
-                height,
+                height: _,
                 transaction_id,
             } => {
                 let log_pointer = LogPointer::new(current_position, command_length);
