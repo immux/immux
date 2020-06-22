@@ -8,7 +8,6 @@ use immuxsys::storage::kvkey::KVKey;
 use immuxsys::storage::kvvalue::KVValue;
 
 use clap::{App, Arg, SubCommand};
-use immuxsys::constants::SUBCOMMAND_START_TRANSACTION;
 
 fn main() -> KVResult<()> {
     let arg_matches = App::new(env!("CARGO_PKG_NAME"))
@@ -269,8 +268,8 @@ fn main() -> KVResult<()> {
                         println!("{:?}", command);
                     }
                 }
-                Some(str) => {
-                    let key_bytes = str.as_bytes().to_vec();
+                Some(key_str) => {
+                    let key_bytes = key_str.as_bytes().to_vec();
                     let kvkey = KVKey::new(&key_bytes);
                     let res = store_engine.inspect(Some(&kvkey))?;
                     for command in res {

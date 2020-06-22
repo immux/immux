@@ -259,7 +259,6 @@ impl LogKeyValueStore {
         return Ok(());
     }
 
-    //    To be fixed
     pub fn remove_all(&mut self) -> KVResult<()> {
         let command = Command::RemoveAll;
 
@@ -276,7 +275,8 @@ impl LogKeyValueStore {
         self.reader.seek(SeekFrom::Start(0))?;
         self.reader.read_to_end(&mut command_buffer)?;
 
-        let command_buffer_parser = CommandBufferParser::new(command_buffer, 0);
+        let command_buffer_parser = CommandBufferParser::new(&command_buffer, 0);
+
         match key {
             None => {
                 let commands = command_buffer_parser.map(|(command, _)| command).collect();
@@ -423,7 +423,7 @@ impl LogKeyValueStore {
         let mut command_buffer: Vec<u8> = Vec::new();
         self.reader.seek(SeekFrom::Start(0))?;
         self.reader.read_to_end(&mut command_buffer)?;
-        let command_buffer_parser = CommandBufferParser::new(command_buffer, 0);
+        let command_buffer_parser = CommandBufferParser::new(&command_buffer, 0);
 
         let commands: Vec<Command> =
             command_buffer_parser.map(|(command, _)| command).collect();
@@ -526,7 +526,7 @@ fn load_key_pointer_map(
 
     reader.seek(SeekFrom::Start(0))?;
     reader.read_to_end(&mut command_buffer)?;
-    let command_buffer_parser = CommandBufferParser::new(command_buffer, 0);
+    let command_buffer_parser = CommandBufferParser::new(&command_buffer, 0);
 
     for (command, command_length) in command_buffer_parser {
         match command {
@@ -744,6 +744,7 @@ mod tests {
             .unwrap();
 
         let actual_output = store_engine.get(&key, &None).unwrap().unwrap();
+
         let expected_output = &values.as_slice()[target_height.as_u64() as usize];
 
         assert_eq!(&actual_output, expected_output);

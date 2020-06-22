@@ -1,17 +1,17 @@
 use crate::storage::command::Command;
 
-pub struct CommandBufferParser {
-    buffer: Vec<u8>,
+pub struct CommandBufferParser<'a> {
+    buffer: &'a [u8],
     index: usize,
 }
 
-impl CommandBufferParser {
-    pub fn new(buffer: Vec<u8>, index: usize) -> CommandBufferParser {
+impl<'a> CommandBufferParser<'a> {
+    pub fn new(buffer: &[u8], index: usize) -> CommandBufferParser {
         return CommandBufferParser { buffer, index };
     }
 }
 
-impl Iterator for CommandBufferParser {
+impl<'a> Iterator for CommandBufferParser<'a> {
     type Item = (Command, usize);
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -73,7 +73,10 @@ mod tests {
         let commands = get_commands();
         let buffer = serialize_commands(&commands);
 
-        let command_buffer_parser = CommandBufferParser { buffer, index: 0 };
+        let command_buffer_parser = CommandBufferParser {
+            buffer: &buffer,
+            index: 0,
+        };
 
         for (index, (actual_command, _)) in command_buffer_parser.enumerate() {
             let expected_command = &commands.as_slice()[index];
@@ -89,7 +92,10 @@ mod tests {
         let some_broken_bytes = [0xff, 0x00, 0xfa];
         buffer.extend_from_slice(&some_broken_bytes);
 
-        let mut command_buffer_parser = CommandBufferParser { buffer, index: 0 };
+        let mut command_buffer_parser = CommandBufferParser {
+            buffer: &buffer,
+            index: 0,
+        };
 
         for expected_command in commands {
             let (actual_command, _) = &command_buffer_parser.next().unwrap();
