@@ -5,6 +5,7 @@ authors = ["Immux Network Technology Company, Limited"]
 edition = "2018"
 
 [dependencies]
+# This is a temporary dependency, we currently use clap as a command line tools mainly for testing purpose for now.
 clap = "2.33.0"
 
 [dev-dependencies]

@@ -27,22 +27,30 @@ impl Iterator for CommandBufferParser {
 
 #[cfg(test)]
 mod tests {
-    use crate::storage::buffer_parser::CommandBufferParser;
-    use crate::storage::command::Command;
     use std::convert::TryInto;
+
+    use crate::storage::buffer_parser::CommandBufferParser;
+    use crate::storage::chain_height::ChainHeight;
+    use crate::storage::command::Command;
+    use crate::storage::kvkey::KVKey;
+    use crate::storage::kvvalue::KVValue;
 
     fn get_commands() -> Vec<Command> {
         let commands: Vec<Command> = vec![
             Command::Set {
-                key: vec![0x00, 0x01],
-                value: vec![0xff, 0xf3],
+                key: KVKey::new(&[0x00, 0x01]),
+                value: KVValue::new(&[0xff, 0xf3]),
             },
             Command::RevertOne {
-                key: vec![0x11, 0x22],
-                height: 3,
+                key: KVKey::new(&[0x11, 0x22]),
+                height: ChainHeight::new(3),
             },
-            Command::RevertAll { height: 6 },
-            Command::Remove { key: vec![0x88] },
+            Command::RevertAll {
+                height: ChainHeight::new(6),
+            },
+            Command::RemoveOne {
+                key: KVKey::new(&[0x88]),
+            },
             Command::RemoveAll,
         ];
 

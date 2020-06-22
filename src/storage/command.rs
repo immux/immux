@@ -1,7 +1,10 @@
-use crate::varint::{varint_decode, varint_encode, VarIntError};
 use std::convert::TryInto;
 
-pub const MAX_KEY_LENGTH: usize = 8 * 1024;
+use crate::storage::chain_height::ChainHeight;
+use crate::storage::kvkey::KVKey;
+use crate::storage::kvvalue::KVValue;
+use crate::storage::transaction_manager::TransactionId;
+use crate::varint::{varint_decode, varint_encode, VarIntError};
 
 #[derive(Debug)]
 pub enum CommandError {
@@ -19,17 +22,56 @@ enum CommandPrefix {
     Set = 0x00,
     RevertOne = 0x01,
     RevertAll = 0x02,
-    Remove = 0x03,
+    RemoveOne = 0x03,
     RemoveAll = 0x04,
+    TransactionStart = 0x05,
+    TransactionalSet = 0x06,
+    TransactionalRevertOne = 0x07,
+    TransactionalRemoveOne = 0x08,
+    TransactionCommit = 0x09,
+    TransactionAbort = 0x10,
 }
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Command {
-    Set { key: Vec<u8>, value: Vec<u8> },
-    RevertOne { key: Vec<u8>, height: u64 },
-    RevertAll { height: u64 },
-    Remove { key: Vec<u8> },
+    Set {
+        key: KVKey,
+        value: KVValue,
+    },
+    RevertOne {
+        key: KVKey,
+        height: ChainHeight,
+    },
+    RevertAll {
+        height: ChainHeight,
+    },
+    RemoveOne {
+        key: KVKey,
+    },
     RemoveAll,
+    TransactionStart {
+        transaction_id: TransactionId,
+    },
+    TransactionalSet {
+        key: KVKey,
+        value: KVValue,
+        transaction_id: TransactionId,
+    },
+    TransactionalRevertOne {
+        key: KVKey,
+        height: ChainHeight,
+        transaction_id: TransactionId,
+    },
+    TransactionalRemoveOne {
+        key: KVKey,
+        transaction_id: TransactionId,
+    },
+    TransactionCommit {
+        transaction_id: TransactionId,
+    },
+    TransactionAbort {
+        transaction_id: TransactionId,
+    },
 }
 
 impl TryInto<Vec<u8>> for Command {
@@ -38,69 +80,134 @@ impl TryInto<Vec<u8>> for Command {
     fn try_into(self) -> Result<Vec<u8>, Self::Error> {
         match self {
             Command::Set { key, value } => {
-                if key.len() > MAX_KEY_LENGTH {
-                    return Err(CommandError::KeyExceedsMaxLength);
-                }
+                let mut command_bytes: Vec<u8> = Vec::new();
 
-                let mut ret: Vec<u8> = Vec::new();
+                command_bytes.push(CommandPrefix::Set as u8);
 
-                ret.push(CommandPrefix::Set as u8);
+                let key_length: u64 = key.as_bytes().len() as u64;
+                command_bytes.extend_from_slice(&varint_encode(key_length));
+                command_bytes.extend_from_slice(&key.as_bytes());
 
-                let key_length: u64 = key.len() as u64;
-                ret.extend_from_slice(&varint_encode(key_length));
-                ret.extend_from_slice(&key);
+                let value_length: u64 = value.as_bytes().len() as u64;
+                command_bytes.extend_from_slice(&varint_encode(value_length));
+                command_bytes.extend_from_slice(&value.as_bytes());
 
-                let value_length: u64 = value.len() as u64;
-                ret.extend_from_slice(&varint_encode(value_length));
-                ret.extend_from_slice(&value);
-
-                return Ok(ret);
+                return Ok(command_bytes);
             }
             Command::RevertOne { key, height } => {
-                if key.len() > MAX_KEY_LENGTH {
-                    return Err(CommandError::KeyExceedsMaxLength);
-                }
+                let mut command_bytes: Vec<u8> = Vec::new();
 
-                let mut ret: Vec<u8> = Vec::new();
+                command_bytes.push(CommandPrefix::RevertOne as u8);
 
-                ret.push(CommandPrefix::RevertOne as u8);
+                let key_length: u64 = key.as_bytes().len() as u64;
+                command_bytes.extend_from_slice(&varint_encode(key_length));
+                command_bytes.extend_from_slice(&key.as_bytes());
 
-                let key_length: u64 = key.len() as u64;
-                ret.extend_from_slice(&varint_encode(key_length));
-                ret.extend_from_slice(&key);
+                command_bytes.extend_from_slice(&varint_encode(height.as_u64()));
 
-                ret.extend_from_slice(&varint_encode(height));
-
-                return Ok(ret);
+                return Ok(command_bytes);
             }
             Command::RevertAll { height } => {
-                let mut ret: Vec<u8> = Vec::new();
+                let mut command_bytes: Vec<u8> = Vec::new();
 
-                ret.push(CommandPrefix::RevertAll as u8);
-                ret.extend_from_slice(&varint_encode(height));
+                command_bytes.push(CommandPrefix::RevertAll as u8);
+                command_bytes.extend_from_slice(&varint_encode(height.as_u64()));
 
-                return Ok(ret);
+                return Ok(command_bytes);
             }
-            Command::Remove { key } => {
-                if key.len() > MAX_KEY_LENGTH {
-                    return Err(CommandError::KeyExceedsMaxLength);
-                }
+            Command::RemoveOne { key } => {
+                let mut command_bytes: Vec<u8> = Vec::new();
 
-                let mut ret: Vec<u8> = Vec::new();
+                command_bytes.push(CommandPrefix::RemoveOne as u8);
 
-                ret.push(CommandPrefix::Remove as u8);
+                let key_length: u64 = key.as_bytes().len() as u64;
+                command_bytes.extend_from_slice(&varint_encode(key_length));
+                command_bytes.extend_from_slice(&key.as_bytes());
 
-                let key_length: u64 = key.len() as u64;
-                ret.extend_from_slice(&varint_encode(key_length));
-                ret.extend_from_slice(&key);
-
-                return Ok(ret);
+                return Ok(command_bytes);
             }
             Command::RemoveAll => {
-                let mut ret: Vec<u8> = Vec::new();
+                let mut command_bytes: Vec<u8> = Vec::new();
 
-                ret.push(CommandPrefix::RemoveAll as u8);
-                return Ok(ret);
+                command_bytes.push(CommandPrefix::RemoveAll as u8);
+                return Ok(command_bytes);
+            }
+            Command::TransactionStart { transaction_id } => {
+                let mut command_bytes: Vec<u8> = Vec::new();
+
+                command_bytes.push(CommandPrefix::TransactionStart as u8);
+                command_bytes.extend_from_slice(&varint_encode(transaction_id));
+                return Ok(command_bytes);
+            }
+            Command::TransactionalSet {
+                key,
+                value,
+                transaction_id,
+            } => {
+                let mut command_bytes: Vec<u8> = Vec::new();
+
+                command_bytes.push(CommandPrefix::TransactionalSet as u8);
+
+                let key_length: u64 = key.as_bytes().len() as u64;
+                command_bytes.extend_from_slice(&varint_encode(key_length));
+                command_bytes.extend_from_slice(&key.as_bytes());
+
+                let value_length: u64 = value.as_bytes().len() as u64;
+                command_bytes.extend_from_slice(&varint_encode(value_length));
+                command_bytes.extend_from_slice(&value.as_bytes());
+
+                command_bytes.extend_from_slice(&varint_encode(transaction_id));
+
+                return Ok(command_bytes);
+            }
+            Command::TransactionalRevertOne {
+                key,
+                height,
+                transaction_id,
+            } => {
+                let mut command_bytes: Vec<u8> = Vec::new();
+
+                command_bytes.push(CommandPrefix::TransactionalRevertOne as u8);
+
+                let key_length: u64 = key.as_bytes().len() as u64;
+                command_bytes.extend_from_slice(&varint_encode(key_length));
+                command_bytes.extend_from_slice(&key.as_bytes());
+
+                command_bytes.extend_from_slice(&varint_encode(height.as_u64()));
+
+                command_bytes.extend_from_slice(&varint_encode(transaction_id));
+
+                return Ok(command_bytes);
+            }
+            Command::TransactionalRemoveOne {
+                key,
+                transaction_id,
+            } => {
+                let mut command_bytes: Vec<u8> = Vec::new();
+
+                command_bytes.push(CommandPrefix::TransactionalRemoveOne as u8);
+
+                let key_length: u64 = key.as_bytes().len() as u64;
+                command_bytes.extend_from_slice(&varint_encode(key_length));
+                command_bytes.extend_from_slice(&key.as_bytes());
+
+                command_bytes.extend_from_slice(&varint_encode(transaction_id));
+
+                return Ok(command_bytes);
+            }
+            Command::TransactionCommit { transaction_id } => {
+                let mut command_bytes: Vec<u8> = Vec::new();
+
+                command_bytes.push(CommandPrefix::TransactionCommit as u8);
+                command_bytes.extend_from_slice(&varint_encode(transaction_id));
+                return Ok(command_bytes);
+            }
+            Command::TransactionAbort { transaction_id } => {
+                let mut command_bytes: Vec<u8> = Vec::new();
+
+                command_bytes.push(CommandPrefix::TransactionAbort as u8);
+                command_bytes.extend_from_slice(&varint_encode(transaction_id));
+                return Ok(command_bytes);
             }
         }
     }
@@ -108,68 +215,147 @@ impl TryInto<Vec<u8>> for Command {
 
 impl Command {
     pub fn try_from(data: &[u8]) -> Result<(Self, usize), CommandError> {
-        let mut index = 0;
-        match data.get(index) {
+        let mut position = 0;
+        match data.get(position) {
             None => return Err(CommandError::UnexpectedFormat(None)),
             Some(&prefix) => {
-                index += 1;
+                position += 1;
 
                 if prefix == CommandPrefix::Set as u8 {
-                    let (key_length, varint_size) = varint_decode(&data[index..])?;
-                    index += varint_size;
+                    let (key_length, varint_size) = varint_decode(&data[position..])?;
+                    position += varint_size;
 
-                    let key = &data[index..index + key_length as usize];
-                    index += key_length as usize;
+                    let key = KVKey::new(&data[position..position + key_length as usize]);
+                    position += key_length as usize;
 
-                    let (value_length, varint_size) = varint_decode(&data[index..])?;
-                    index += varint_size;
+                    let (value_length, varint_size) = varint_decode(&data[position..])?;
+                    position += varint_size;
 
-                    let value = &data[index..index + value_length as usize];
-                    index += value_length as usize;
+                    let value = KVValue::new(&data[position..position + value_length as usize]);
+                    position += value_length as usize;
 
-                    let command = Command::Set {
-                        key: key.to_vec(),
-                        value: value.to_vec(),
-                    };
+                    let command = Command::Set { key, value };
 
-                    return Ok((command, index));
+                    return Ok((command, position));
                 } else if prefix == CommandPrefix::RevertOne as u8 {
-                    let (key_length, varint_size) = varint_decode(&data[index..])?;
-                    index += varint_size;
+                    let (key_length, varint_size) = varint_decode(&data[position..])?;
+                    position += varint_size;
 
-                    let key = &data[index..index + key_length as usize];
-                    index += key_length as usize;
+                    let key = KVKey::new(&data[position..position + key_length as usize]);
+                    position += key_length as usize;
 
-                    let (height, varint_size) = varint_decode(&data[index..])?;
-                    index += varint_size;
+                    let (height, varint_size) = varint_decode(&data[position..])?;
+                    position += varint_size;
 
                     let command = Command::RevertOne {
-                        key: key.to_vec(),
-                        height,
+                        key,
+                        height: ChainHeight::new(height),
                     };
 
-                    return Ok((command, index));
+                    return Ok((command, position));
                 } else if prefix == CommandPrefix::RevertAll as u8 {
-                    let (height, varint_size) = varint_decode(&data[index..])?;
-                    index += varint_size;
+                    let (height, varint_size) = varint_decode(&data[position..])?;
+                    position += varint_size;
 
-                    let command = Command::RevertAll { height };
+                    let command = Command::RevertAll {
+                        height: ChainHeight::new(height),
+                    };
 
-                    return Ok((command, index));
-                } else if prefix == CommandPrefix::Remove as u8 {
-                    let (key_length, varint_size) = varint_decode(&data[index..])?;
-                    index += varint_size;
+                    return Ok((command, position));
+                } else if prefix == CommandPrefix::RemoveOne as u8 {
+                    let (key_length, varint_size) = varint_decode(&data[position..])?;
+                    position += varint_size;
 
-                    let key = &data[index..index + key_length as usize];
-                    index += key_length as usize;
+                    let key = KVKey::new(&data[position..position + key_length as usize]);
+                    position += key_length as usize;
 
-                    let command = Command::Remove { key: key.to_vec() };
+                    let command = Command::RemoveOne { key };
 
-                    return Ok((command, index));
+                    return Ok((command, position));
                 } else if prefix == CommandPrefix::RemoveAll as u8 {
                     let command = Command::RemoveAll;
 
-                    return Ok((command, index));
+                    return Ok((command, position));
+                } else if prefix == CommandPrefix::TransactionStart as u8 {
+                    let (transaction_id, varint_size) = varint_decode(&data[position..])?;
+                    position += varint_size;
+
+                    let command = Command::TransactionStart { transaction_id };
+
+                    return Ok((command, position));
+                } else if prefix == CommandPrefix::TransactionalSet as u8 {
+                    let (key_length, varint_size) = varint_decode(&data[position..])?;
+                    position += varint_size;
+
+                    let key = KVKey::new(&data[position..position + key_length as usize]);
+                    position += key_length as usize;
+
+                    let (value_length, varint_size) = varint_decode(&data[position..])?;
+                    position += varint_size;
+
+                    let value = KVValue::new(&data[position..position + value_length as usize]);
+                    position += value_length as usize;
+
+                    let (transaction_id, varint_size) = varint_decode(&data[position..])?;
+                    position += varint_size;
+
+                    let command = Command::TransactionalSet {
+                        key,
+                        value,
+                        transaction_id,
+                    };
+
+                    return Ok((command, position));
+                } else if prefix == CommandPrefix::TransactionalRemoveOne as u8 {
+                    let (key_length, varint_size) = varint_decode(&data[position..])?;
+                    position += varint_size;
+
+                    let key = KVKey::new(&data[position..position + key_length as usize]);
+                    position += key_length as usize;
+
+                    let (transaction_id, varint_size) = varint_decode(&data[position..])?;
+                    position += varint_size;
+
+                    let command = Command::TransactionalRemoveOne {
+                        key,
+                        transaction_id,
+                    };
+
+                    return Ok((command, position));
+                } else if prefix == CommandPrefix::TransactionalRevertOne as u8 {
+                    let (key_length, varint_size) = varint_decode(&data[position..])?;
+                    position += varint_size;
+
+                    let key = KVKey::new(&data[position..position + key_length as usize]);
+                    position += key_length as usize;
+
+                    let (height, varint_size) = varint_decode(&data[position..])?;
+                    position += varint_size;
+
+                    let (transaction_id, varint_size) = varint_decode(&data[position..])?;
+                    position += varint_size;
+
+                    let command = Command::TransactionalRevertOne {
+                        key,
+                        height: ChainHeight::new(height),
+                        transaction_id,
+                    };
+
+                    return Ok((command, position));
+                } else if prefix == CommandPrefix::TransactionCommit as u8 {
+                    let (transaction_id, varint_size) = varint_decode(&data[position..])?;
+                    position += varint_size;
+
+                    let command = Command::TransactionCommit { transaction_id };
+
+                    return Ok((command, position));
+                } else if prefix == CommandPrefix::TransactionAbort as u8 {
+                    let (transaction_id, varint_size) = varint_decode(&data[position..])?;
+                    position += varint_size;
+
+                    let command = Command::TransactionAbort { transaction_id };
+
+                    return Ok((command, position));
                 } else {
                     return Err(CommandError::UnexpectedFormat(None));
                 }
@@ -180,12 +366,9 @@ impl Command {
 
 #[test]
 fn parse_set_command() {
-    let key = [0x00, 0x01].to_vec();
-    let value = [0xff, 0xf2, 0xfe].to_vec();
-    let expected_command = Command::Set {
-        key: key.clone(),
-        value: value.clone(),
-    };
+    let key = KVKey::new(&[0x00, 0x01]);
+    let value = KVValue::new(&[0xff, 0xf2, 0xfe]);
+    let expected_command = Command::Set { key, value };
 
     let command_bytes: Vec<u8> = expected_command.clone().try_into().unwrap();
     let (actual_command, _) = Command::try_from(&command_bytes).unwrap();
@@ -195,12 +378,9 @@ fn parse_set_command() {
 
 #[test]
 fn serde_revert_one_command() {
-    let key = [0x00, 0x01].to_vec();
-    let height = 32;
-    let expected_command = Command::RevertOne {
-        key: key.clone(),
-        height,
-    };
+    let key = KVKey::new(&[0x00, 0x01]);
+    let height = ChainHeight::new(32);
+    let expected_command = Command::RevertOne { key, height };
 
     let command_bytes: Vec<u8> = expected_command.clone().try_into().unwrap();
     let (actual_command, _) = Command::try_from(&command_bytes).unwrap();
@@ -210,7 +390,7 @@ fn serde_revert_one_command() {
 
 #[test]
 fn serde_revert_all_command() {
-    let height = 32;
+    let height = ChainHeight::new(32);
     let expected_command = Command::RevertAll { height };
 
     let command_bytes: Vec<u8> = expected_command.clone().try_into().unwrap();
@@ -221,8 +401,8 @@ fn serde_revert_all_command() {
 
 #[test]
 fn serde_remove_command() {
-    let key = [0x00, 0x01].to_vec();
-    let expected_command = Command::Remove { key: key.clone() };
+    let key = KVKey::new(&[0x00, 0x01]);
+    let expected_command = Command::RemoveOne { key };
 
     let command_bytes: Vec<u8> = expected_command.clone().try_into().unwrap();
     let (actual_command, _) = Command::try_from(&command_bytes).unwrap();
