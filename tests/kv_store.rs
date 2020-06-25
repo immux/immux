@@ -708,6 +708,7 @@ fn dirty_read() {
     }
 }
 
+// Quoted From: Martin Kleppmann. “Designing Data-Intensive Applications.” Chapter 7
 #[test]
 #[ignore]
 fn repeatable_read() {
@@ -763,6 +764,7 @@ fn repeatable_read() {
     assert_eq!(transaction_1_account_2_value, original_value_2);
 }
 
+// Quoted From: Martin Kleppmann. “Designing Data-Intensive Applications.” Chapter 7
 #[test]
 #[ignore]
 fn lost_update() {
@@ -865,6 +867,7 @@ fn lost_update() {
     }
 }
 
+// Quoted From: Martin Kleppmann. “Designing Data-Intensive Applications.” Chapter 7
 #[test]
 #[ignore]
 fn write_skew() {
