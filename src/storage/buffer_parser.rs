@@ -48,7 +48,7 @@ mod tests {
             Command::RevertAll {
                 height: ChainHeight::new(6),
             },
-            Command::Remove {
+            Command::RemoveOne {
                 key: KVKey::new(&[0x88]),
             },
             Command::RemoveAll,
