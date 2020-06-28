@@ -7,7 +7,7 @@ pub const SUBCOMMAND_REVERT_ALL: &str = "revert_all";
 pub const SUBCOMMAND_REMOVE_ONE: &str = "remove_one";
 pub const SUBCOMMAND_REMOVE_ALL: &str = "remove_all";
 pub const SUBCOMMAND_INSPECT: &str = "inspect";
-pub const SUBCOMMAND_START_TRANSACTION: &str = "start_transaction";
+pub const SUBCOMMAND_CREATE_TRANSACTION: &str = "create_transaction";
 pub const SUBCOMMAND_COMMIT_TRANSACTION: &str = "commit_transaction";
 pub const SUBCOMMAND_ABORT_TRANSACTION: &str = "abort_transaction";
 
@@ -19,7 +19,7 @@ pub const SUBCOMMAND_REVERT_ALL_DESCRIPTION: &str = "Revert the whole db.";
 pub const SUBCOMMAND_REMOVE_ONE_DESCRIPTION: &str = "Remove the key";
 pub const SUBCOMMAND_REMOVE_ALL_DESCRIPTION: &str = "Clear the whole db";
 pub const SUBCOMMAND_INSPECT_DESCRIPTION: &str = "Inspect the string value of a given string key.";
-pub const SUBCOMMAND_START_TRANSACTION_DESCRIPTION: &str = "Start transaction";
+pub const SUBCOMMAND_CREATE_TRANSACTION_DESCRIPTION: &str = "Create transaction";
 pub const SUBCOMMAND_COMMIT_TRANSACTION_DESCRIPTION: &str = "Commit transaction";
 pub const SUBCOMMAND_ABORT_TRANSACTION_DESCRIPTION: &str = "Abort transaction";
 
@@ -40,3 +40,5 @@ pub const TEMP_LOG_FILE_PATH: &str = "/tmp";
 pub const LOG_FILE_NAME: &str = "command_log";
 
 pub const MAX_KEY_LENGTH: usize = 8 * 1024;
+
+pub const MAX_TRANSACTION_ID: u64 = u64::MAX;

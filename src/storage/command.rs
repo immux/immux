@@ -1,5 +1,3 @@
-use std::convert::TryInto;
-
 use crate::storage::chain_height::ChainHeight;
 use crate::storage::kvkey::KVKey;
 use crate::storage::kvvalue::KVValue;
@@ -74,10 +72,8 @@ pub enum Command {
     },
 }
 
-impl TryInto<Vec<u8>> for Command {
-    type Error = CommandError;
-
-    fn try_into(self) -> Result<Vec<u8>, Self::Error> {
+impl Command {
+    pub fn serialize(&self) -> Vec<u8> {
         match self {
             Command::Set { key, value } => {
                 let mut command_bytes: Vec<u8> = Vec::new();
@@ -92,7 +88,7 @@ impl TryInto<Vec<u8>> for Command {
                 command_bytes.extend_from_slice(&varint_encode(value_length));
                 command_bytes.extend_from_slice(&value.as_bytes());
 
-                return Ok(command_bytes);
+                return command_bytes;
             }
             Command::RevertOne { key, height } => {
                 let mut command_bytes: Vec<u8> = Vec::new();
@@ -105,7 +101,7 @@ impl TryInto<Vec<u8>> for Command {
 
                 command_bytes.extend_from_slice(&varint_encode(height.as_u64()));
 
-                return Ok(command_bytes);
+                return command_bytes;
             }
             Command::RevertAll { height } => {
                 let mut command_bytes: Vec<u8> = Vec::new();
@@ -113,7 +109,7 @@ impl TryInto<Vec<u8>> for Command {
                 command_bytes.push(CommandPrefix::RevertAll as u8);
                 command_bytes.extend_from_slice(&varint_encode(height.as_u64()));
 
-                return Ok(command_bytes);
+                return command_bytes;
             }
             Command::RemoveOne { key } => {
                 let mut command_bytes: Vec<u8> = Vec::new();
@@ -124,20 +120,20 @@ impl TryInto<Vec<u8>> for Command {
                 command_bytes.extend_from_slice(&varint_encode(key_length));
                 command_bytes.extend_from_slice(&key.as_bytes());
 
-                return Ok(command_bytes);
+                return command_bytes;
             }
             Command::RemoveAll => {
                 let mut command_bytes: Vec<u8> = Vec::new();
 
                 command_bytes.push(CommandPrefix::RemoveAll as u8);
-                return Ok(command_bytes);
+                return command_bytes;
             }
             Command::TransactionStart { transaction_id } => {
                 let mut command_bytes: Vec<u8> = Vec::new();
 
                 command_bytes.push(CommandPrefix::TransactionStart as u8);
-                command_bytes.extend_from_slice(&varint_encode(transaction_id));
-                return Ok(command_bytes);
+                command_bytes.extend_from_slice(&varint_encode(transaction_id.as_u64()));
+                return command_bytes;
             }
             Command::TransactionalSet {
                 key,
@@ -156,9 +152,9 @@ impl TryInto<Vec<u8>> for Command {
                 command_bytes.extend_from_slice(&varint_encode(value_length));
                 command_bytes.extend_from_slice(&value.as_bytes());
 
-                command_bytes.extend_from_slice(&varint_encode(transaction_id));
+                command_bytes.extend_from_slice(&varint_encode(transaction_id.as_u64()));
 
-                return Ok(command_bytes);
+                return command_bytes;
             }
             Command::TransactionalRevertOne {
                 key,
@@ -175,9 +171,9 @@ impl TryInto<Vec<u8>> for Command {
 
                 command_bytes.extend_from_slice(&varint_encode(height.as_u64()));
 
-                command_bytes.extend_from_slice(&varint_encode(transaction_id));
+                command_bytes.extend_from_slice(&varint_encode(transaction_id.as_u64()));
 
-                return Ok(command_bytes);
+                return command_bytes;
             }
             Command::TransactionalRemoveOne {
                 key,
@@ -191,29 +187,27 @@ impl TryInto<Vec<u8>> for Command {
                 command_bytes.extend_from_slice(&varint_encode(key_length));
                 command_bytes.extend_from_slice(&key.as_bytes());
 
-                command_bytes.extend_from_slice(&varint_encode(transaction_id));
+                command_bytes.extend_from_slice(&varint_encode(transaction_id.as_u64()));
 
-                return Ok(command_bytes);
+                return command_bytes;
             }
             Command::TransactionCommit { transaction_id } => {
                 let mut command_bytes: Vec<u8> = Vec::new();
 
                 command_bytes.push(CommandPrefix::TransactionCommit as u8);
-                command_bytes.extend_from_slice(&varint_encode(transaction_id));
-                return Ok(command_bytes);
+                command_bytes.extend_from_slice(&varint_encode(transaction_id.as_u64()));
+                return command_bytes;
             }
             Command::TransactionAbort { transaction_id } => {
                 let mut command_bytes: Vec<u8> = Vec::new();
 
                 command_bytes.push(CommandPrefix::TransactionAbort as u8);
-                command_bytes.extend_from_slice(&varint_encode(transaction_id));
-                return Ok(command_bytes);
+                command_bytes.extend_from_slice(&varint_encode(transaction_id.as_u64()));
+                return command_bytes;
             }
         }
     }
-}
 
-impl Command {
     pub fn try_from(data: &[u8]) -> Result<(Self, usize), CommandError> {
         let mut position = 0;
         match data.get(position) {
@@ -280,7 +274,9 @@ impl Command {
                     let (transaction_id, varint_size) = varint_decode(&data[position..])?;
                     position += varint_size;
 
-                    let command = Command::TransactionStart { transaction_id };
+                    let command = Command::TransactionStart {
+                        transaction_id: TransactionId::new(transaction_id),
+                    };
 
                     return Ok((command, position));
                 } else if prefix == CommandPrefix::TransactionalSet as u8 {
@@ -302,7 +298,7 @@ impl Command {
                     let command = Command::TransactionalSet {
                         key,
                         value,
-                        transaction_id,
+                        transaction_id: TransactionId::new(transaction_id),
                     };
 
                     return Ok((command, position));
@@ -318,7 +314,7 @@ impl Command {
 
                     let command = Command::TransactionalRemoveOne {
                         key,
-                        transaction_id,
+                        transaction_id: TransactionId::new(transaction_id),
                     };
 
                     return Ok((command, position));
@@ -338,7 +334,7 @@ impl Command {
                     let command = Command::TransactionalRevertOne {
                         key,
                         height: ChainHeight::new(height),
-                        transaction_id,
+                        transaction_id: TransactionId::new(transaction_id),
                     };
 
                     return Ok((command, position));
@@ -346,14 +342,18 @@ impl Command {
                     let (transaction_id, varint_size) = varint_decode(&data[position..])?;
                     position += varint_size;
 
-                    let command = Command::TransactionCommit { transaction_id };
+                    let command = Command::TransactionCommit {
+                        transaction_id: TransactionId::new(transaction_id),
+                    };
 
                     return Ok((command, position));
                 } else if prefix == CommandPrefix::TransactionAbort as u8 {
                     let (transaction_id, varint_size) = varint_decode(&data[position..])?;
                     position += varint_size;
 
-                    let command = Command::TransactionAbort { transaction_id };
+                    let command = Command::TransactionAbort {
+                        transaction_id: TransactionId::new(transaction_id),
+                    };
 
                     return Ok((command, position));
                 } else {
@@ -370,51 +370,51 @@ fn parse_set_command() {
     let value = KVValue::new(&[0xff, 0xf2, 0xfe]);
     let expected_command = Command::Set { key, value };
 
-    let command_bytes: Vec<u8> = expected_command.clone().try_into().unwrap();
+    let command_bytes: Vec<u8> = expected_command.serialize();
     let (actual_command, _) = Command::try_from(&command_bytes).unwrap();
 
     assert_eq!(expected_command, actual_command);
 }
 
 #[test]
-fn serde_revert_one_command() {
+fn serialize_revert_one_command() {
     let key = KVKey::new(&[0x00, 0x01]);
     let height = ChainHeight::new(32);
     let expected_command = Command::RevertOne { key, height };
 
-    let command_bytes: Vec<u8> = expected_command.clone().try_into().unwrap();
+    let command_bytes: Vec<u8> = expected_command.serialize();
     let (actual_command, _) = Command::try_from(&command_bytes).unwrap();
 
     assert_eq!(expected_command, actual_command);
 }
 
 #[test]
-fn serde_revert_all_command() {
+fn serialize_revert_all_command() {
     let height = ChainHeight::new(32);
     let expected_command = Command::RevertAll { height };
 
-    let command_bytes: Vec<u8> = expected_command.clone().try_into().unwrap();
+    let command_bytes: Vec<u8> = expected_command.serialize();
     let (actual_command, _) = Command::try_from(&command_bytes).unwrap();
 
     assert_eq!(expected_command, actual_command);
 }
 
 #[test]
-fn serde_remove_command() {
+fn serialize_remove_command() {
     let key = KVKey::new(&[0x00, 0x01]);
     let expected_command = Command::RemoveOne { key };
 
-    let command_bytes: Vec<u8> = expected_command.clone().try_into().unwrap();
+    let command_bytes: Vec<u8> = expected_command.serialize();
     let (actual_command, _) = Command::try_from(&command_bytes).unwrap();
 
     assert_eq!(expected_command, actual_command);
 }
 
 #[test]
-fn serde_remove_all_command() {
+fn serialize_remove_all_command() {
     let expected_command = Command::RemoveAll;
 
-    let command_bytes: Vec<u8> = expected_command.clone().try_into().unwrap();
+    let command_bytes: Vec<u8> = expected_command.serialize();
     let (actual_command, _) = Command::try_from(&command_bytes).unwrap();
 
     assert_eq!(expected_command, actual_command);

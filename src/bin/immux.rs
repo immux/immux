@@ -8,6 +8,7 @@ use immuxsys::storage::kvkey::KVKey;
 use immuxsys::storage::kvvalue::KVValue;
 
 use clap::{App, Arg, SubCommand};
+use immuxsys::storage::transaction_manager::TransactionId;
 
 fn main() -> KVResult<()> {
     let arg_matches = App::new(env!("CARGO_PKG_NAME"))
@@ -103,8 +104,8 @@ fn main() -> KVResult<()> {
                 ),
         )
         .subcommand(
-            SubCommand::with_name(Constants::SUBCOMMAND_START_TRANSACTION)
-                .about(Constants::SUBCOMMAND_START_TRANSACTION_DESCRIPTION),
+            SubCommand::with_name(Constants::SUBCOMMAND_CREATE_TRANSACTION)
+                .about(Constants::SUBCOMMAND_CREATE_TRANSACTION_DESCRIPTION),
         )
         .subcommand(
             SubCommand::with_name(Constants::SUBCOMMAND_COMMIT_TRANSACTION)
@@ -146,7 +147,7 @@ fn main() -> KVResult<()> {
                 store_engine.set(
                     KVKey::new(&key.as_bytes()),
                     KVValue::new(&value.as_bytes()),
-                    Some(transaction_id),
+                    Some(TransactionId::new(transaction_id)),
                 )
             } else {
                 store_engine.set(
@@ -168,7 +169,10 @@ fn main() -> KVResult<()> {
                 arg_matches.value_of(Constants::ARGUMENT_NAME_FOR_TRANSACTION_ID)
             {
                 let transaction_id = transaction_id_str.parse::<u64>()?;
-                match store_engine.get(&KVKey::new(&key.as_bytes()), &Some(transaction_id))? {
+                match store_engine.get(
+                    &KVKey::new(&key.as_bytes()),
+                    &Some(TransactionId::new(transaction_id)),
+                )? {
                     Some(res) => {
                         println!("{:?}", String::from_utf8(res.as_bytes().to_vec()));
                     }
@@ -209,7 +213,7 @@ fn main() -> KVResult<()> {
                 store_engine.revert_one(
                     KVKey::new(&key.as_bytes()),
                     &ChainHeight::new(height),
-                    Some(transaction_id),
+                    Some(TransactionId::new(transaction_id)),
                 )
             } else {
                 store_engine.revert_one(
@@ -243,7 +247,10 @@ fn main() -> KVResult<()> {
                 arg_matches.value_of(Constants::ARGUMENT_NAME_FOR_TRANSACTION_ID)
             {
                 let transaction_id = transaction_id_str.parse::<u64>()?;
-                store_engine.remove_one(KVKey::new(&key.as_bytes()), Some(transaction_id))
+                store_engine.remove_one(
+                    KVKey::new(&key.as_bytes()),
+                    Some(TransactionId::new(transaction_id)),
+                )
             } else {
                 store_engine.remove_one(KVKey::new(&key.as_bytes()), None)
             }
@@ -280,7 +287,7 @@ fn main() -> KVResult<()> {
 
             return Ok(());
         }
-        (Constants::SUBCOMMAND_START_TRANSACTION, Some(_arg_matches)) => {
+        (Constants::SUBCOMMAND_CREATE_TRANSACTION, Some(_arg_matches)) => {
             let path = PathBuf::from(Constants::TEMP_LOG_FILE_PATH);
 
             let mut store_engine = LogKeyValueStore::open(&path)?;
@@ -298,7 +305,7 @@ fn main() -> KVResult<()> {
 
             let mut store_engine = LogKeyValueStore::open(&path)?;
             let transaction_id = transaction_id_str.parse::<u64>()?;
-            store_engine.commit_transaction(transaction_id)
+            store_engine.commit_transaction(TransactionId::new(transaction_id))
         }
         (Constants::SUBCOMMAND_ABORT_TRANSACTION, Some(arg_matches)) => {
             let transaction_id_str = arg_matches
@@ -309,7 +316,7 @@ fn main() -> KVResult<()> {
 
             let mut store_engine = LogKeyValueStore::open(&path)?;
             let transaction_id = transaction_id_str.parse::<u64>()?;
-            store_engine.abort_transaction(transaction_id)
+            store_engine.abort_transaction(TransactionId::new(transaction_id))
         }
         _ => unreachable!(),
     }

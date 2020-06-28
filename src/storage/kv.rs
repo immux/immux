@@ -1,5 +1,4 @@
 use std::collections::{HashMap, HashSet};
-use std::convert::TryInto;
 use std::fs::{create_dir_all, File, OpenOptions};
 use std::io::Read;
 use std::io::{BufReader, BufWriter, Seek, SeekFrom, Write};
@@ -66,6 +65,11 @@ impl LogKeyValueStore {
 
         let command = {
             if let Some(transaction_id) = transaction_id {
+                self.transaction_manager
+                    .validate_transaction_id(&transaction_id)?;
+                self.transaction_manager
+                    .add_affected_keys(&transaction_id, &key);
+
                 Command::TransactionalSet {
                     key: key.clone(),
                     value,
@@ -78,13 +82,6 @@ impl LogKeyValueStore {
                 }
             }
         };
-
-        if let Some(transaction_id) = transaction_id {
-            self.transaction_manager
-                .validate_transaction_id(&transaction_id)?;
-            self.transaction_manager
-                .update_transaction_id_to_keys(transaction_id, Some(key.clone()));
-        }
 
         let log_pointer = append_command(command, &mut self.writer)?;
 
@@ -114,18 +111,14 @@ impl LogKeyValueStore {
                     let (command, _) = Command::try_from(buffer.as_slice())?;
 
                     match command {
-                        Command::Set { key: _, value } => {
-                            return Ok(Some(value));
-                        }
+                        Command::Set { key: _, value } => Ok(Some(value)),
                         Command::RevertOne { key, height } => self.get_revert_value(&key, &height),
-                        Command::RemoveOne { key: _ } => return Ok(None),
+                        Command::RemoveOne { key: _ } => Ok(None),
                         Command::TransactionalSet {
                             key: _,
                             value,
                             transaction_id: _,
-                        } => {
-                            return Ok(Some(value));
-                        }
+                        } => Ok(Some(value)),
                         Command::TransactionalRevertOne {
                             key,
                             height,
@@ -134,7 +127,7 @@ impl LogKeyValueStore {
                         Command::TransactionalRemoveOne {
                             key: _,
                             transaction_id: _,
-                        } => return Ok(None),
+                        } => Ok(None),
                         _ => Err(KVError::PointToUnexpectedCommand),
                     }
                 } else {
@@ -181,7 +174,7 @@ impl LogKeyValueStore {
             self.transaction_manager
                 .validate_transaction_id(&transaction_id)?;
             self.transaction_manager
-                .update_transaction_id_to_keys(transaction_id, Some(key.clone()));
+                .add_affected_keys(&transaction_id, &key);
         }
 
         let log_pointer = append_command(command, &mut self.writer)?;
@@ -238,7 +231,7 @@ impl LogKeyValueStore {
             self.transaction_manager
                 .validate_transaction_id(&transaction_id)?;
             self.transaction_manager
-                .update_transaction_id_to_keys(transaction_id, Some(key.clone()));
+                .add_affected_keys(&transaction_id, &key);
         }
 
         self.current_height.increment()?;
@@ -337,7 +330,7 @@ impl LogKeyValueStore {
         append_command(command, &mut self.writer)?;
 
         self.transaction_manager
-            .update_transaction_id_to_keys(transaction_id, None);
+            .initialize_affected_keys(&transaction_id);
 
         self.current_height.increment()?;
 
@@ -482,8 +475,8 @@ fn load_key_pointer_map(
                 }
             }
             Command::TransactionStart { transaction_id } => {
-                transaction_manager.update_transaction_id_to_keys(transaction_id, None);
-                transaction_manager.update_transaction_id(transaction_id);
+                transaction_manager.initialize_affected_keys(&transaction_id);
+                transaction_manager.update_transaction_id(&transaction_id);
             }
             Command::TransactionalSet {
                 key,
@@ -497,7 +490,7 @@ fn load_key_pointer_map(
                     &mut key_pointer_map,
                     Some(transaction_id),
                 );
-                transaction_manager.update_transaction_id_to_keys(transaction_id, Some(key));
+                transaction_manager.add_affected_keys(&transaction_id, &key);
             }
             Command::TransactionalRevertOne {
                 key,
@@ -512,7 +505,7 @@ fn load_key_pointer_map(
                     Some(transaction_id),
                 );
 
-                transaction_manager.update_transaction_id_to_keys(transaction_id, Some(key));
+                transaction_manager.add_affected_keys(&transaction_id, &key);
             }
             Command::TransactionalRemoveOne {
                 key,
@@ -526,7 +519,7 @@ fn load_key_pointer_map(
                     Some(transaction_id),
                 );
 
-                transaction_manager.update_transaction_id_to_keys(transaction_id, Some(key));
+                transaction_manager.add_affected_keys(&transaction_id, &key);
             }
             Command::TransactionCommit { transaction_id } => {
                 update_committed_log_pointers(
@@ -563,13 +556,12 @@ fn update_committed_log_pointers(
     key_pointer_map: &mut HashMap<KVKey, HashMap<Option<TransactionId>, LogPointer>>,
     transaction_id: TransactionId,
 ) {
-    if let Some(affected_keys) = transaction_manager.get_affected_keys(&transaction_id) {
-        for key in affected_keys {
-            if let Some(log_pointers) = key_pointer_map.get_mut(key) {
-                if let Some(target_log_pointer) = log_pointers.get(&Some(transaction_id)).cloned() {
-                    log_pointers.insert(None, target_log_pointer);
-                    log_pointers.remove(&Some(transaction_id));
-                }
+    let affected_keys = transaction_manager.get_affected_keys(&transaction_id);
+    for key in affected_keys {
+        if let Some(log_pointers) = key_pointer_map.get_mut(&key) {
+            if let Some(target_log_pointer) = log_pointers.get(&Some(transaction_id)).cloned() {
+                log_pointers.insert(None, target_log_pointer);
+                log_pointers.remove(&Some(transaction_id));
             }
         }
     }
@@ -582,11 +574,10 @@ fn update_aborted_log_pointers(
     key_pointer_map: &mut HashMap<KVKey, HashMap<Option<TransactionId>, LogPointer>>,
     transaction_id: TransactionId,
 ) {
-    if let Some(affected_keys) = transaction_manager.get_affected_keys(&transaction_id) {
-        for key in affected_keys {
-            if let Some(log_pointers) = key_pointer_map.get_mut(key) {
-                log_pointers.remove(&Some(transaction_id));
-            }
+    let affected_keys = transaction_manager.get_affected_keys(&transaction_id);
+    for key in affected_keys {
+        if let Some(log_pointers) = key_pointer_map.get_mut(&key) {
+            log_pointers.remove(&Some(transaction_id));
         }
     }
 
@@ -611,7 +602,7 @@ fn update_key_pointer_map(
 }
 
 fn append_command(command: Command, writer: &mut BufWriter<File>) -> KVResult<LogPointer> {
-    let command_bytes: Vec<u8> = command.try_into()?;
+    let command_bytes: Vec<u8> = command.serialize();
 
     let current_pos = writer.seek(SeekFrom::Current(0))?;
     writer.write_all(command_bytes.as_slice())?;

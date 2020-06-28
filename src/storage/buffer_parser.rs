@@ -27,8 +27,6 @@ impl<'a> Iterator for CommandBufferParser<'a> {
 
 #[cfg(test)]
 mod tests {
-    use std::convert::TryInto;
-
     use crate::storage::buffer_parser::CommandBufferParser;
     use crate::storage::chain_height::ChainHeight;
     use crate::storage::command::Command;
@@ -60,7 +58,7 @@ mod tests {
     fn serialize_commands(commands: &Vec<Command>) -> Vec<u8> {
         let mut buffer: Vec<u8> = Vec::new();
         &commands.to_vec().iter().fold(&mut buffer, |acc, command| {
-            let command_bytes: Vec<u8> = command.clone().try_into().unwrap();
+            let command_bytes: Vec<u8> = command.serialize();
             acc.extend_from_slice(&command_bytes);
             return acc;
         });
