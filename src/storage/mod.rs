@@ -6,3 +6,4 @@ pub mod kv;
 pub mod kvkey;
 pub mod kvvalue;
 pub mod log_pointer;
+pub mod transaction_manager;

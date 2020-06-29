@@ -10,3 +10,7 @@ clap = "2.33.0"
 
 [dev-dependencies]
 
+[[test]]
+name = "test_kv"
+path = "src/storage/tests/test_kv.rs"
+
