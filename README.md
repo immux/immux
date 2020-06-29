@@ -15,7 +15,7 @@ cargo run
 
 ### Test
 
-#### Execute tests (both unit tests and end-to-end tests)
+#### Execute storage.tests (both unit storage.tests and end-to-end storage.tests)
 ```
 cargo test
 ```
@@ -37,7 +37,7 @@ sh coverage.sh
 
 ##### 3. Check result
 
-Look at `tests/coverage-report/index.html`.
+Look at `storage.tests/coverage-report/index.html`.
 
 #### Benchmarking
 

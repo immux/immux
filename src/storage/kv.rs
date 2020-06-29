@@ -590,10 +590,8 @@ fn update_key_pointer_map(
     key_pointer_map: &mut HashMap<KVKey, HashMap<Option<TransactionId>, LogPointer>>,
     transaction_id: Option<TransactionId>,
 ) {
-    if let Some(log_pointers) = key_pointer_map.get(&key) {
-        let mut new_log_pointers = log_pointers.clone();
-        new_log_pointers.insert(transaction_id, log_pointer);
-        key_pointer_map.insert(key, new_log_pointers);
+    if let Some(log_pointers) = key_pointer_map.get_mut(&key) {
+        log_pointers.insert(transaction_id, log_pointer);
     } else {
         let mut log_pointers = HashMap::new();
         log_pointers.insert(transaction_id, log_pointer);
