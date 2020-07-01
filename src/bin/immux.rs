@@ -4,13 +4,13 @@ use immuxsys::constants as Constants;
 use immuxsys::storage::chain_height::ChainHeight;
 
 use clap::{App, Arg, SubCommand};
-use immuxsys::database::database::Database;
-use immuxsys::database::errors::DatabaseResult;
-use immuxsys::database::unit_content::UnitContent;
-use immuxsys::database::unit_key::UnitKey;
+use immuxsys::executor::executor::Executor;
+use immuxsys::executor::errors::ExecutorResult;
+use immuxsys::executor::unit_content::UnitContent;
+use immuxsys::executor::unit_key::UnitKey;
 use immuxsys::storage::transaction_manager::TransactionId;
 
-fn main() -> DatabaseResult<()> {
+fn main() -> ExecutorResult<()> {
     let arg_matches = App::new(env!("CARGO_PKG_NAME"))
         .version(env!("CARGO_PKG_VERSION"))
         .author(env!("CARGO_PKG_AUTHORS"))
@@ -138,7 +138,7 @@ fn main() -> DatabaseResult<()> {
 
             let path = PathBuf::from(Constants::TEMP_LOG_FILE_PATH);
 
-            let mut store_engine = Database::open(&path)?;
+            let mut store_engine = Executor::open(&path)?;
 
             if let Some(transaction_id_str) =
                 arg_matches.value_of(Constants::ARGUMENT_NAME_FOR_TRANSACTION_ID)
@@ -163,7 +163,7 @@ fn main() -> DatabaseResult<()> {
                 .expect(Constants::MISSING_KEY_ARGUMENT_MESSAGE);
 
             let path = PathBuf::from(Constants::TEMP_LOG_FILE_PATH);
-            let mut store_engine = Database::open(&path)?;
+            let mut store_engine = Executor::open(&path)?;
 
             if let Some(transaction_id_str) =
                 arg_matches.value_of(Constants::ARGUMENT_NAME_FOR_TRANSACTION_ID)
@@ -203,7 +203,7 @@ fn main() -> DatabaseResult<()> {
 
             let path = PathBuf::from(Constants::TEMP_LOG_FILE_PATH);
 
-            let mut store_engine = Database::open(&path)?;
+            let mut store_engine = Executor::open(&path)?;
             let height = height_str.parse::<u64>()?;
 
             if let Some(transaction_id_str) =
@@ -230,7 +230,7 @@ fn main() -> DatabaseResult<()> {
 
             let path = PathBuf::from(Constants::TEMP_LOG_FILE_PATH);
 
-            let mut store_engine = Database::open(&path)?;
+            let mut store_engine = Executor::open(&path)?;
             let height = height_str.parse::<u64>()?;
             store_engine.revert_all(&ChainHeight::new(height))
         }
@@ -241,7 +241,7 @@ fn main() -> DatabaseResult<()> {
 
             let path = PathBuf::from(Constants::TEMP_LOG_FILE_PATH);
 
-            let mut store_engine = Database::open(&path)?;
+            let mut store_engine = Executor::open(&path)?;
 
             if let Some(transaction_id_str) =
                 arg_matches.value_of(Constants::ARGUMENT_NAME_FOR_TRANSACTION_ID)
@@ -258,7 +258,7 @@ fn main() -> DatabaseResult<()> {
         (Constants::SUBCOMMAND_REMOVE_ALL, Some(_arg_matches)) => {
             let path = PathBuf::from(Constants::TEMP_LOG_FILE_PATH);
 
-            let mut store_engine = Database::open(&path)?;
+            let mut store_engine = Executor::open(&path)?;
             store_engine.remove_all()
         }
         (Constants::SUBCOMMAND_INSPECT, Some(arg_matches)) => {
@@ -266,7 +266,7 @@ fn main() -> DatabaseResult<()> {
 
             let path = PathBuf::from(Constants::TEMP_LOG_FILE_PATH);
 
-            let mut store_engine = Database::open(&path)?;
+            let mut store_engine = Executor::open(&path)?;
 
             match key {
                 None => {
@@ -290,7 +290,7 @@ fn main() -> DatabaseResult<()> {
         (Constants::SUBCOMMAND_CREATE_TRANSACTION, Some(_arg_matches)) => {
             let path = PathBuf::from(Constants::TEMP_LOG_FILE_PATH);
 
-            let mut store_engine = Database::open(&path)?;
+            let mut store_engine = Executor::open(&path)?;
             let transaction_id = store_engine.start_transaction()?;
             println!("{:?}", transaction_id);
 
@@ -303,7 +303,7 @@ fn main() -> DatabaseResult<()> {
 
             let path = PathBuf::from(Constants::TEMP_LOG_FILE_PATH);
 
-            let mut store_engine = Database::open(&path)?;
+            let mut store_engine = Executor::open(&path)?;
             let transaction_id = transaction_id_str.parse::<u64>()?;
             store_engine.commit_transaction(TransactionId::new(transaction_id))
         }
@@ -314,7 +314,7 @@ fn main() -> DatabaseResult<()> {
 
             let path = PathBuf::from(Constants::TEMP_LOG_FILE_PATH);
 
-            let mut store_engine = Database::open(&path)?;
+            let mut store_engine = Executor::open(&path)?;
             let transaction_id = transaction_id_str.parse::<u64>()?;
             store_engine.abort_transaction(TransactionId::new(transaction_id))
         }

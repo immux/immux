@@ -1,8 +1,8 @@
 use std::path::PathBuf;
 
-use crate::database::errors::DatabaseResult;
-use crate::database::unit_content::UnitContent;
-use crate::database::unit_key::UnitKey;
+use crate::executor::errors::ExecutorResult;
+use crate::executor::unit_content::UnitContent;
+use crate::executor::unit_key::UnitKey;
 use crate::storage::chain_height::ChainHeight;
 use crate::storage::command::Command;
 use crate::storage::kv::LogKeyValueStore;
@@ -10,15 +10,15 @@ use crate::storage::kvkey::KVKey;
 use crate::storage::kvvalue::KVValue;
 use crate::storage::transaction_manager::TransactionId;
 
-pub struct Database {
+pub struct Executor {
     store_engine: LogKeyValueStore,
 }
 
-impl Database {
-    pub fn open(path: &PathBuf) -> DatabaseResult<Database> {
+impl Executor {
+    pub fn open(path: &PathBuf) -> ExecutorResult<Executor> {
         let store_engine = LogKeyValueStore::open(path)?;
-        let database = Database { store_engine };
-        return Ok(database);
+        let executor = Executor { store_engine };
+        return Ok(executor);
     }
 
     pub fn set(
@@ -26,7 +26,7 @@ impl Database {
         key: UnitKey,
         value: UnitContent,
         transaction_id: Option<TransactionId>,
-    ) -> DatabaseResult<()> {
+    ) -> ExecutorResult<()> {
         let kv_key = KVKey::from(&key);
         let kv_value = KVValue::from(value);
         self.store_engine.set(kv_key, kv_value, transaction_id)?;
@@ -37,7 +37,7 @@ impl Database {
         &mut self,
         key: &UnitKey,
         transaction_id: &Option<TransactionId>,
-    ) -> DatabaseResult<Option<UnitContent>> {
+    ) -> ExecutorResult<Option<UnitContent>> {
         let kv_key = KVKey::from(key);
         match self.store_engine.get(&kv_key, transaction_id)? {
             None => Ok(None),
@@ -53,14 +53,14 @@ impl Database {
         key: UnitKey,
         height: &ChainHeight,
         transaction_id: Option<TransactionId>,
-    ) -> DatabaseResult<()> {
+    ) -> ExecutorResult<()> {
         let kv_key = KVKey::from(&key);
         self.store_engine
             .revert_one(kv_key, height, transaction_id)?;
         return Ok(());
     }
 
-    pub fn revert_all(&mut self, height: &ChainHeight) -> DatabaseResult<()> {
+    pub fn revert_all(&mut self, height: &ChainHeight) -> ExecutorResult<()> {
         self.store_engine.revert_all(height)?;
         return Ok(());
     }
@@ -69,13 +69,13 @@ impl Database {
         &mut self,
         key: UnitKey,
         transaction_id: Option<TransactionId>,
-    ) -> DatabaseResult<()> {
+    ) -> ExecutorResult<()> {
         let kv_key = KVKey::from(&key);
         self.store_engine.remove_one(kv_key, transaction_id)?;
         return Ok(());
     }
 
-    pub fn remove_all(&mut self) -> DatabaseResult<()> {
+    pub fn remove_all(&mut self) -> ExecutorResult<()> {
         self.store_engine.remove_all()?;
         return Ok(());
     }
@@ -83,24 +83,24 @@ impl Database {
     pub fn inspect(
         &mut self,
         key: Option<&UnitKey>,
-    ) -> DatabaseResult<Vec<(Command, ChainHeight)>> {
+    ) -> ExecutorResult<Vec<(Command, ChainHeight)>> {
         let kv_key = key.map(|unit_key| KVKey::from(unit_key));
         let result = self.store_engine.inspect(kv_key.as_ref())?;
 
         return Ok(result);
     }
 
-    pub fn start_transaction(&mut self) -> DatabaseResult<TransactionId> {
+    pub fn start_transaction(&mut self) -> ExecutorResult<TransactionId> {
         let transaction_id = self.store_engine.start_transaction()?;
         return Ok(transaction_id);
     }
 
-    pub fn commit_transaction(&mut self, transaction_id: TransactionId) -> DatabaseResult<()> {
+    pub fn commit_transaction(&mut self, transaction_id: TransactionId) -> ExecutorResult<()> {
         self.store_engine.commit_transaction(transaction_id)?;
         return Ok(());
     }
 
-    pub fn abort_transaction(&mut self, transaction_id: TransactionId) -> DatabaseResult<()> {
+    pub fn abort_transaction(&mut self, transaction_id: TransactionId) -> ExecutorResult<()> {
         self.store_engine.abort_transaction(transaction_id)?;
         return Ok(());
     }
