@@ -10,7 +10,7 @@ mod kv_tests {
     use immuxsys::storage::kvkey::KVKey;
     use immuxsys::storage::kvvalue::KVValue;
     use immuxsys::storage::transaction_manager::TransactionId;
-    use immuxsys::utils::{u64_to_u8_array, u8_array_to_u64};
+    use immuxsys::utils::ints::{u64_to_u8_array, u8_array_to_u64};
 
     fn get_store_engine(path: &PathBuf) -> LogKeyValueStore {
         let log_file_path = get_log_file_dir(&path);

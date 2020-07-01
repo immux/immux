@@ -2,7 +2,7 @@ use crate::storage::chain_height::ChainHeight;
 use crate::storage::kvkey::KVKey;
 use crate::storage::kvvalue::KVValue;
 use crate::storage::transaction_manager::TransactionId;
-use crate::varint::{varint_decode, varint_encode, VarIntError};
+use crate::utils::varint::{varint_decode, varint_encode, VarIntError};
 
 #[derive(Debug)]
 pub enum CommandError {

@@ -1,3 +1,5 @@
+use crate::database::unit_key::UnitKey;
+
 #[derive(Debug, Eq, PartialEq, Hash, Clone)]
 pub struct KVKey(Vec<u8>);
 
@@ -31,6 +33,12 @@ impl From<&str> for KVKey {
 impl From<KVKey> for Vec<u8> {
     fn from(key: KVKey) -> Vec<u8> {
         key.0
+    }
+}
+
+impl From<&UnitKey> for KVKey {
+    fn from(unit_key: &UnitKey) -> KVKey {
+        KVKey::new(unit_key.as_bytes())
     }
 }
 

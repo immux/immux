@@ -1,0 +1,433 @@
+use std::collections::HashMap;
+use std::convert::TryFrom;
+
+use crate::utils::bools::{bool_to_u8, u8_to_bool};
+use crate::utils::floats::{f64_to_u8_array, u8_array_to_f64};
+use crate::utils::strings::utf8_to_string;
+use crate::utils::varint::{varint_decode, varint_encode};
+
+pub enum ContentTypePrefix {
+    Nil = 0x00,
+    String = 0x10,
+    Boolean = 0x11,
+    Float64 = 0x12,
+    Array = 0x20,
+    Map = 0x21,
+}
+
+impl TryFrom<u8> for ContentTypePrefix {
+    type Error = UnitContentError;
+    fn try_from(byte: u8) -> Result<Self, UnitContentError> {
+        if byte == ContentTypePrefix::Nil as u8 {
+            return Ok(ContentTypePrefix::Nil);
+        } else if byte == ContentTypePrefix::String as u8 {
+            return Ok(ContentTypePrefix::String);
+        } else if byte == ContentTypePrefix::Boolean as u8 {
+            return Ok(ContentTypePrefix::Boolean);
+        } else if byte == ContentTypePrefix::Float64 as u8 {
+            return Ok(ContentTypePrefix::Float64);
+        } else if byte == ContentTypePrefix::Array as u8 {
+            return Ok(ContentTypePrefix::Array);
+        } else if byte == ContentTypePrefix::Map as u8 {
+            return Ok(ContentTypePrefix::Map);
+        } else {
+            return Err(UnitContentError::UnexpectedTypePrefix(byte));
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum UnitContent {
+    Nil,
+    String(String),
+    Bool(bool),
+    Float64(f64),
+    Array(Vec<UnitContent>),
+    Map(HashMap<String, UnitContent>),
+}
+
+#[derive(Debug)]
+pub enum UnitContentError {
+    UnexpectedTypePrefix(u8),
+    EmptyInput,
+    MissingDataBytes,
+    UnexpectedLengthBytes,
+}
+
+impl UnitContent {
+    pub fn marshal(&self) -> Vec<u8> {
+        let mut result = Vec::with_capacity(1);
+        match &self {
+            UnitContent::Nil => result.push(ContentTypePrefix::Nil as u8),
+            UnitContent::Bool(boolean) => {
+                result.push(ContentTypePrefix::Boolean as u8);
+                result.push(bool_to_u8(*boolean));
+            }
+            UnitContent::Float64(number_f64) => {
+                result.push(ContentTypePrefix::Float64 as u8);
+                result.extend_from_slice(&f64_to_u8_array(*number_f64));
+            }
+            UnitContent::String(string) => {
+                let bytes = string.as_bytes();
+                result.push(ContentTypePrefix::String as u8);
+                result.extend_from_slice(&varint_encode(bytes.len() as u64));
+                result.extend_from_slice(bytes)
+            }
+            UnitContent::Array(array) => {
+                result.push(ContentTypePrefix::Array as u8);
+                let mut data = Vec::new();
+
+                for content in array {
+                    let bytes = content.marshal();
+                    data.extend_from_slice(&bytes);
+                }
+
+                result.extend_from_slice(&varint_encode(data.len() as u64));
+                result.extend_from_slice(&data);
+            }
+            UnitContent::Map(map) => {
+                result.push(ContentTypePrefix::Map as u8);
+                let mut data = Vec::new();
+
+                for (key, value) in map.iter() {
+                    let key_bytes = key.as_bytes();
+                    let value_bytes = value.marshal();
+                    data.extend_from_slice(&varint_encode(key_bytes.len() as u64));
+                    data.extend_from_slice(key_bytes);
+                    data.extend_from_slice(&value_bytes);
+                }
+
+                result.extend_from_slice(&varint_encode(data.len() as u64));
+                result.extend_from_slice(&data);
+            }
+        }
+        return result;
+    }
+
+    pub fn parse(data: &[u8]) -> Result<(Self, usize), UnitContentError> {
+        match data.get(0) {
+            None => return Err(UnitContentError::EmptyInput.into()),
+            Some(first_byte) => {
+                let type_prefix = ContentTypePrefix::try_from(*first_byte)?;
+                let remaining_bytes = &data[1..];
+                match type_prefix {
+                    ContentTypePrefix::Nil => {
+                        return Ok((UnitContent::Nil, 1));
+                    }
+                    ContentTypePrefix::Boolean => match remaining_bytes.get(0) {
+                        None => return Err(UnitContentError::MissingDataBytes.into()),
+                        Some(data_byte) => {
+                            return Ok((UnitContent::Bool(u8_to_bool(*data_byte)), 2));
+                        }
+                    },
+                    ContentTypePrefix::Float64 => {
+                        if remaining_bytes.len() < 8 {
+                            return Err(UnitContentError::MissingDataBytes.into());
+                        } else {
+                            let array: [u8; 8] = [
+                                remaining_bytes[0],
+                                remaining_bytes[1],
+                                remaining_bytes[2],
+                                remaining_bytes[3],
+                                remaining_bytes[4],
+                                remaining_bytes[5],
+                                remaining_bytes[6],
+                                remaining_bytes[7],
+                            ];
+                            return Ok((UnitContent::Float64(u8_array_to_f64(&array)), 9));
+                        }
+                    }
+                    ContentTypePrefix::String => {
+                        let (length, offset) = varint_decode(&remaining_bytes)
+                            .map_err(|_| UnitContentError::UnexpectedLengthBytes)?;
+                        let string_bytes = &remaining_bytes[offset..offset + length as usize];
+                        return Ok((
+                            UnitContent::String(utf8_to_string(string_bytes)),
+                            1 + offset + length as usize,
+                        ));
+                    }
+                    ContentTypePrefix::Array => {
+                        let mut result: Vec<UnitContent> = Vec::with_capacity(1);
+                        let (total_length, offset) = varint_decode(&remaining_bytes)
+                            .map_err(|_| UnitContentError::UnexpectedLengthBytes)?;
+                        let contents_bytes =
+                            &remaining_bytes[offset..offset + total_length as usize];
+
+                        let mut position = 0;
+                        while position < contents_bytes.len() {
+                            let (content, offset) =
+                                UnitContent::parse(&contents_bytes[position..])?;
+                            result.push(content);
+                            position += offset;
+                        }
+
+                        return Ok((
+                            UnitContent::Array(result),
+                            1 + offset + total_length as usize,
+                        ));
+                    }
+                    ContentTypePrefix::Map => {
+                        let mut result = HashMap::new();
+                        let (total_length, offset) = varint_decode(&remaining_bytes)
+                            .map_err(|_| UnitContentError::UnexpectedLengthBytes)?;
+                        let map_bytes = &remaining_bytes[offset..offset + total_length as usize];
+
+                        let mut position = 0;
+                        while position < map_bytes.len() {
+                            let (string_length, offset) = varint_decode(&map_bytes[position..])
+                                .map_err(|_| UnitContentError::UnexpectedLengthBytes)?;
+                            position += offset;
+                            let string_bytes =
+                                &map_bytes[position..position + string_length as usize];
+                            position += string_length as usize;
+
+                            let (content, offset) = UnitContent::parse(&map_bytes[position..])?;
+                            position += offset;
+
+                            result.insert(utf8_to_string(string_bytes), content);
+                        }
+
+                        return Ok((UnitContent::Map(result), 1 + offset + total_length as usize));
+                    }
+                }
+            }
+        }
+    }
+}
+
+impl ToString for UnitContent {
+    fn to_string(&self) -> String {
+        match self {
+            UnitContent::Nil => String::from("nil"),
+            UnitContent::String(string) => string.clone(),
+            UnitContent::Float64(f) => format!("{}", f),
+            UnitContent::Bool(b) => (if *b { "true" } else { "false" }).to_string(),
+            UnitContent::Map(map) => format!("{:?}", map),
+            UnitContent::Array(array) => format!("{:?}", array),
+        }
+    }
+}
+
+#[cfg(test)]
+mod unit_content_tests {
+    use std::clone::Clone;
+    use std::collections::HashMap;
+
+    use crate::database::unit_content::UnitContent;
+    use crate::utils::varint::varint_encode;
+
+    fn permutation<T: Clone>(array: &[T]) -> Vec<Vec<T>> {
+        if array.len() == 0 {
+            return vec![];
+        }
+
+        if array.len() == 1 {
+            return vec![array.to_vec()];
+        }
+
+        let mut result = vec![];
+
+        for (index, pivot) in array.iter().enumerate() {
+            let mut new_array = vec![];
+            new_array.extend_from_slice(&array[0..index]);
+            new_array.extend_from_slice(&array[index + 1..]);
+
+            let temp_result = permutation(&new_array);
+
+            for arr in temp_result.iter() {
+                let mut temp_arr = vec![];
+                temp_arr.push(pivot.clone());
+                temp_arr.extend_from_slice(arr.as_slice());
+                result.push(temp_arr);
+            }
+        }
+
+        return result;
+    }
+
+    #[test]
+    fn weak_permutation_test() {
+        let array = [1, 2, 3];
+        let actual_result = permutation(&array);
+        let expected_result = vec![
+            [1, 2, 3],
+            [1, 3, 2],
+            [2, 1, 3],
+            [2, 3, 1],
+            [3, 1, 2],
+            [3, 2, 1],
+        ];
+
+        assert_eq!(actual_result, expected_result);
+    }
+
+    fn get_unit_content_map_key_value_pairs() -> Vec<(String, UnitContent)> {
+        vec![
+            (String::from("a"), UnitContent::Nil),
+            (String::from("b"), UnitContent::String("hello".to_string())),
+            (String::from("c"), UnitContent::Bool(true)),
+            (String::from("d"), UnitContent::Float64(1.5)),
+            (
+                String::from("e"),
+                UnitContent::Array(vec![
+                    UnitContent::String("world".to_string()),
+                    UnitContent::Float64(1.5),
+                    UnitContent::Array(vec![UnitContent::Bool(true), UnitContent::Bool(false)]),
+                ]),
+            ),
+        ]
+    }
+
+    #[test]
+    fn serialize_unit_content_map() {
+        let key_value_pairs = get_unit_content_map_key_value_pairs();
+
+        let mut map: HashMap<String, UnitContent> = HashMap::new();
+
+        for (key, value) in key_value_pairs.iter() {
+            map.insert(key.clone(), value.clone());
+        }
+
+        let unit_content = UnitContent::Map(map);
+        let actual_output = unit_content.marshal();
+
+        let permutation: Vec<Vec<(String, UnitContent)>> = permutation(&key_value_pairs);
+        let mut expected_outputs: Vec<Vec<u8>> = vec![];
+
+        for pairs in permutation.iter() {
+            let mut expected_output: Vec<u8> = vec![0x21, 0x35];
+
+            for (key, value) in pairs {
+                let key_length = varint_encode(key.len() as u64);
+                let key_bytes = key.as_bytes();
+                let content_bytes = value.marshal();
+
+                expected_output.extend_from_slice(&key_length);
+                expected_output.extend_from_slice(key_bytes);
+                expected_output.extend_from_slice(&content_bytes);
+            }
+
+            expected_outputs.push(expected_output);
+        }
+
+        assert!(expected_outputs.contains(&actual_output));
+    }
+
+    #[test]
+    fn deserialize_unit_content_map() {
+        let unit_content_map_bytes = [
+            0x21, 0x35, 0x01, 0x65, 0x20, 0x16, 0x10, 0x05, 0x77, 0x6f, 0x72, 0x6c, 0x64, 0x12,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xf8, 0x3f, 0x20, 0x04, 0x11, 0x01, 0x11, 0x00,
+            0x01, 0x64, 0x12, 0x00, 0x00, 0x00, 0x00, 0x00, 0x0, 0xf8, 0x3f, 0x01, 0x63, 0x11,
+            0x01, 0x01, 0x62, 0x10, 0x05, 0x68, 0x65, 0x6c, 0x6c, 0x6f, 0x01, 0x61, 0x00,
+        ];
+
+        let expected_key_value_pairs = get_unit_content_map_key_value_pairs();
+        let mut map: HashMap<String, UnitContent> = HashMap::new();
+        for (key, value) in expected_key_value_pairs.iter() {
+            map.insert(key.clone(), value.clone());
+        }
+        let expected_content = UnitContent::Map(map);
+        let (actual_content, actual_size) = UnitContent::parse(&unit_content_map_bytes).unwrap();
+        let expected_size = expected_content.marshal().len();
+
+        assert_eq!(expected_content, actual_content);
+        assert_eq!(expected_size, actual_size);
+    }
+
+    #[test]
+    fn unit_content_map_reversibility() {
+        let expected_key_value_pairs = get_unit_content_map_key_value_pairs();
+
+        let mut map: HashMap<String, UnitContent> = HashMap::new();
+        for (key, value) in expected_key_value_pairs.iter() {
+            map.insert(key.clone(), value.clone());
+        }
+        let expected_output = UnitContent::Map(map);
+        let (actual_output, actual_size) = UnitContent::parse(&expected_output.marshal()).unwrap();
+
+        let expected_size = expected_output.marshal().len();
+
+        assert_eq!(expected_output, actual_output);
+        assert_eq!(expected_size, actual_size);
+    }
+
+    fn get_fixture() -> Vec<(Option<UnitContent>, Vec<u8>)> {
+        vec![
+            (Some(UnitContent::Nil), vec![0x00]),
+            (Some(UnitContent::Bool(true)), vec![0x11, 0x01]),
+            (Some(UnitContent::Bool(false)), vec![0x11, 0x00]),
+            (
+                Some(UnitContent::Float64(1.5)),
+                vec![0x12, 0, 0, 0, 0, 0, 0, 0xf8, 0x3f],
+            ),
+            (
+                Some(UnitContent::String(String::from("hello"))),
+                vec![0x10, 0x05, 0x68, 0x65, 0x6c, 0x6c, 0x6f],
+            ),
+            (
+                Some(UnitContent::Array(vec![
+                    UnitContent::Nil,
+                    UnitContent::String(String::from("hello")),
+                    UnitContent::Bool(true),
+                    UnitContent::Float64(1.5),
+                    UnitContent::Array(vec![UnitContent::Nil]),
+                ])),
+                vec![
+                    0x20, /*Array prefix*/
+                    0x16, /*Length*/
+                    0x00, /*Nil*/
+                    0x10, 0x05, 0x68, 0x65, 0x6c, 0x6c, 0x6f, /*String*/
+                    0x11, 0x01, /*bool true*/
+                    0x12, 0, 0, 0, 0, 0, 0, 0xf8, 0x3f, /*float*/
+                    0x20, /*Array prefix*/
+                    0x01, /*Length*/
+                    0x00, /*Nil*/
+                ],
+            ),
+            // Non-existing type
+            (None, vec![0xaa, 0x01, 0x02, 0x03]),
+            // Malformed boolean
+            (None, vec![0x11]),
+            // Malformed bytes with wrong varint length
+            (None, vec![0xff, 0xff, 0x10]),
+            // Empty input
+            (None, vec![]),
+        ]
+    }
+
+    #[test]
+    fn test_serialize() {
+        let table = get_fixture();
+        assert!(table.len() > 0);
+        for row in table {
+            if let (Some(content), expected) = row {
+                let serialized = content.marshal();
+                assert_eq!(expected, serialized);
+            } else {
+                // Malformed bytes, skip
+            }
+        }
+    }
+
+    #[test]
+    fn test_deserialize() {
+        let table = get_fixture();
+        assert!(table.len() > 0);
+        for row in table {
+            let (expected, data) = row;
+            if let Some(expected_content) = expected {
+                let (parsed, actual_size) = UnitContent::parse(&data).unwrap();
+                let expected_size = expected_content.marshal().len();
+
+                assert_eq!(expected_content, parsed);
+                assert_eq!(expected_size, actual_size);
+            } else {
+                match UnitContent::parse(&data) {
+                    Ok(_) => panic!("Should not be able to parse {:?}", data),
+                    Err(_) => (),
+                }
+            }
+        }
+    }
+}
