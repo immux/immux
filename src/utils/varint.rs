@@ -1,4 +1,4 @@
-use crate::utils::{
+use crate::utils::ints::{
     u16_to_u8_array, u32_to_u8_array, u64_to_u8_array, u8_array_to_u16, u8_array_to_u32,
     u8_array_to_u64,
 };
@@ -68,7 +68,7 @@ pub fn varint_encode(i: u64) -> Vec<u8> {
 
 #[cfg(test)]
 mod varint_utils_tests {
-    use crate::varint::{varint_decode, varint_encode};
+    use crate::utils::varint::{varint_decode, varint_encode};
 
     #[test]
     fn test_varint_8bit_encode() {

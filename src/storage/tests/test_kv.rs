@@ -10,7 +10,7 @@ mod kv_tests {
     use immuxsys::storage::kvkey::KVKey;
     use immuxsys::storage::kvvalue::KVValue;
     use immuxsys::storage::transaction_manager::TransactionId;
-    use immuxsys::utils::{u64_to_u8_array, u8_array_to_u64};
+    use immuxsys::utils::ints::{u64_to_u8_array, u8_array_to_u64};
 
     fn get_store_engine(path: &PathBuf) -> LogKeyValueStore {
         let log_file_path = get_log_file_dir(&path);
@@ -32,10 +32,8 @@ mod kv_tests {
         let key = KVKey::new(&[0x00, 0x01, 0x03]);
         let expected_value = KVValue::new(&[0xff, 0xff, 0xff, 0xff]);
 
-        store_engine
-            .set(key.clone(), expected_value.clone(), None)
-            .unwrap();
-        let actual_value = store_engine.get(&key, &None).unwrap().unwrap();
+        store_engine.set(&key, &expected_value, None).unwrap();
+        let actual_value = store_engine.get(&key, None).unwrap().unwrap();
 
         assert_eq!(actual_value, expected_value);
     }
@@ -57,14 +55,12 @@ mod kv_tests {
         ];
 
         for value in &values {
-            store_engine.set(key.clone(), value.clone(), None).unwrap();
+            store_engine.set(&key, &value, None).unwrap();
         }
 
-        store_engine
-            .revert_one(key.clone(), &target_height, None)
-            .unwrap();
+        store_engine.revert_one(&key, &target_height, None).unwrap();
 
-        let actual_output = store_engine.get(&key, &None).unwrap().unwrap();
+        let actual_output = store_engine.get(&key, None).unwrap().unwrap();
 
         let expected_output = &values.as_slice()[target_height.as_u64() as usize];
 
@@ -90,9 +86,7 @@ mod kv_tests {
         ];
 
         for kv_pair in &key_value_pairs {
-            store_engine
-                .set(kv_pair.0.clone(), kv_pair.1.clone(), None)
-                .unwrap();
+            store_engine.set(&kv_pair.0, &kv_pair.1, None).unwrap();
         }
 
         store_engine.revert_all(&target_height).unwrap();
@@ -104,7 +98,7 @@ mod kv_tests {
         }
 
         for (key, expected_value) in expected_hashmap {
-            let actual_value = store_engine.get(&key, &None).unwrap().unwrap();
+            let actual_value = store_engine.get(&key, None).unwrap().unwrap();
             assert_eq!(expected_value, &actual_value);
         }
     }
@@ -117,12 +111,10 @@ mod kv_tests {
         let key = KVKey::new(&[0x00, 0x01, 0x03]);
         let expected_value = KVValue::new(&[0xff, 0xff, 0xff, 0xff]);
 
-        store_engine
-            .set(key.clone(), expected_value.clone(), None)
-            .unwrap();
-        store_engine.remove_one(key.clone(), None).unwrap();
+        store_engine.set(&key, &expected_value, None).unwrap();
+        store_engine.remove_one(&key, None).unwrap();
 
-        let actual_value = store_engine.get(&key, &None).unwrap();
+        let actual_value = store_engine.get(&key, None).unwrap();
 
         assert_eq!(actual_value, None);
     }
@@ -140,15 +132,13 @@ mod kv_tests {
         ];
 
         for kv_pair in &key_value_pairs {
-            store_engine
-                .set(kv_pair.0.clone(), kv_pair.1.clone(), None)
-                .unwrap();
+            store_engine.set(&kv_pair.0, &kv_pair.1, None).unwrap();
         }
 
         store_engine.remove_all().unwrap();
 
         for kv_pair in &key_value_pairs {
-            let out_put = store_engine.get(&kv_pair.0, &None).unwrap();
+            let out_put = store_engine.get(&kv_pair.0, None).unwrap();
             assert_eq!(out_put, None);
         }
     }
@@ -168,13 +158,13 @@ mod kv_tests {
         let transaction_id = store_engine.start_transaction().unwrap();
         for pair in &key_value_paris {
             store_engine
-                .set(pair.0.clone(), pair.1.clone(), Some(transaction_id))
+                .set(&pair.0, &pair.1, Some(transaction_id))
                 .unwrap();
         }
         store_engine.commit_transaction(transaction_id).unwrap();
 
         for pair in &key_value_paris {
-            let actual_value = store_engine.get(&pair.0, &None).unwrap().unwrap();
+            let actual_value = store_engine.get(&pair.0, None).unwrap().unwrap();
             let expected_value = pair.1.clone();
 
             assert_eq!(actual_value, expected_value);
@@ -197,13 +187,13 @@ mod kv_tests {
         let transaction_id = store_engine.start_transaction().unwrap();
         for pair in &key_value_paris {
             store_engine
-                .set(pair.0.clone(), pair.1.clone(), Some(transaction_id))
+                .set(&pair.0, &pair.1, Some(transaction_id))
                 .unwrap();
         }
         store_engine.abort_transaction(transaction_id).unwrap();
 
         for pair in &key_value_paris {
-            let actual_value = store_engine.get(&pair.0, &None).unwrap();
+            let actual_value = store_engine.get(&pair.0, None).unwrap();
             assert_eq!(actual_value, expected_value);
         }
     }
@@ -218,12 +208,12 @@ mod kv_tests {
 
         let transaction_id = store_engine.start_transaction().unwrap();
         store_engine
-            .set(key.clone(), value.clone(), Some(transaction_id))
+            .set(&key, &value, Some(transaction_id))
             .unwrap();
 
         {
             let actual_value_within_transaction = store_engine
-                .get(&key, &Some(transaction_id))
+                .get(&key, Some(transaction_id))
                 .unwrap()
                 .unwrap();
             let expected_value_within_transaction = value.clone();
@@ -235,7 +225,7 @@ mod kv_tests {
         }
 
         {
-            let actual_value_outside_transaction = store_engine.get(&key, &None).unwrap();
+            let actual_value_outside_transaction = store_engine.get(&key, None).unwrap();
             let expected_value_outside_transaction = None;
 
             assert_eq!(
@@ -247,7 +237,7 @@ mod kv_tests {
         store_engine.commit_transaction(transaction_id).unwrap();
 
         {
-            let actual_value_after_commit = store_engine.get(&key, &None).unwrap().unwrap();
+            let actual_value_after_commit = store_engine.get(&key, None).unwrap().unwrap();
             let expected_value_after_commit = value.clone();
 
             assert_eq!(expected_value_after_commit, actual_value_after_commit);
@@ -269,18 +259,18 @@ mod kv_tests {
 
         for pair in &key_value_paris {
             store_engine
-                .set(pair.0.clone(), pair.1.clone(), None)
+                .set(&pair.0.clone(), &pair.1.clone(), None)
                 .unwrap();
         }
 
         let transaction_id = store_engine.start_transaction().unwrap();
         store_engine
-            .remove_one(kv_to_be_removed.0.clone(), Some(transaction_id))
+            .remove_one(&kv_to_be_removed.0, Some(transaction_id))
             .unwrap();
 
         {
             let actual_value_within_transaction = store_engine
-                .get(&kv_to_be_removed.0.clone(), &Some(transaction_id))
+                .get(&kv_to_be_removed.0.clone(), Some(transaction_id))
                 .unwrap();
             let expected_value_within_transaction = None;
 
@@ -292,7 +282,7 @@ mod kv_tests {
 
         {
             let actual_value_outside_transaction = store_engine
-                .get(&&kv_to_be_removed.0.clone(), &None)
+                .get(&&kv_to_be_removed.0.clone(), None)
                 .unwrap()
                 .unwrap();
             let expected_value_outside_transaction = kv_to_be_removed.1.clone();
@@ -306,9 +296,8 @@ mod kv_tests {
         store_engine.commit_transaction(transaction_id).unwrap();
 
         {
-            let actual_value_after_commit = store_engine
-                .get(&kv_to_be_removed.0.clone(), &None)
-                .unwrap();
+            let actual_value_after_commit =
+                store_engine.get(&kv_to_be_removed.0.clone(), None).unwrap();
             let expected_value_after_commit = None;
 
             assert_eq!(expected_value_after_commit, actual_value_after_commit);
@@ -334,23 +323,17 @@ mod kv_tests {
         let kv_to_be_reverted = &key_value_paris[index as usize];
 
         for pair in &key_value_paris {
-            store_engine
-                .set(pair.0.clone(), pair.1.clone(), None)
-                .unwrap();
+            store_engine.set(&pair.0, &pair.1, None).unwrap();
         }
 
         let transaction_id = store_engine.start_transaction().unwrap();
         store_engine
-            .revert_one(
-                kv_to_be_reverted.0.clone(),
-                &target_height,
-                Some(transaction_id),
-            )
+            .revert_one(&kv_to_be_reverted.0, &target_height, Some(transaction_id))
             .unwrap();
 
         {
             let actual_value_within_transaction = store_engine
-                .get(&kv_to_be_reverted.0.clone(), &Some(transaction_id))
+                .get(&kv_to_be_reverted.0.clone(), Some(transaction_id))
                 .unwrap()
                 .unwrap();
             let expected_value_within_transaction = kv_to_be_reverted.1.clone();
@@ -363,7 +346,7 @@ mod kv_tests {
 
         {
             let actual_value_outside_transaction = store_engine
-                .get(&kv_to_be_reverted.0.clone(), &None)
+                .get(&kv_to_be_reverted.0.clone(), None)
                 .unwrap()
                 .unwrap();
             let expected_value_outside_transaction = key_value_paris.last().unwrap().1.clone();
@@ -378,7 +361,7 @@ mod kv_tests {
 
         {
             let actual_value_after_commit = store_engine
-                .get(&kv_to_be_reverted.0.clone(), &None)
+                .get(&kv_to_be_reverted.0.clone(), None)
                 .unwrap()
                 .unwrap();
             let expected_value_after_commit = kv_to_be_reverted.1.clone();
@@ -401,26 +384,20 @@ mod kv_tests {
         let target_kv = (KVKey::from("k4"), KVValue::from("d"));
 
         for pair in &key_value_paris {
-            store_engine
-                .set(pair.0.clone(), pair.1.clone(), None)
-                .unwrap();
+            store_engine.set(&pair.0, &pair.1, None).unwrap();
         }
 
         let transaction_id = store_engine.start_transaction().unwrap();
 
         {
             store_engine
-                .set(
-                    target_kv.0.clone(),
-                    target_kv.1.clone(),
-                    Some(transaction_id),
-                )
+                .set(&target_kv.0, &target_kv.1, Some(transaction_id))
                 .unwrap();
-            let actual_value_within_transaction = store_engine
-                .get(&target_kv.0.clone(), &Some(transaction_id))
+            let actual_value_within_transaction = &store_engine
+                .get(&target_kv.0, Some(transaction_id))
                 .unwrap()
                 .unwrap();
-            let expected_value_within_transaction = target_kv.1.clone();
+            let expected_value_within_transaction = &target_kv.1;
 
             assert_eq!(
                 expected_value_within_transaction,
@@ -433,7 +410,7 @@ mod kv_tests {
         {
             for pair in &key_value_paris {
                 let actual_value_outside_transaction =
-                    store_engine.get(&pair.0.clone(), &None).unwrap();
+                    store_engine.get(&pair.0.clone(), None).unwrap();
                 let expected_value_outside_transaction = None;
 
                 assert_eq!(
@@ -446,11 +423,8 @@ mod kv_tests {
         store_engine.commit_transaction(transaction_id).unwrap();
 
         {
-            let actual_value_after_commit = store_engine
-                .get(&target_kv.0.clone(), &None)
-                .unwrap()
-                .unwrap();
-            let expected_value_after_commit = target_kv.1.clone();
+            let actual_value_after_commit = store_engine.get(&target_kv.0, None).unwrap().unwrap();
+            let expected_value_after_commit = target_kv.1;
 
             assert_eq!(expected_value_after_commit, actual_value_after_commit);
         }
@@ -478,9 +452,7 @@ mod kv_tests {
         let target_height = ChainHeight::new(index);
 
         for pair in &key_value_pairs {
-            store_engine
-                .set(pair.0.clone(), pair.1.clone(), None)
-                .unwrap();
+            store_engine.set(&pair.0, &pair.1, None).unwrap();
         }
 
         let transaction_id = store_engine.start_transaction().unwrap();
@@ -489,15 +461,11 @@ mod kv_tests {
 
         {
             store_engine
-                .set(
-                    target_kv.0.clone(),
-                    target_kv.1.clone(),
-                    Some(transaction_id),
-                )
+                .set(&target_kv.0, &target_kv.1, Some(transaction_id))
                 .unwrap();
             let expected_value_within_transaction = target_kv.1.clone();
             let actual_value_within_transaction = store_engine
-                .get(&target_kv.0.clone(), &Some(transaction_id))
+                .get(&target_kv.0, Some(transaction_id))
                 .unwrap()
                 .unwrap();
 
@@ -517,14 +485,14 @@ mod kv_tests {
             }
 
             for (key, expected_value_after_revert) in expected_hashmap {
-                let actual_value_after_revert = store_engine.get(&key, &None).unwrap().unwrap();
+                let actual_value_after_revert = store_engine.get(&key, None).unwrap().unwrap();
                 assert_eq!(expected_value_after_revert, &actual_value_after_revert);
             }
         }
 
         {
             let actual_target_value_after_revert =
-                store_engine.get(&target_kv.0.clone(), &None).unwrap();
+                store_engine.get(&target_kv.0.clone(), None).unwrap();
             let expected_target_value_after_revert = None;
 
             assert_eq!(
@@ -554,9 +522,7 @@ mod kv_tests {
         let target_height = ChainHeight::new(index);
 
         for pair in &key_value_pairs {
-            store_engine
-                .set(pair.0.clone(), pair.1.clone(), None)
-                .unwrap();
+            store_engine.set(&pair.0, &pair.1, None).unwrap();
         }
 
         let transaction_id = store_engine.start_transaction().unwrap();
@@ -626,10 +592,10 @@ mod kv_tests {
             let kv_1 = kv_pairs.0;
             let kv_2 = kv_pairs.1;
             store_engine
-                .set(kv_1.0.clone(), kv_1.1.clone(), Some(transaction_id_1))
+                .set(&kv_1.0, &kv_1.1, Some(transaction_id_1))
                 .unwrap();
             store_engine
-                .set(kv_2.0.clone(), kv_2.1.clone(), Some(transaction_id_2))
+                .set(&kv_2.0, &kv_2.1, Some(transaction_id_2))
                 .unwrap();
         }
 
@@ -637,7 +603,7 @@ mod kv_tests {
         store_engine.commit_transaction(transaction_id_2).unwrap();
 
         for (index, key) in shared_keys.iter().enumerate() {
-            let actual_value = store_engine.get(key, &None).unwrap().unwrap();
+            let actual_value = store_engine.get(key, None).unwrap().unwrap();
             let expected_value = key_value_pairs_2[index].1.clone();
             assert_eq!(actual_value, expected_value);
         }
@@ -651,13 +617,13 @@ mod kv_tests {
         let key = KVKey::from("a");
         let value = KVValue::from("1");
 
-        store_engine.set(key.clone(), value.clone(), None).unwrap();
+        store_engine.set(&key, &value, None).unwrap();
 
         let transaction_id = store_engine.start_transaction().unwrap();
 
         {
             let actual_value = store_engine
-                .get(&key, &Some(transaction_id))
+                .get(&key, Some(transaction_id))
                 .unwrap()
                 .unwrap();
             let expected_value = value;
@@ -675,14 +641,12 @@ mod kv_tests {
         let origin_value = KVValue::from("1");
         let value_in_transaction = KVValue::from("2");
 
-        store_engine
-            .set(key.clone(), origin_value.clone(), None)
-            .unwrap();
+        store_engine.set(&key, &origin_value, None).unwrap();
 
         let transaction_id = store_engine.start_transaction().unwrap();
 
         {
-            let actual_value = store_engine.get(&key, &None).unwrap().unwrap();
+            let actual_value = store_engine.get(&key, None).unwrap().unwrap();
             let expected_value = origin_value.clone();
 
             assert_eq!(actual_value, expected_value);
@@ -690,13 +654,9 @@ mod kv_tests {
 
         {
             store_engine
-                .set(
-                    key.clone(),
-                    value_in_transaction.clone(),
-                    Some(transaction_id),
-                )
+                .set(&key, &value_in_transaction, Some(transaction_id))
                 .unwrap();
-            let actual_value = store_engine.get(&key, &None).unwrap().unwrap();
+            let actual_value = store_engine.get(&key, None).unwrap().unwrap();
             let expected_value = origin_value.clone();
 
             assert_eq!(actual_value, expected_value);
@@ -705,7 +665,7 @@ mod kv_tests {
         store_engine.commit_transaction(transaction_id).unwrap();
 
         {
-            let actual_value = store_engine.get(&key, &None).unwrap().unwrap();
+            let actual_value = store_engine.get(&key, None).unwrap().unwrap();
             let expected_value = value_in_transaction.clone();
 
             assert_eq!(actual_value, expected_value);
@@ -729,40 +689,32 @@ mod kv_tests {
         let target_value_2 = KVValue::new(&u64_to_u8_array(400));
 
         store_engine
-            .set(account_1.clone(), original_value_1.clone(), None)
+            .set(&account_1, &original_value_1, None)
             .unwrap();
         store_engine
-            .set(account_2.clone(), original_value_2.clone(), None)
+            .set(&account_2, &original_value_2, None)
             .unwrap();
 
         let transaction_id_1 = store_engine.start_transaction().unwrap();
         let transaction_id_2 = store_engine.start_transaction().unwrap();
 
         let transaction_1_account_1_value = store_engine
-            .get(&account_1, &Some(transaction_id_1))
+            .get(&account_1, Some(transaction_id_1))
             .unwrap()
             .unwrap();
         assert_eq!(transaction_1_account_1_value, original_value_1);
 
         store_engine
-            .set(
-                account_1.clone(),
-                target_value_1.clone(),
-                Some(transaction_id_2),
-            )
+            .set(&account_1, &target_value_1, Some(transaction_id_2))
             .unwrap();
         store_engine
-            .set(
-                account_2.clone(),
-                target_value_2.clone(),
-                Some(transaction_id_2),
-            )
+            .set(&account_2, &target_value_2, Some(transaction_id_2))
             .unwrap();
 
         store_engine.commit_transaction(transaction_id_2).unwrap();
 
         let transaction_1_account_2_value = store_engine
-            .get(&account_2, &Some(transaction_id_1))
+            .get(&account_2, Some(transaction_id_1))
             .unwrap()
             .unwrap();
         assert_eq!(transaction_1_account_2_value, original_value_2);
@@ -778,19 +730,17 @@ mod kv_tests {
         let account = KVKey::from("account");
         let original_value = KVValue::new(&u64_to_u8_array(500));
 
-        store_engine
-            .set(account.clone(), original_value.clone(), None)
-            .unwrap();
+        store_engine.set(&account, &original_value, None).unwrap();
 
         let transaction_id_1 = store_engine.start_transaction().unwrap();
         let transaction_id_2 = store_engine.start_transaction().unwrap();
 
         let transaction_1_account_value = store_engine
-            .get(&account, &Some(transaction_id_1))
+            .get(&account, Some(transaction_id_1))
             .unwrap()
             .unwrap();
         let transaction_2_account_value = store_engine
-            .get(&account, &Some(transaction_id_2))
+            .get(&account, Some(transaction_id_2))
             .unwrap()
             .unwrap();
 
@@ -812,11 +762,7 @@ mod kv_tests {
             let transaction_1_new_value = KVValue::new(&u64_to_u8_array(value));
 
             store_engine
-                .set(
-                    account.clone(),
-                    transaction_1_new_value,
-                    Some(transaction_id_1),
-                )
+                .set(&account, &transaction_1_new_value, Some(transaction_id_1))
                 .unwrap();
         }
 
@@ -838,11 +784,7 @@ mod kv_tests {
             let transaction_2_new_value = KVValue::new(&u64_to_u8_array(value));
 
             store_engine
-                .set(
-                    account.clone(),
-                    transaction_2_new_value,
-                    Some(transaction_id_2),
-                )
+                .set(&account, &transaction_2_new_value, Some(transaction_id_2))
                 .unwrap();
         }
 
@@ -865,7 +807,7 @@ mod kv_tests {
             value += 200;
 
             let expected_value = KVValue::new(&u64_to_u8_array(value));
-            let actual_value = store_engine.get(&account, &None).unwrap().unwrap();
+            let actual_value = store_engine.get(&account, None).unwrap().unwrap();
 
             assert_eq!(expected_value, actual_value);
         }
@@ -890,17 +832,13 @@ mod kv_tests {
         let is_tom_on_call_target_value = KVValue::new(&[0x00]);
 
         store_engine
-            .set(
-                total_doctor_on_call.clone(),
-                original_total_on_call_value.clone(),
-                None,
-            )
+            .set(&total_doctor_on_call, &original_total_on_call_value, None)
             .unwrap();
         store_engine
-            .set(is_alex_on_call.clone(), is_alex_on_call_value.clone(), None)
+            .set(&is_alex_on_call, &is_alex_on_call_value, None)
             .unwrap();
         store_engine
-            .set(is_tom_on_call.clone(), is_tom_on_call_value.clone(), None)
+            .set(&is_tom_on_call, &is_tom_on_call_value, None)
             .unwrap();
 
         let alex_transaction = store_engine.start_transaction().unwrap();
@@ -908,7 +846,7 @@ mod kv_tests {
 
         {
             let total_on_call_value = store_engine
-                .get(&total_doctor_on_call, &Some(alex_transaction))
+                .get(&total_doctor_on_call, Some(alex_transaction))
                 .unwrap()
                 .unwrap();
             let total_on_call_bytes = total_on_call_value.as_bytes();
@@ -928,15 +866,15 @@ mod kv_tests {
                 let new_total_on_call_value = KVValue::new(&u64_to_u8_array(total_on_call_num));
                 store_engine
                     .set(
-                        total_doctor_on_call.clone(),
-                        new_total_on_call_value.clone(),
+                        &total_doctor_on_call,
+                        &new_total_on_call_value,
                         Some(alex_transaction),
                     )
                     .unwrap();
                 store_engine
                     .set(
-                        is_alex_on_call,
-                        is_alex_on_call_target_value.clone(),
+                        &is_alex_on_call,
+                        &is_alex_on_call_target_value,
                         Some(alex_transaction),
                     )
                     .unwrap();
@@ -945,7 +883,7 @@ mod kv_tests {
 
         {
             let total_on_call_value = store_engine
-                .get(&total_doctor_on_call, &Some(tom_transaction))
+                .get(&total_doctor_on_call, Some(tom_transaction))
                 .unwrap()
                 .unwrap();
             let total_on_call_bytes = total_on_call_value.as_bytes();
@@ -965,15 +903,15 @@ mod kv_tests {
                 let new_total_on_call_value = KVValue::new(&u64_to_u8_array(total_on_call_num));
                 store_engine
                     .set(
-                        total_doctor_on_call.clone(),
-                        new_total_on_call_value.clone(),
+                        &total_doctor_on_call,
+                        &new_total_on_call_value,
                         Some(tom_transaction),
                     )
                     .unwrap();
                 store_engine
                     .set(
-                        is_tom_on_call,
-                        is_tom_on_call_target_value.clone(),
+                        &is_tom_on_call,
+                        &is_tom_on_call_target_value,
                         Some(tom_transaction),
                     )
                     .unwrap();

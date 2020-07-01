@@ -2,15 +2,14 @@ use std::path::PathBuf;
 
 use immuxsys::constants as Constants;
 use immuxsys::storage::chain_height::ChainHeight;
-use immuxsys::storage::errors::KVResult;
-use immuxsys::storage::kv::LogKeyValueStore;
-use immuxsys::storage::kvkey::KVKey;
-use immuxsys::storage::kvvalue::KVValue;
 
 use clap::{App, Arg, SubCommand};
+use immuxsys::storage::executor::{
+    errors::ExecutorResult, executor::Executor, unit_content::UnitContent, unit_key::UnitKey,
+};
 use immuxsys::storage::transaction_manager::TransactionId;
 
-fn main() -> KVResult<()> {
+fn main() -> ExecutorResult<()> {
     let arg_matches = App::new(env!("CARGO_PKG_NAME"))
         .version(env!("CARGO_PKG_VERSION"))
         .author(env!("CARGO_PKG_AUTHORS"))
@@ -95,13 +94,17 @@ fn main() -> KVResult<()> {
                 .about(Constants::SUBCOMMAND_REMOVE_ALL_DESCRIPTION),
         )
         .subcommand(
-            SubCommand::with_name(Constants::SUBCOMMAND_INSPECT)
-                .about(Constants::SUBCOMMAND_INSPECT_DESCRIPTION)
+            SubCommand::with_name(Constants::SUBCOMMAND_INSPECT_ONE)
+                .about(Constants::SUBCOMMAND_INSPECT_ONE_DESCRIPTION)
                 .arg(
                     Arg::with_name(Constants::ARGUMENT_NAME_FOR_KEY)
                         .help(Constants::GENERAL_ARGUMENT_HELP_INFORMATION)
-                        .required(false),
+                        .required(true),
                 ),
+        )
+        .subcommand(
+            SubCommand::with_name(Constants::SUBCOMMAND_INSPECT_ALL)
+                .about(Constants::SUBCOMMAND_INSPECT_ALL_DESCRIPTION),
         )
         .subcommand(
             SubCommand::with_name(Constants::SUBCOMMAND_CREATE_TRANSACTION)
@@ -138,21 +141,21 @@ fn main() -> KVResult<()> {
 
             let path = PathBuf::from(Constants::TEMP_LOG_FILE_PATH);
 
-            let mut store_engine = LogKeyValueStore::open(&path)?;
+            let mut executor = Executor::open(&path)?;
 
             if let Some(transaction_id_str) =
                 arg_matches.value_of(Constants::ARGUMENT_NAME_FOR_TRANSACTION_ID)
             {
                 let transaction_id = transaction_id_str.parse::<u64>()?;
-                store_engine.set(
-                    KVKey::new(&key.as_bytes()),
-                    KVValue::new(&value.as_bytes()),
+                executor.set(
+                    &UnitKey::new(&key.as_bytes()),
+                    &UnitContent::String(value.to_string()),
                     Some(TransactionId::new(transaction_id)),
                 )
             } else {
-                store_engine.set(
-                    KVKey::new(&key.as_bytes()),
-                    KVValue::new(&value.as_bytes()),
+                executor.set(
+                    &UnitKey::new(&key.as_bytes()),
+                    &UnitContent::String(value.to_string()),
                     None,
                 )
             }
@@ -163,27 +166,27 @@ fn main() -> KVResult<()> {
                 .expect(Constants::MISSING_KEY_ARGUMENT_MESSAGE);
 
             let path = PathBuf::from(Constants::TEMP_LOG_FILE_PATH);
-            let mut store_engine = LogKeyValueStore::open(&path)?;
+            let mut executor = Executor::open(&path)?;
 
             if let Some(transaction_id_str) =
                 arg_matches.value_of(Constants::ARGUMENT_NAME_FOR_TRANSACTION_ID)
             {
                 let transaction_id = transaction_id_str.parse::<u64>()?;
-                match store_engine.get(
-                    &KVKey::new(&key.as_bytes()),
-                    &Some(TransactionId::new(transaction_id)),
+                match executor.get(
+                    &UnitKey::new(&key.as_bytes()),
+                    Some(TransactionId::new(transaction_id)),
                 )? {
-                    Some(res) => {
-                        println!("{:?}", String::from_utf8(res.as_bytes().to_vec()));
+                    Some(result) => {
+                        println!("{:?}", result);
                     }
                     None => {
                         println!("{:?}", Constants::MISSING_KEY_MESSAGE);
                     }
                 }
             } else {
-                match store_engine.get(&KVKey::new(&key.as_bytes()), &None)? {
-                    Some(res) => {
-                        println!("{:?}", String::from_utf8(res.as_bytes().to_vec()));
+                match executor.get(&UnitKey::new(&key.as_bytes()), None)? {
+                    Some(result) => {
+                        println!("{:?}", result);
                     }
                     None => {
                         println!("{:?}", Constants::MISSING_KEY_MESSAGE);
@@ -203,21 +206,21 @@ fn main() -> KVResult<()> {
 
             let path = PathBuf::from(Constants::TEMP_LOG_FILE_PATH);
 
-            let mut store_engine = LogKeyValueStore::open(&path)?;
+            let mut executor = Executor::open(&path)?;
             let height = height_str.parse::<u64>()?;
 
             if let Some(transaction_id_str) =
                 arg_matches.value_of(Constants::ARGUMENT_NAME_FOR_TRANSACTION_ID)
             {
                 let transaction_id = transaction_id_str.parse::<u64>()?;
-                store_engine.revert_one(
-                    KVKey::new(&key.as_bytes()),
+                executor.revert_one(
+                    &UnitKey::new(&key.as_bytes()),
                     &ChainHeight::new(height),
                     Some(TransactionId::new(transaction_id)),
                 )
             } else {
-                store_engine.revert_one(
-                    KVKey::new(&key.as_bytes()),
+                executor.revert_one(
+                    &UnitKey::new(&key.as_bytes()),
                     &ChainHeight::new(height),
                     None,
                 )
@@ -230,9 +233,9 @@ fn main() -> KVResult<()> {
 
             let path = PathBuf::from(Constants::TEMP_LOG_FILE_PATH);
 
-            let mut store_engine = LogKeyValueStore::open(&path)?;
+            let mut executor = Executor::open(&path)?;
             let height = height_str.parse::<u64>()?;
-            store_engine.revert_all(&ChainHeight::new(height))
+            executor.revert_all(&ChainHeight::new(height))
         }
         (Constants::SUBCOMMAND_REMOVE_ONE, Some(arg_matches)) => {
             let key = arg_matches
@@ -241,48 +244,47 @@ fn main() -> KVResult<()> {
 
             let path = PathBuf::from(Constants::TEMP_LOG_FILE_PATH);
 
-            let mut store_engine = LogKeyValueStore::open(&path)?;
+            let mut executor = Executor::open(&path)?;
 
             if let Some(transaction_id_str) =
                 arg_matches.value_of(Constants::ARGUMENT_NAME_FOR_TRANSACTION_ID)
             {
                 let transaction_id = transaction_id_str.parse::<u64>()?;
-                store_engine.remove_one(
-                    KVKey::new(&key.as_bytes()),
+                executor.remove_one(
+                    &UnitKey::new(&key.as_bytes()),
                     Some(TransactionId::new(transaction_id)),
                 )
             } else {
-                store_engine.remove_one(KVKey::new(&key.as_bytes()), None)
+                executor.remove_one(&UnitKey::new(&key.as_bytes()), None)
             }
         }
         (Constants::SUBCOMMAND_REMOVE_ALL, Some(_arg_matches)) => {
             let path = PathBuf::from(Constants::TEMP_LOG_FILE_PATH);
 
-            let mut store_engine = LogKeyValueStore::open(&path)?;
-            store_engine.remove_all()
+            let mut executor = Executor::open(&path)?;
+            executor.remove_all()
         }
-        (Constants::SUBCOMMAND_INSPECT, Some(arg_matches)) => {
-            let key = arg_matches.value_of(Constants::ARGUMENT_NAME_FOR_KEY);
-
+        (Constants::SUBCOMMAND_INSPECT_ONE, Some(arg_matches)) => {
+            let key = arg_matches
+                .value_of(Constants::ARGUMENT_NAME_FOR_KEY)
+                .expect(Constants::MISSING_KEY_ARGUMENT_MESSAGE);
+            let unit_key = UnitKey::new(&key.as_bytes());
             let path = PathBuf::from(Constants::TEMP_LOG_FILE_PATH);
+            let mut executor = Executor::open(&path)?;
 
-            let mut store_engine = LogKeyValueStore::open(&path)?;
+            let res = executor.inspect_one(&unit_key)?;
+            for command in res {
+                println!("{:?}", command);
+            }
 
-            match key {
-                None => {
-                    let res = store_engine.inspect(None)?;
-                    for command in res {
-                        println!("{:?}", command);
-                    }
-                }
-                Some(key_str) => {
-                    let key_bytes = key_str.as_bytes().to_vec();
-                    let kvkey = KVKey::new(&key_bytes);
-                    let res = store_engine.inspect(Some(&kvkey))?;
-                    for command in res {
-                        println!("{:?}", command);
-                    }
-                }
+            return Ok(());
+        }
+        (Constants::SUBCOMMAND_INSPECT_ALL, Some(_arg_matches)) => {
+            let path = PathBuf::from(Constants::TEMP_LOG_FILE_PATH);
+            let mut executor = Executor::open(&path)?;
+            let res = executor.inspect_all()?;
+            for command in res {
+                println!("{:?}", command);
             }
 
             return Ok(());
@@ -290,8 +292,8 @@ fn main() -> KVResult<()> {
         (Constants::SUBCOMMAND_CREATE_TRANSACTION, Some(_arg_matches)) => {
             let path = PathBuf::from(Constants::TEMP_LOG_FILE_PATH);
 
-            let mut store_engine = LogKeyValueStore::open(&path)?;
-            let transaction_id = store_engine.start_transaction()?;
+            let mut executor = Executor::open(&path)?;
+            let transaction_id = executor.start_transaction()?;
             println!("{:?}", transaction_id);
 
             return Ok(());
@@ -303,9 +305,9 @@ fn main() -> KVResult<()> {
 
             let path = PathBuf::from(Constants::TEMP_LOG_FILE_PATH);
 
-            let mut store_engine = LogKeyValueStore::open(&path)?;
+            let mut executor = Executor::open(&path)?;
             let transaction_id = transaction_id_str.parse::<u64>()?;
-            store_engine.commit_transaction(TransactionId::new(transaction_id))
+            executor.commit_transaction(TransactionId::new(transaction_id))
         }
         (Constants::SUBCOMMAND_ABORT_TRANSACTION, Some(arg_matches)) => {
             let transaction_id_str = arg_matches
@@ -314,9 +316,9 @@ fn main() -> KVResult<()> {
 
             let path = PathBuf::from(Constants::TEMP_LOG_FILE_PATH);
 
-            let mut store_engine = LogKeyValueStore::open(&path)?;
+            let mut executor = Executor::open(&path)?;
             let transaction_id = transaction_id_str.parse::<u64>()?;
-            store_engine.abort_transaction(TransactionId::new(transaction_id))
+            executor.abort_transaction(TransactionId::new(transaction_id))
         }
         _ => unreachable!(),
     }

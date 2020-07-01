@@ -1,3 +1,5 @@
+use crate::storage::executor::unit_content::UnitContent;
+
 #[derive(Clone, Debug, PartialEq)]
 pub struct KVValue(Vec<u8>);
 
@@ -25,6 +27,12 @@ impl From<&[u8]> for KVValue {
 impl From<&str> for KVValue {
     fn from(data: &str) -> KVValue {
         KVValue::new(data.as_bytes())
+    }
+}
+
+impl From<&UnitContent> for KVValue {
+    fn from(unit_content: &UnitContent) -> KVValue {
+        KVValue::new(&unit_content.marshal())
     }
 }
 
