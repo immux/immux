@@ -3,7 +3,6 @@ use std::convert::TryFrom;
 
 use crate::utils::bools::{bool_to_u8, u8_to_bool};
 use crate::utils::floats::{f64_to_u8_array, u8_array_to_f64};
-use crate::utils::strings::utf8_to_string;
 use crate::utils::varint::{varint_decode, varint_encode};
 
 pub enum ContentTypePrefix {
@@ -141,8 +140,9 @@ impl UnitContent {
                         let (length, offset) = varint_decode(&remaining_bytes)
                             .map_err(|_| UnitContentError::UnexpectedLengthBytes)?;
                         let string_bytes = &remaining_bytes[offset..offset + length as usize];
+                        let content_string = String::from_utf8_lossy(string_bytes).to_string();
                         return Ok((
-                            UnitContent::String(utf8_to_string(string_bytes)),
+                            UnitContent::String(content_string),
                             1 + offset + length as usize,
                         ));
                     }
@@ -184,7 +184,8 @@ impl UnitContent {
                             let (content, offset) = UnitContent::parse(&map_bytes[position..])?;
                             position += offset;
 
-                            result.insert(utf8_to_string(string_bytes), content);
+                            let content_string = String::from_utf8_lossy(string_bytes).to_string();
+                            result.insert(content_string, content);
                         }
 
                         return Ok((UnitContent::Map(result), 1 + offset + total_length as usize));
@@ -213,7 +214,7 @@ mod unit_content_tests {
     use std::clone::Clone;
     use std::collections::HashMap;
 
-    use crate::executor::unit_content::UnitContent;
+    use crate::storage::executor::unit_content::UnitContent;
     use crate::utils::varint::varint_encode;
 
     fn permutation<T: Clone>(array: &[T]) -> Vec<Vec<T>> {
@@ -278,92 +279,51 @@ mod unit_content_tests {
         ]
     }
 
-    #[test]
-    fn serialize_unit_content_map() {
+    fn get_permutation_content_map_bytes() -> Vec<Vec<u8>> {
         let key_value_pairs = get_unit_content_map_key_value_pairs();
 
-        let mut map: HashMap<String, UnitContent> = HashMap::new();
-
-        for (key, value) in key_value_pairs.iter() {
-            map.insert(key.clone(), value.clone());
-        }
-
-        let unit_content = UnitContent::Map(map);
-        let actual_output = unit_content.marshal();
-
         let permutation: Vec<Vec<(String, UnitContent)>> = permutation(&key_value_pairs);
-        let mut expected_outputs: Vec<Vec<u8>> = vec![];
+        let mut result: Vec<Vec<u8>> = vec![];
 
         for pairs in permutation.iter() {
-            let mut expected_output: Vec<u8> = vec![0x21, 0x35];
+            let mut possible_output: Vec<u8> = vec![0x21, 0x35];
 
             for (key, value) in pairs {
                 let key_length = varint_encode(key.len() as u64);
                 let key_bytes = key.as_bytes();
                 let content_bytes = value.marshal();
 
-                expected_output.extend_from_slice(&key_length);
-                expected_output.extend_from_slice(key_bytes);
-                expected_output.extend_from_slice(&content_bytes);
+                possible_output.extend_from_slice(&key_length);
+                possible_output.extend_from_slice(key_bytes);
+                possible_output.extend_from_slice(&content_bytes);
             }
 
-            expected_outputs.push(expected_output);
+            result.push(possible_output);
         }
 
-        assert!(expected_outputs.contains(&actual_output));
+        return result;
     }
 
-    #[test]
-    fn deserialize_unit_content_map() {
-        let unit_content_map_bytes = [
-            0x21, 0x35, 0x01, 0x65, 0x20, 0x16, 0x10, 0x05, 0x77, 0x6f, 0x72, 0x6c, 0x64, 0x12,
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xf8, 0x3f, 0x20, 0x04, 0x11, 0x01, 0x11, 0x00,
-            0x01, 0x64, 0x12, 0x00, 0x00, 0x00, 0x00, 0x00, 0x0, 0xf8, 0x3f, 0x01, 0x63, 0x11,
-            0x01, 0x01, 0x62, 0x10, 0x05, 0x68, 0x65, 0x6c, 0x6c, 0x6f, 0x01, 0x61, 0x00,
-        ];
-
-        let expected_key_value_pairs = get_unit_content_map_key_value_pairs();
+    fn get_fixture() -> Vec<(Option<UnitContent>, Vec<Vec<u8>>)> {
+        let key_value_pairs = get_unit_content_map_key_value_pairs();
         let mut map: HashMap<String, UnitContent> = HashMap::new();
-        for (key, value) in expected_key_value_pairs.iter() {
+        for (key, value) in key_value_pairs.iter() {
             map.insert(key.clone(), value.clone());
         }
-        let expected_content = UnitContent::Map(map);
-        let (actual_content, actual_size) = UnitContent::parse(&unit_content_map_bytes).unwrap();
-        let expected_size = expected_content.marshal().len();
+        let content_map = UnitContent::Map(map);
+        let permutation_content_map_bytes = get_permutation_content_map_bytes();
 
-        assert_eq!(expected_content, actual_content);
-        assert_eq!(expected_size, actual_size);
-    }
-
-    #[test]
-    fn unit_content_map_reversibility() {
-        let expected_key_value_pairs = get_unit_content_map_key_value_pairs();
-
-        let mut map: HashMap<String, UnitContent> = HashMap::new();
-        for (key, value) in expected_key_value_pairs.iter() {
-            map.insert(key.clone(), value.clone());
-        }
-        let expected_output = UnitContent::Map(map);
-        let (actual_output, actual_size) = UnitContent::parse(&expected_output.marshal()).unwrap();
-
-        let expected_size = expected_output.marshal().len();
-
-        assert_eq!(expected_output, actual_output);
-        assert_eq!(expected_size, actual_size);
-    }
-
-    fn get_fixture() -> Vec<(Option<UnitContent>, Vec<u8>)> {
         vec![
-            (Some(UnitContent::Nil), vec![0x00]),
-            (Some(UnitContent::Bool(true)), vec![0x11, 0x01]),
-            (Some(UnitContent::Bool(false)), vec![0x11, 0x00]),
+            (Some(UnitContent::Nil), vec![vec![0x00]]),
+            (Some(UnitContent::Bool(true)), vec![vec![0x11, 0x01]]),
+            (Some(UnitContent::Bool(false)), vec![vec![0x11, 0x00]]),
             (
                 Some(UnitContent::Float64(1.5)),
-                vec![0x12, 0, 0, 0, 0, 0, 0, 0xf8, 0x3f],
+                vec![vec![0x12, 0, 0, 0, 0, 0, 0, 0xf8, 0x3f]],
             ),
             (
                 Some(UnitContent::String(String::from("hello"))),
-                vec![0x10, 0x05, 0x68, 0x65, 0x6c, 0x6c, 0x6f],
+                vec![vec![0x10, 0x05, 0x68, 0x65, 0x6c, 0x6c, 0x6f]],
             ),
             (
                 Some(UnitContent::Array(vec![
@@ -373,7 +333,7 @@ mod unit_content_tests {
                     UnitContent::Float64(1.5),
                     UnitContent::Array(vec![UnitContent::Nil]),
                 ])),
-                vec![
+                vec![vec![
                     0x20, /*Array prefix*/
                     0x16, /*Length*/
                     0x00, /*Nil*/
@@ -383,14 +343,15 @@ mod unit_content_tests {
                     0x20, /*Array prefix*/
                     0x01, /*Length*/
                     0x00, /*Nil*/
-                ],
+                ]],
             ),
+            (Some(content_map), permutation_content_map_bytes),
             // Non-existing type
-            (None, vec![0xaa, 0x01, 0x02, 0x03]),
+            (None, vec![vec![0xaa, 0x01, 0x02, 0x03]]),
             // Malformed boolean
-            (None, vec![0x11]),
+            (None, vec![vec![0x11]]),
             // Malformed bytes with wrong varint length
-            (None, vec![0xff, 0xff, 0x10]),
+            (None, vec![vec![0xff, 0xff, 0x10]]),
             // Empty input
             (None, vec![]),
         ]
@@ -403,7 +364,7 @@ mod unit_content_tests {
         for row in table {
             if let (Some(content), expected) = row {
                 let serialized = content.marshal();
-                assert_eq!(expected, serialized);
+                assert!(expected.contains(&serialized));
             } else {
                 // Malformed bytes, skip
             }
@@ -415,17 +376,21 @@ mod unit_content_tests {
         let table = get_fixture();
         assert!(table.len() > 0);
         for row in table {
-            let (expected, data) = row;
+            let (expected, bytes_vec) = row;
             if let Some(expected_content) = expected {
-                let (parsed, actual_size) = UnitContent::parse(&data).unwrap();
-                let expected_size = expected_content.marshal().len();
+                for bytes in bytes_vec {
+                    let (parsed, actual_size) = UnitContent::parse(&bytes).unwrap();
+                    let expected_size = expected_content.marshal().len();
 
-                assert_eq!(expected_content, parsed);
-                assert_eq!(expected_size, actual_size);
+                    assert_eq!(expected_content, parsed);
+                    assert_eq!(expected_size, actual_size);
+                }
             } else {
-                match UnitContent::parse(&data) {
-                    Ok(_) => panic!("Should not be able to parse {:?}", data),
-                    Err(_) => (),
+                for bytes in bytes_vec {
+                    match UnitContent::parse(&bytes) {
+                        Ok(_) => panic!("Should not be able to parse {:?}", bytes),
+                        Err(_) => (),
+                    }
                 }
             }
         }
