@@ -7,6 +7,8 @@ edition = "2018"
 [dependencies]
 # This is a temporary dependency, we currently use clap as a command line tools mainly for testing purpose for now.
 clap = "2.33.0"
+# This is a temporary dependency, we currently use this lib for bench purpose.
+tiny_http = "0.6"
 
 [dev-dependencies]
 
