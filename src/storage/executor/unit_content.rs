@@ -4,7 +4,6 @@ use std::convert::TryFrom;
 use crate::utils::bools::{bool_to_u8, u8_to_bool};
 use crate::utils::floats::{f64_to_u8_array, u8_array_to_f64};
 use crate::utils::varint::{varint_decode, varint_encode};
-use std::ops::Deref;
 
 pub enum ContentTypePrefix {
     Nil = 0x00,
@@ -141,8 +140,7 @@ impl UnitContent {
                         let (length, offset) = varint_decode(&remaining_bytes)
                             .map_err(|_| UnitContentError::UnexpectedLengthBytes)?;
                         let string_bytes = &remaining_bytes[offset..offset + length as usize];
-                        let content_string =
-                            String::from_utf8_lossy(string_bytes).deref().to_string();
+                        let content_string = String::from_utf8_lossy(string_bytes).to_string();
                         return Ok((
                             UnitContent::String(content_string),
                             1 + offset + length as usize,
@@ -186,8 +184,7 @@ impl UnitContent {
                             let (content, offset) = UnitContent::parse(&map_bytes[position..])?;
                             position += offset;
 
-                            let content_string =
-                                String::from_utf8_lossy(string_bytes).deref().to_string();
+                            let content_string = String::from_utf8_lossy(string_bytes).to_string();
                             result.insert(content_string, content);
                         }
 
