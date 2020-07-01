@@ -1,10 +1,10 @@
 use std::path::PathBuf;
 
-use crate::executor::errors::ExecutorResult;
-use crate::executor::unit_content::UnitContent;
-use crate::executor::unit_key::UnitKey;
 use crate::storage::chain_height::ChainHeight;
 use crate::storage::command::Command;
+use crate::storage::executor::errors::ExecutorResult;
+use crate::storage::executor::unit_content::UnitContent;
+use crate::storage::executor::unit_key::UnitKey;
 use crate::storage::kv::LogKeyValueStore;
 use crate::storage::kvkey::KVKey;
 use crate::storage::kvvalue::KVValue;
@@ -23,20 +23,20 @@ impl Executor {
 
     pub fn set(
         &mut self,
-        key: UnitKey,
-        value: UnitContent,
+        key: &UnitKey,
+        value: &UnitContent,
         transaction_id: Option<TransactionId>,
     ) -> ExecutorResult<()> {
-        let kv_key = KVKey::from(&key);
+        let kv_key = KVKey::from(key);
         let kv_value = KVValue::from(value);
-        self.store_engine.set(kv_key, kv_value, transaction_id)?;
+        self.store_engine.set(&kv_key, &kv_value, transaction_id)?;
         return Ok(());
     }
 
     pub fn get(
         &mut self,
         key: &UnitKey,
-        transaction_id: &Option<TransactionId>,
+        transaction_id: Option<TransactionId>,
     ) -> ExecutorResult<Option<UnitContent>> {
         let kv_key = KVKey::from(key);
         match self.store_engine.get(&kv_key, transaction_id)? {
@@ -50,13 +50,13 @@ impl Executor {
 
     pub fn revert_one(
         &mut self,
-        key: UnitKey,
+        key: &UnitKey,
         height: &ChainHeight,
         transaction_id: Option<TransactionId>,
     ) -> ExecutorResult<()> {
-        let kv_key = KVKey::from(&key);
+        let kv_key = KVKey::from(key);
         self.store_engine
-            .revert_one(kv_key, height, transaction_id)?;
+            .revert_one(&kv_key, height, transaction_id)?;
         return Ok(());
     }
 
@@ -67,11 +67,11 @@ impl Executor {
 
     pub fn remove_one(
         &mut self,
-        key: UnitKey,
+        key: &UnitKey,
         transaction_id: Option<TransactionId>,
     ) -> ExecutorResult<()> {
-        let kv_key = KVKey::from(&key);
-        self.store_engine.remove_one(kv_key, transaction_id)?;
+        let kv_key = KVKey::from(key);
+        self.store_engine.remove_one(&kv_key, transaction_id)?;
         return Ok(());
     }
 
@@ -79,13 +79,19 @@ impl Executor {
         self.store_engine.remove_all()?;
         return Ok(());
     }
-    
-    pub fn inspect(
+
+    pub fn inspect_all(&mut self) -> ExecutorResult<Vec<(Command, ChainHeight)>> {
+        let result = self.store_engine.inspect_all()?;
+
+        return Ok(result);
+    }
+
+    pub fn inspect_one(
         &mut self,
-        key: Option<&UnitKey>,
+        target_key: &UnitKey,
     ) -> ExecutorResult<Vec<(Command, ChainHeight)>> {
-        let kv_key = key.map(|unit_key| KVKey::from(unit_key));
-        let result = self.store_engine.inspect(kv_key.as_ref())?;
+        let kv_key = KVKey::from(target_key);
+        let result = self.store_engine.inspect_one(&kv_key)?;
 
         return Ok(result);
     }

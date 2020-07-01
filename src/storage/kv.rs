@@ -55,8 +55,8 @@ impl LogKeyValueStore {
 
     pub fn set(
         &mut self,
-        key: KVKey,
-        value: KVValue,
+        key: &KVKey,
+        value: &KVValue,
         transaction_id: Option<TransactionId>,
     ) -> KVResult<()> {
         if key.as_bytes().len() > Constants::MAX_KEY_LENGTH {
@@ -72,13 +72,13 @@ impl LogKeyValueStore {
 
                 Command::TransactionalSet {
                     key: key.clone(),
-                    value,
+                    value: value.clone(),
                     transaction_id,
                 }
             } else {
                 Command::Set {
                     key: key.clone(),
-                    value,
+                    value: value.clone(),
                 }
             }
         };
@@ -87,7 +87,7 @@ impl LogKeyValueStore {
 
         self.current_height.increment()?;
 
-        update_key_pointer_map(key, log_pointer, &mut self.key_pointer_map, transaction_id);
+        update_key_pointer_map(key, &log_pointer, &mut self.key_pointer_map, transaction_id);
 
         return Ok(());
     }
@@ -95,7 +95,7 @@ impl LogKeyValueStore {
     pub fn get(
         &mut self,
         key: &KVKey,
-        transaction_id: &Option<TransactionId>,
+        transaction_id: Option<TransactionId>,
     ) -> KVResult<Option<KVValue>> {
         match self.key_pointer_map.get(&key) {
             None => Ok(None),
@@ -132,7 +132,7 @@ impl LogKeyValueStore {
                     }
                 } else {
                     return if transaction_id.is_some() {
-                        self.get(&key, &None)
+                        self.get(&key, None)
                     } else {
                         Ok(None)
                     };
@@ -143,7 +143,7 @@ impl LogKeyValueStore {
 
     pub fn revert_one(
         &mut self,
-        key: KVKey,
+        key: &KVKey,
         height: &ChainHeight,
         transaction_id: Option<TransactionId>,
     ) -> KVResult<()> {
@@ -181,7 +181,7 @@ impl LogKeyValueStore {
 
         self.current_height.increment()?;
 
-        update_key_pointer_map(key, log_pointer, &mut self.key_pointer_map, transaction_id);
+        update_key_pointer_map(key, &log_pointer, &mut self.key_pointer_map, transaction_id);
 
         return Ok(());
     }
@@ -207,7 +207,7 @@ impl LogKeyValueStore {
 
     pub fn remove_one(
         &mut self,
-        key: KVKey,
+        key: &KVKey,
         transaction_id: Option<TransactionId>,
     ) -> KVResult<()> {
         if key.as_bytes().len() > Constants::MAX_KEY_LENGTH {
@@ -236,7 +236,7 @@ impl LogKeyValueStore {
 
         self.current_height.increment()?;
 
-        update_key_pointer_map(key, log_pointer, &mut self.key_pointer_map, transaction_id);
+        update_key_pointer_map(key, &log_pointer, &mut self.key_pointer_map, transaction_id);
 
         return Ok(());
     }
@@ -255,73 +255,76 @@ impl LogKeyValueStore {
         return Ok(());
     }
 
-    pub fn inspect(&mut self, key: Option<&KVKey>) -> KVResult<Vec<(Command, ChainHeight)>> {
+    pub fn inspect_all(&mut self) -> KVResult<Vec<(Command, ChainHeight)>> {
         let mut command_buffer: Vec<u8> = Vec::new();
         self.reader.seek(SeekFrom::Start(0))?;
         self.reader.read_to_end(&mut command_buffer)?;
 
         let command_buffer_parser = CommandBufferParser::new(&command_buffer, 0);
 
-        match key {
-            None => {
-                let commands_with_height = command_buffer_parser
-                    .enumerate()
-                    .map(|(index, (command, _))| (command, ChainHeight::new((index + 1) as u64)))
-                    .collect();
-                return Ok(commands_with_height);
-            }
-            Some(target_key) => {
-                let mut appeared_key = HashSet::new();
-                let ret = command_buffer_parser
-                    .enumerate()
-                    .filter_map(|(index, (command, _))| match &command {
-                        Command::Set { key, value: _ } => {
-                            appeared_key.insert(key.clone());
+        let commands_with_height = command_buffer_parser
+            .enumerate()
+            .map(|(index, (command, _))| (command, ChainHeight::new((index + 1) as u64)))
+            .collect();
+        return Ok(commands_with_height);
+    }
 
-                            if target_key == key {
-                                return Some((command, ChainHeight::new((index + 1) as u64)));
-                            } else {
-                                return None;
-                            }
-                        }
-                        Command::RevertOne { key, height: _ } => {
-                            appeared_key.insert(key.clone());
+    pub fn inspect_one(&mut self, target_key: &KVKey) -> KVResult<Vec<(Command, ChainHeight)>> {
+        let mut command_buffer: Vec<u8> = Vec::new();
+        self.reader.seek(SeekFrom::Start(0))?;
+        self.reader.read_to_end(&mut command_buffer)?;
 
-                            if target_key == key {
-                                return Some((command, ChainHeight::new((index + 1) as u64)));
-                            } else {
-                                return None;
-                            }
-                        }
-                        Command::RevertAll { height: _ } => {
-                            if appeared_key.contains(&target_key) {
-                                return Some((command, ChainHeight::new((index + 1) as u64)));
-                            } else {
-                                return None;
-                            }
-                        }
-                        Command::RemoveOne { key } => {
-                            appeared_key.insert(key.clone());
+        let command_buffer_parser = CommandBufferParser::new(&command_buffer, 0);
 
-                            if target_key == key {
-                                return Some((command, ChainHeight::new((index + 1) as u64)));
-                            } else {
-                                return None;
-                            }
-                        }
-                        Command::RemoveAll => {
-                            if appeared_key.contains(&target_key) {
-                                return Some((command, ChainHeight::new((index + 1) as u64)));
-                            } else {
-                                return None;
-                            }
-                        }
-                        _ => None,
-                    })
-                    .collect();
-                return Ok(ret);
-            }
-        }
+        let mut appeared_key = HashSet::new();
+        let ret = command_buffer_parser
+            .enumerate()
+            .filter_map(|(index, (command, _))| match &command {
+                Command::Set { key, value: _ } => {
+                    appeared_key.insert(key.clone());
+
+                    if target_key == key {
+                        return Some((command, ChainHeight::new((index + 1) as u64)));
+                    } else {
+                        return None;
+                    }
+                }
+                Command::RevertOne { key, height: _ } => {
+                    appeared_key.insert(key.clone());
+
+                    if target_key == key {
+                        return Some((command, ChainHeight::new((index + 1) as u64)));
+                    } else {
+                        return None;
+                    }
+                }
+                Command::RevertAll { height: _ } => {
+                    if appeared_key.contains(&target_key) {
+                        return Some((command, ChainHeight::new((index + 1) as u64)));
+                    } else {
+                        return None;
+                    }
+                }
+                Command::RemoveOne { key } => {
+                    appeared_key.insert(key.clone());
+
+                    if target_key == key {
+                        return Some((command, ChainHeight::new((index + 1) as u64)));
+                    } else {
+                        return None;
+                    }
+                }
+                Command::RemoveAll => {
+                    if appeared_key.contains(&target_key) {
+                        return Some((command, ChainHeight::new((index + 1) as u64)));
+                    } else {
+                        return None;
+                    }
+                }
+                _ => None,
+            })
+            .collect();
+        return Ok(ret);
     }
 
     pub fn start_transaction(&mut self) -> KVResult<TransactionId> {
@@ -454,11 +457,11 @@ fn load_key_pointer_map(
         match command {
             Command::Set { key, value: _ } => {
                 let log_pointer = LogPointer::new(current_position, command_length);
-                update_key_pointer_map(key, log_pointer, &mut key_pointer_map, None);
+                update_key_pointer_map(&key, &log_pointer, &mut key_pointer_map, None);
             }
             Command::RevertOne { key, height: _ } => {
                 let log_pointer = LogPointer::new(current_position, command_length);
-                update_key_pointer_map(key, log_pointer, &mut key_pointer_map, None);
+                update_key_pointer_map(&key, &log_pointer, &mut key_pointer_map, None);
             }
             Command::RevertAll { height } => {
                 let (new_key_pointer_map, _, _) = load_key_pointer_map(&mut reader, Some(&height))?;
@@ -467,7 +470,7 @@ fn load_key_pointer_map(
             }
             Command::RemoveOne { key } => {
                 let log_pointer = LogPointer::new(current_position, command_length);
-                update_key_pointer_map(key, log_pointer, &mut key_pointer_map, None);
+                update_key_pointer_map(&key, &log_pointer, &mut key_pointer_map, None);
             }
             Command::RemoveAll => {
                 for log_pointers in key_pointer_map.values_mut() {
@@ -485,8 +488,8 @@ fn load_key_pointer_map(
             } => {
                 let log_pointer = LogPointer::new(current_position, command_length);
                 update_key_pointer_map(
-                    key.clone(),
-                    log_pointer,
+                    &key,
+                    &log_pointer,
                     &mut key_pointer_map,
                     Some(transaction_id),
                 );
@@ -499,8 +502,8 @@ fn load_key_pointer_map(
             } => {
                 let log_pointer = LogPointer::new(current_position, command_length);
                 update_key_pointer_map(
-                    key.clone(),
-                    log_pointer,
+                    &key,
+                    &log_pointer,
                     &mut key_pointer_map,
                     Some(transaction_id),
                 );
@@ -513,8 +516,8 @@ fn load_key_pointer_map(
             } => {
                 let log_pointer = LogPointer::new(current_position, command_length);
                 update_key_pointer_map(
-                    key.clone(),
-                    log_pointer,
+                    &key,
+                    &log_pointer,
                     &mut key_pointer_map,
                     Some(transaction_id),
                 );
@@ -585,17 +588,17 @@ fn update_aborted_log_pointers(
 }
 
 fn update_key_pointer_map(
-    key: KVKey,
-    log_pointer: LogPointer,
+    key: &KVKey,
+    log_pointer: &LogPointer,
     key_pointer_map: &mut HashMap<KVKey, HashMap<Option<TransactionId>, LogPointer>>,
     transaction_id: Option<TransactionId>,
 ) {
     if let Some(log_pointers) = key_pointer_map.get_mut(&key) {
-        log_pointers.insert(transaction_id, log_pointer);
+        log_pointers.insert(transaction_id, log_pointer.clone());
     } else {
         let mut log_pointers = HashMap::new();
-        log_pointers.insert(transaction_id, log_pointer);
-        key_pointer_map.insert(key, log_pointers);
+        log_pointers.insert(transaction_id, log_pointer.to_owned());
+        key_pointer_map.insert(key.clone(), log_pointers);
     }
 }
 
