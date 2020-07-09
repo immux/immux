@@ -6,6 +6,35 @@ The master repository for Immux code, currently including:
 
 ## ImmuxDB
 
+### Http end point
+```
+GET /grouping/id ("get", outside of transactions)
+GET /.transactions/tid/grouping/unit_id ("get" within transaction)
+GET /grouping/id/.journal ("inspect_one")
+GET /.journal ("inspect all")
+GET /grouping (get all in grouping) (not implemented yet)
+
+PUT /grouping/id {data} ("set")
+PUT /grouping/id?height={height} ("revert one")
+PUT /.transactions/tid/grouping/unit_id?height={height} ("revert one" within transaction)
+PUT /.transactions/tid/grouping/unit_id {data} ("set" within transaction)
+PUT /?height={height} ("revert all")
+
+DELETE /grouping/id ("remove one")
+DELETE /.transactions/tid/grouping/unit_id ("remove one" with transaction)
+DELETE / ("remove all")
+
+POST /.transactions ("create_transaction")
+POST /.transactions/tid?commit ("commit_transaction")
+POST /.transactions/tid?abort("abort_transaction")
+
+/* Not implemented yet
+GET /grouping/.index (get indices)
+POST /grouping/.index?field={field} (create index)
+DELETE /grouping/.index/index-number (delete index)
+*/
+```
+
 ### Run the server
 
 ```
