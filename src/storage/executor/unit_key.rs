@@ -34,6 +34,12 @@ impl From<UnitKey> for Vec<u8> {
     }
 }
 
+impl ToString for UnitKey {
+    fn to_string(&self) -> String {
+        String::from_utf8_lossy(self.0.as_slice()).to_string()
+    }
+}
+
 #[cfg(test)]
 mod unit_key_tests {
     use super::UnitKey;

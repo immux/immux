@@ -7,12 +7,20 @@ edition = "2018"
 [dependencies]
 # This is a temporary dependency, we currently use clap as a command line tools mainly for testing purpose for now.
 clap = "2.33.0"
-# This is a temporary dependency, we currently use this lib for bench purpose.
+# These are temporary dependencies, we currently use this lib for bench purpose.
 tiny_http = "0.6"
+url = "1.7"
 
 [dev-dependencies]
+immuxsys_client = { path = "src/client" }
+immuxsys_dev_utils = { path = "src/dev_utils" }
 
 [[test]]
 name = "test_kv"
 path = "src/storage/tests/test_kv.rs"
 
+[workspace]
+members = [
+    "src/client",
+    "src/dev_utils",
+]
