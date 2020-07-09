@@ -39,51 +39,55 @@ impl UrlInformation {
 
 pub fn run_server(mut executor: Executor, port: u16) -> ServerResult<()> {
     let address = format!("{}:{}", Constants::SERVER_END_POINT, port);
-    let server = Server::http(address)?;
-    for mut request in server.incoming_requests() {
-        let (status, body): (u16, String) = match handle_request(request.borrow_mut(), &mut executor) {
-            Err(error) => (500, format!("request parsing error {:?}", error)),
-            Ok(outcome) => match outcome {
-                Outcome::Select(outcome) => {
-                    let body = match outcome {
-                        None => String::from(""),
-                        Some(content) => content.to_string(),
-                    };
-                    (200, body)
-                }
-                Outcome::InspectOne(outcome) => {
-                    let mut body = String::new();
-                    for (instruction, height) in outcome {
-                        body += &instruction.to_string();
-                        body += "\t";
-                        body += &format!("height: {:?}", height);
-                        body += "\r\n";
-                    }
-                    (200, body)
-                }
-                Outcome::InspectAll(outcome) => {
-                    let mut body = String::new();
-                    for (instruction, height) in outcome {
-                        body += &instruction.to_string();
-                        body += "\t";
-                        body += &format!("height: {:?}", height);
-                        body += "\r\n";
-                    }
-                    (200, body)
-                }
-                Outcome::CreateTransaction(transaction_id) => {
-                    let body = transaction_id.as_u64().to_string();
-                    (200, body)
-                }
-                _ => (200, String::from("Unspecified outcome")),
-            },
-        };
+    match Server::http(address) {
+        Ok(server) => {
+            for mut request in server.incoming_requests() {
+                let (status, body): (u16, String) = match handle_request(request.borrow_mut(), &mut executor) {
+                    Err(error) => (500, format!("Server error {:?}", error)),
+                    Ok(outcome) => match outcome {
+                        Outcome::Select(outcome) => {
+                            let body = match outcome {
+                                None => String::from(""),
+                                Some(content) => content.to_string(),
+                            };
+                            (200, body)
+                        }
+                        Outcome::InspectOne(outcome) => {
+                            let mut body = String::new();
+                            for (instruction, height) in outcome {
+                                body += &instruction.to_string();
+                                body += "\t";
+                                body += &format!("height: {:?}", height);
+                                body += "\r\n";
+                            }
+                            (200, body)
+                        }
+                        Outcome::InspectAll(outcome) => {
+                            let mut body = String::new();
+                            for (instruction, height) in outcome {
+                                body += &instruction.to_string();
+                                body += "\t";
+                                body += &format!("height: {:?}", height);
+                                body += "\r\n";
+                            }
+                            (200, body)
+                        }
+                        Outcome::CreateTransaction(transaction_id) => {
+                            let body = transaction_id.as_u64().to_string();
+                            (200, body)
+                        }
+                        _ => (200, String::from("Unspecified outcome")),
+                    },
+                };
 
-        let response = Response::from_string(body).with_status_code(status);
-        match request.respond(response) {
-            Ok(_) => {}
-            Err(error) => return Err(ServerError::HttpResponseError(error)),
+                let response = Response::from_string(body).with_status_code(status);
+                match request.respond(response) {
+                    Ok(_) => {}
+                    Err(error) => return Err(ServerError::HttpResponseError(error)),
+                }
+            }
         }
+        Err(_error) => return Err(ServerError::TinyHTTPError),
     }
     return Ok(());
 }
@@ -166,7 +170,7 @@ fn parse_http_request(request: &mut Request) -> ServerResult<Instruction> {
             if segments.len() >= 5 {
                 let url_transactions_key_word = segments[1];
                 let transaction_id_str = segments[2];
-                let _collection_str = segments[3];
+                let _grouping_str = segments[3];
                 let unit_key_str = segments[4];
 
                 if url_transactions_key_word != Constants::URL_TRANSACTIONS_KEY_WORD || unit_key_str.is_empty() {
@@ -183,7 +187,7 @@ fn parse_http_request(request: &mut Request) -> ServerResult<Instruction> {
                 };
                 return Ok(instruction);
             } else if segments.len() >= 4 {
-                let _collection_str = segments[1];
+                let _grouping_str = segments[1];
                 let unit_key_str = segments[2];
                 let url_journal_key_word = segments[3];
 
@@ -195,7 +199,7 @@ fn parse_http_request(request: &mut Request) -> ServerResult<Instruction> {
                 let instruction = Instruction::InspectOne { key: unit_key };
                 return Ok(instruction);
             } else if segments.len() >= 3 {
-                let _collection_str = segments[1];
+                let _grouping_str = segments[1];
                 let unit_key_str = segments[2];
                 let unit_key = UnitKey::from(unit_key_str);
 
@@ -209,7 +213,7 @@ fn parse_http_request(request: &mut Request) -> ServerResult<Instruction> {
                     let instruction = Instruction::InspectAll;
                     return Ok(instruction);
                 } else {
-                    return Err(ServerError::UnimplementedForGetCollection);
+                    return Err(ServerError::UnimplementedForGetGrouping);
                 }
             } else {
                 return Err(ServerError::UrlParsingError);
@@ -219,7 +223,7 @@ fn parse_http_request(request: &mut Request) -> ServerResult<Instruction> {
             if segments.len() >= 5 {
                 let url_transactions_key_word = segments[1];
                 let transaction_id_str = segments[2];
-                let _collection_str = segments[3];
+                let _grouping_str = segments[3];
                 let unit_key_str = segments[4];
 
                 if url_transactions_key_word != Constants::URL_TRANSACTIONS_KEY_WORD || unit_key_str.is_empty() {
@@ -245,7 +249,7 @@ fn parse_http_request(request: &mut Request) -> ServerResult<Instruction> {
                     return Ok(instruction);
                 }
             } else if segments.len() >= 3 {
-                let _collection_str = segments[1];
+                let _grouping_str = segments[1];
                 let unit_key_str = segments[2];
 
                 if unit_key_str.is_empty() {
@@ -313,7 +317,7 @@ fn parse_http_request(request: &mut Request) -> ServerResult<Instruction> {
             if segments.len() >= 5 {
                 let url_transactions_key_word = segments[1];
                 let transaction_id_str = segments[2];
-                let _collection_str = segments[3];
+                let _grouping_str = segments[3];
                 let unit_key_str = segments[4];
 
                 if unit_key_str.is_empty() || transaction_id_str.is_empty() || url_transactions_key_word != Constants::URL_TRANSACTIONS_KEY_WORD {
@@ -327,7 +331,7 @@ fn parse_http_request(request: &mut Request) -> ServerResult<Instruction> {
                 let instruction = Instruction::TransactionalRemoveOne { key: unit_key, transaction_id };
                 return Ok(instruction);
             } else if segments.len() >= 3 {
-                let _collection_str = segments[1];
+                let _grouping_str = segments[1];
                 let unit_key_str = segments[2];
 
                 let unit_key = UnitKey::from(unit_key_str);

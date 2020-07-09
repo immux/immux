@@ -1,14 +1,11 @@
-use std::boxed::Box;
 use std::io::Error;
 use std::num::ParseIntError;
 
 use crate::storage::executor::errors::ExecutorError;
 
-pub type ServerGeneralError = Box<dyn std::error::Error + std::marker::Send + std::marker::Sync>;
-
 #[derive(Debug)]
 pub enum ServerError {
-    GeneralError(ServerGeneralError),
+    TinyHTTPError,
     ExecutorError(ExecutorError),
     BodyExtractionError(Error),
     UrlParsingError,
@@ -17,13 +14,7 @@ pub enum ServerError {
     HttpResponseError(Error),
 
     //    unimplemented error
-    UnimplementedForGetCollection,
-}
-
-impl From<ServerGeneralError> for ServerError {
-    fn from(err: ServerGeneralError) -> ServerError {
-        ServerError::GeneralError(err)
-    }
+    UnimplementedForGetGrouping,
 }
 
 impl From<ExecutorError> for ServerError {

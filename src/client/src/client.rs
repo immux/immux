@@ -17,8 +17,8 @@ impl ImmuxDBClient {
 }
 
 impl ImmuxDBClient {
-    pub fn get_by_key(&self, collection: &String, unit_key: &UnitKey) -> ClientResult {
-        let url = format!("http://{}/{}/{}", &self.host, collection, unit_key.to_string());
+    pub fn get_by_key(&self, grouping: &str, unit_key: &UnitKey) -> ClientResult {
+        let url = format!("http://{}/{}/{}", &self.host, grouping, unit_key.to_string());
 
         let mut response = reqwest::get(&url)?;
         let status_code = response.status();
@@ -29,13 +29,13 @@ impl ImmuxDBClient {
         }
     }
 
-    pub fn transactional_get(&self, collection: &String, unit_key: &UnitKey, transaction_id: &TransactionId) -> ClientResult {
+    pub fn transactional_get(&self, grouping: &str, unit_key: &UnitKey, transaction_id: &TransactionId) -> ClientResult {
         let url = format!(
             "http://{}/{}/{}/{}/{}",
             &self.host,
             Constants::URL_TRANSACTIONS_KEY_WORD,
             transaction_id.as_u64(),
-            collection,
+            grouping,
             unit_key.to_string(),
         );
 
@@ -48,11 +48,11 @@ impl ImmuxDBClient {
         }
     }
 
-    pub fn inspect_one(&self, collection: &String, unit_key: &UnitKey) -> ClientResult {
+    pub fn inspect_one(&self, grouping: &str, unit_key: &UnitKey) -> ClientResult {
         let url = format!(
             "http://{}/{}/{}/{}",
             &self.host,
-            collection,
+            grouping,
             unit_key.to_string(),
             Constants::URL_JOURNAL_KEY_WORD,
         );
@@ -66,14 +66,14 @@ impl ImmuxDBClient {
         }
     }
 
-    pub fn get_by_collection(&self, _collection: &String) -> ClientResult {
+    pub fn get_by_grouping(&self, _grouping: &str) -> ClientResult {
         return Err(ImmuxDBClientError::Unimplemented);
     }
 
-    pub fn set_unit(&self, collection: &String, unit_key: &UnitKey, unit_content: &UnitContent) -> ClientResult {
+    pub fn set_unit(&self, grouping: &str, unit_key: &UnitKey, unit_content: &UnitContent) -> ClientResult {
         let client = reqwest::Client::new();
         let mut response = client
-            .put(&format!("http://{}/{}/{}", &self.host, collection, unit_key.to_string(),))
+            .put(&format!("http://{}/{}/{}", &self.host, grouping, unit_key.to_string(),))
             .body(unit_content.to_string())
             .send()?;
         let status_code = response.status();
@@ -84,7 +84,7 @@ impl ImmuxDBClient {
         }
     }
 
-    pub fn transactional_set_unit(&self, collection: &String, unit_key: &UnitKey, unit_content: &UnitContent, transaction_id: &TransactionId) -> ClientResult {
+    pub fn transactional_set_unit(&self, grouping: &str, unit_key: &UnitKey, unit_content: &UnitContent, transaction_id: &TransactionId) -> ClientResult {
         let client = reqwest::Client::new();
         let mut response = client
             .put(&format!(
@@ -92,7 +92,7 @@ impl ImmuxDBClient {
                 &self.host,
                 Constants::URL_TRANSACTIONS_KEY_WORD,
                 transaction_id.as_u64(),
-                collection,
+                grouping,
                 unit_key.to_string(),
             ))
             .body(unit_content.to_string())
@@ -105,13 +105,13 @@ impl ImmuxDBClient {
         }
     }
 
-    pub fn revert_one(&self, collection: &String, unit_key: &UnitKey, height: &ChainHeight) -> ClientResult {
+    pub fn revert_one(&self, grouping: &str, unit_key: &UnitKey, height: &ChainHeight) -> ClientResult {
         let client = reqwest::Client::new();
         let mut response = client
             .put(&format!(
                 "http://{}/{}/{}?{}={}",
                 &self.host,
-                collection,
+                grouping,
                 unit_key.to_string(),
                 Constants::HEIGHT,
                 height.as_u64(),
@@ -125,7 +125,7 @@ impl ImmuxDBClient {
         }
     }
 
-    pub fn transactional_revert_one(&self, collection: &String, unit_key: &UnitKey, height: &ChainHeight, transaction_id: &TransactionId) -> ClientResult {
+    pub fn transactional_revert_one(&self, grouping: &str, unit_key: &UnitKey, height: &ChainHeight, transaction_id: &TransactionId) -> ClientResult {
         let client = reqwest::Client::new();
         let mut response = client
             .put(&format!(
@@ -133,7 +133,7 @@ impl ImmuxDBClient {
                 &self.host,
                 Constants::URL_TRANSACTIONS_KEY_WORD,
                 transaction_id.as_u64(),
-                collection,
+                grouping,
                 unit_key.to_string(),
                 Constants::HEIGHT,
                 height.as_u64(),
@@ -160,10 +160,10 @@ impl ImmuxDBClient {
         }
     }
 
-    pub fn remove_one(&self, collection: &String, unit_key: &UnitKey) -> ClientResult {
+    pub fn remove_one(&self, grouping: &str, unit_key: &UnitKey) -> ClientResult {
         let client = reqwest::Client::new();
         let mut response = client
-            .delete(&format!("http://{}/{}/{}", &self.host, collection, unit_key.to_string(),))
+            .delete(&format!("http://{}/{}/{}", &self.host, grouping, unit_key.to_string(),))
             .send()?;
         let status_code = response.status();
 
@@ -173,7 +173,7 @@ impl ImmuxDBClient {
         }
     }
 
-    pub fn transactional_remove_one(&self, transaction_id: &TransactionId, collection: &String, unit_key: &UnitKey) -> ClientResult {
+    pub fn transactional_remove_one(&self, transaction_id: &TransactionId, grouping: &str, unit_key: &UnitKey) -> ClientResult {
         let client = reqwest::Client::new();
         let mut response = client
             .delete(&format!(
@@ -181,7 +181,7 @@ impl ImmuxDBClient {
                 &self.host,
                 Constants::URL_TRANSACTIONS_KEY_WORD,
                 transaction_id.as_u64(),
-                collection,
+                grouping,
                 unit_key.to_string(),
             ))
             .send()?;
