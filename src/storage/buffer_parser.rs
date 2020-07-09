@@ -15,7 +15,7 @@ impl<'a> Iterator for CommandBufferParser<'a> {
     type Item = (Command, usize);
 
     fn next(&mut self) -> Option<Self::Item> {
-        match Command::try_from(&self.buffer[self.index..]) {
+        match Command::parse(&self.buffer[self.index..]) {
             Ok((command, command_length)) => {
                 self.index += command_length;
                 return Some((command, command_length));
@@ -43,12 +43,8 @@ mod tests {
                 key: KVKey::new(&[0x11, 0x22]),
                 height: ChainHeight::new(3),
             },
-            Command::RevertAll {
-                height: ChainHeight::new(6),
-            },
-            Command::RemoveOne {
-                key: KVKey::new(&[0x88]),
-            },
+            Command::RevertAll { height: ChainHeight::new(6) },
+            Command::RemoveOne { key: KVKey::new(&[0x88]) },
             Command::RemoveAll,
         ];
 
@@ -71,10 +67,7 @@ mod tests {
         let commands = get_commands();
         let buffer = serialize_commands(&commands);
 
-        let command_buffer_parser = CommandBufferParser {
-            buffer: &buffer,
-            index: 0,
-        };
+        let command_buffer_parser = CommandBufferParser { buffer: &buffer, index: 0 };
 
         for (index, (actual_command, _)) in command_buffer_parser.enumerate() {
             let expected_command = &commands.as_slice()[index];
@@ -90,10 +83,7 @@ mod tests {
         let some_broken_bytes = [0xff, 0x00, 0xfa];
         buffer.extend_from_slice(&some_broken_bytes);
 
-        let mut command_buffer_parser = CommandBufferParser {
-            buffer: &buffer,
-            index: 0,
-        };
+        let mut command_buffer_parser = CommandBufferParser { buffer: &buffer, index: 0 };
 
         for expected_command in commands {
             let (actual_command, _) = &command_buffer_parser.next().unwrap();

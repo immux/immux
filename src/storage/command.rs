@@ -2,17 +2,19 @@ use crate::storage::chain_height::ChainHeight;
 use crate::storage::kvkey::KVKey;
 use crate::storage::kvvalue::KVValue;
 use crate::storage::transaction_manager::TransactionId;
-use crate::utils::varint::{varint_decode, varint_encode, VarIntError};
+use crate::utils::varint::{varint_decode, VarIntError};
 
 #[derive(Debug)]
 pub enum CommandError {
-    UnexpectedFormat(Option<VarIntError>),
+    MissingPrefixByte,
     KeyExceedsMaxLength,
+    VarInt(VarIntError),
+    UnknownPrefix(u8),
 }
 
 impl From<VarIntError> for CommandError {
     fn from(error: VarIntError) -> CommandError {
-        CommandError::UnexpectedFormat(Some(error))
+        CommandError::VarInt(error)
     }
 }
 
@@ -74,144 +76,69 @@ pub enum Command {
 
 impl Command {
     pub fn serialize(&self) -> Vec<u8> {
+        let mut command_bytes: Vec<u8> = Vec::new();
+
         match self {
             Command::Set { key, value } => {
-                let mut command_bytes: Vec<u8> = Vec::new();
-
                 command_bytes.push(CommandPrefix::Set as u8);
-
-                let key_length: u64 = key.as_bytes().len() as u64;
-                command_bytes.extend_from_slice(&varint_encode(key_length));
-                command_bytes.extend_from_slice(&key.as_bytes());
-
-                let value_length: u64 = value.as_bytes().len() as u64;
-                command_bytes.extend_from_slice(&varint_encode(value_length));
-                command_bytes.extend_from_slice(&value.as_bytes());
-
-                return command_bytes;
+                command_bytes.extend(key.serialize());
+                command_bytes.extend(value.serialize());
             }
             Command::RevertOne { key, height } => {
-                let mut command_bytes: Vec<u8> = Vec::new();
-
                 command_bytes.push(CommandPrefix::RevertOne as u8);
-
-                let key_length: u64 = key.as_bytes().len() as u64;
-                command_bytes.extend_from_slice(&varint_encode(key_length));
-                command_bytes.extend_from_slice(&key.as_bytes());
-
-                command_bytes.extend_from_slice(&varint_encode(height.as_u64()));
-
-                return command_bytes;
+                command_bytes.extend(key.serialize());
+                command_bytes.extend(height.serialize());
             }
             Command::RevertAll { height } => {
-                let mut command_bytes: Vec<u8> = Vec::new();
-
                 command_bytes.push(CommandPrefix::RevertAll as u8);
-                command_bytes.extend_from_slice(&varint_encode(height.as_u64()));
-
-                return command_bytes;
+                command_bytes.extend(height.serialize());
             }
             Command::RemoveOne { key } => {
-                let mut command_bytes: Vec<u8> = Vec::new();
-
                 command_bytes.push(CommandPrefix::RemoveOne as u8);
-
-                let key_length: u64 = key.as_bytes().len() as u64;
-                command_bytes.extend_from_slice(&varint_encode(key_length));
-                command_bytes.extend_from_slice(&key.as_bytes());
-
-                return command_bytes;
+                command_bytes.extend(key.serialize());
             }
             Command::RemoveAll => {
-                let mut command_bytes: Vec<u8> = Vec::new();
-
                 command_bytes.push(CommandPrefix::RemoveAll as u8);
-                return command_bytes;
             }
             Command::TransactionStart { transaction_id } => {
-                let mut command_bytes: Vec<u8> = Vec::new();
-
                 command_bytes.push(CommandPrefix::TransactionStart as u8);
-                command_bytes.extend_from_slice(&varint_encode(transaction_id.as_u64()));
-                return command_bytes;
+                command_bytes.extend(transaction_id.serialize());
             }
-            Command::TransactionalSet {
-                key,
-                value,
-                transaction_id,
-            } => {
-                let mut command_bytes: Vec<u8> = Vec::new();
-
+            Command::TransactionalSet { key, value, transaction_id } => {
                 command_bytes.push(CommandPrefix::TransactionalSet as u8);
 
-                let key_length: u64 = key.as_bytes().len() as u64;
-                command_bytes.extend_from_slice(&varint_encode(key_length));
-                command_bytes.extend_from_slice(&key.as_bytes());
-
-                let value_length: u64 = value.as_bytes().len() as u64;
-                command_bytes.extend_from_slice(&varint_encode(value_length));
-                command_bytes.extend_from_slice(&value.as_bytes());
-
-                command_bytes.extend_from_slice(&varint_encode(transaction_id.as_u64()));
-
-                return command_bytes;
+                command_bytes.extend(key.serialize());
+                command_bytes.extend(value.serialize());
+                command_bytes.extend(transaction_id.serialize());
             }
-            Command::TransactionalRevertOne {
-                key,
-                height,
-                transaction_id,
-            } => {
-                let mut command_bytes: Vec<u8> = Vec::new();
-
+            Command::TransactionalRevertOne { key, height, transaction_id } => {
                 command_bytes.push(CommandPrefix::TransactionalRevertOne as u8);
 
-                let key_length: u64 = key.as_bytes().len() as u64;
-                command_bytes.extend_from_slice(&varint_encode(key_length));
-                command_bytes.extend_from_slice(&key.as_bytes());
-
-                command_bytes.extend_from_slice(&varint_encode(height.as_u64()));
-
-                command_bytes.extend_from_slice(&varint_encode(transaction_id.as_u64()));
-
-                return command_bytes;
+                command_bytes.extend(key.serialize());
+                command_bytes.extend(height.serialize());
+                command_bytes.extend(transaction_id.serialize());
             }
-            Command::TransactionalRemoveOne {
-                key,
-                transaction_id,
-            } => {
-                let mut command_bytes: Vec<u8> = Vec::new();
-
+            Command::TransactionalRemoveOne { key, transaction_id } => {
                 command_bytes.push(CommandPrefix::TransactionalRemoveOne as u8);
-
-                let key_length: u64 = key.as_bytes().len() as u64;
-                command_bytes.extend_from_slice(&varint_encode(key_length));
-                command_bytes.extend_from_slice(&key.as_bytes());
-
-                command_bytes.extend_from_slice(&varint_encode(transaction_id.as_u64()));
-
-                return command_bytes;
+                command_bytes.extend(key.serialize());
+                command_bytes.extend(transaction_id.serialize());
             }
             Command::TransactionCommit { transaction_id } => {
-                let mut command_bytes: Vec<u8> = Vec::new();
-
                 command_bytes.push(CommandPrefix::TransactionCommit as u8);
-                command_bytes.extend_from_slice(&varint_encode(transaction_id.as_u64()));
-                return command_bytes;
+                command_bytes.extend(transaction_id.serialize());
             }
             Command::TransactionAbort { transaction_id } => {
-                let mut command_bytes: Vec<u8> = Vec::new();
-
                 command_bytes.push(CommandPrefix::TransactionAbort as u8);
-                command_bytes.extend_from_slice(&varint_encode(transaction_id.as_u64()));
-                return command_bytes;
+                command_bytes.extend(transaction_id.serialize());
             }
         }
+        return command_bytes;
     }
 
-    pub fn try_from(data: &[u8]) -> Result<(Self, usize), CommandError> {
+    pub fn parse(data: &[u8]) -> Result<(Self, usize), CommandError> {
         let mut position = 0;
         match data.get(position) {
-            None => return Err(CommandError::UnexpectedFormat(None)),
+            None => return Err(CommandError::MissingPrefixByte),
             Some(&prefix) => {
                 position += 1;
 
@@ -357,7 +284,7 @@ impl Command {
 
                     return Ok((command, position));
                 } else {
-                    return Err(CommandError::UnexpectedFormat(None));
+                    return Err(CommandError::UnknownPrefix(prefix));
                 }
             }
         }
@@ -371,7 +298,7 @@ fn parse_set_command() {
     let expected_command = Command::Set { key, value };
 
     let command_bytes: Vec<u8> = expected_command.serialize();
-    let (actual_command, _) = Command::try_from(&command_bytes).unwrap();
+    let (actual_command, _) = Command::parse(&command_bytes).unwrap();
 
     assert_eq!(expected_command, actual_command);
 }
@@ -383,7 +310,7 @@ fn serialize_revert_one_command() {
     let expected_command = Command::RevertOne { key, height };
 
     let command_bytes: Vec<u8> = expected_command.serialize();
-    let (actual_command, _) = Command::try_from(&command_bytes).unwrap();
+    let (actual_command, _) = Command::parse(&command_bytes).unwrap();
 
     assert_eq!(expected_command, actual_command);
 }
@@ -394,7 +321,7 @@ fn serialize_revert_all_command() {
     let expected_command = Command::RevertAll { height };
 
     let command_bytes: Vec<u8> = expected_command.serialize();
-    let (actual_command, _) = Command::try_from(&command_bytes).unwrap();
+    let (actual_command, _) = Command::parse(&command_bytes).unwrap();
 
     assert_eq!(expected_command, actual_command);
 }
@@ -405,7 +332,7 @@ fn serialize_remove_command() {
     let expected_command = Command::RemoveOne { key };
 
     let command_bytes: Vec<u8> = expected_command.serialize();
-    let (actual_command, _) = Command::try_from(&command_bytes).unwrap();
+    let (actual_command, _) = Command::parse(&command_bytes).unwrap();
 
     assert_eq!(expected_command, actual_command);
 }
@@ -415,7 +342,7 @@ fn serialize_remove_all_command() {
     let expected_command = Command::RemoveAll;
 
     let command_bytes: Vec<u8> = expected_command.serialize();
-    let (actual_command, _) = Command::try_from(&command_bytes).unwrap();
+    let (actual_command, _) = Command::parse(&command_bytes).unwrap();
 
     assert_eq!(expected_command, actual_command);
 }

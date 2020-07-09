@@ -14,13 +14,11 @@ pub const SUBCOMMAND_ABORT_TRANSACTION: &str = "abort_transaction";
 
 pub const SUBCOMMAND_SET_DESCRIPTION: &str = "Set the string key value pair.";
 pub const SUBCOMMAND_GET_DESCRIPTION: &str = "Get the string value of a given string key.";
-pub const SUBCOMMAND_REVERT_ONE_DESCRIPTION: &str =
-    "Revert the string value of a given string key.";
+pub const SUBCOMMAND_REVERT_ONE_DESCRIPTION: &str = "Revert the string value of a given string key.";
 pub const SUBCOMMAND_REVERT_ALL_DESCRIPTION: &str = "Revert the whole db.";
 pub const SUBCOMMAND_REMOVE_ONE_DESCRIPTION: &str = "Remove the key";
 pub const SUBCOMMAND_REMOVE_ALL_DESCRIPTION: &str = "Clear the whole db";
-pub const SUBCOMMAND_INSPECT_ONE_DESCRIPTION: &str =
-    "Inspect the string value of a given string key.";
+pub const SUBCOMMAND_INSPECT_ONE_DESCRIPTION: &str = "Inspect the string value of a given string key.";
 pub const SUBCOMMAND_INSPECT_ALL_DESCRIPTION: &str = "Inspect the whole log.";
 pub const SUBCOMMAND_CREATE_TRANSACTION_DESCRIPTION: &str = "Create transaction";
 pub const SUBCOMMAND_COMMIT_TRANSACTION_DESCRIPTION: &str = "Commit transaction";
@@ -39,9 +37,17 @@ pub const MISSING_TRANSACTION_ID_ARGUMENT_MESSAGE: &str = "TRANSACTION_ID argume
 pub const MISSING_KEY_MESSAGE: &str = "Key not existed";
 
 pub const TEMP_LOG_FILE_PATH: &str = "/tmp";
-
 pub const LOG_FILE_NAME: &str = "command_log";
 
 pub const MAX_KEY_LENGTH: usize = 8 * 1024;
 
 pub const MAX_TRANSACTION_ID: u64 = u64::MAX;
+
+pub const SERVER_END_POINT: &str = "127.0.0.1";
+pub const HEIGHT: &str = "height";
+pub const REVERT_ALL_KEYWORD: &str = "revert_all";
+pub const COMMIT_TRANSACTION_KEY_WORD: &str = "commit";
+pub const ABORT_TRANSACTION_KEY_WORD: &str = "abort";
+
+pub const URL_TRANSACTIONS_KEY_WORD: &str = ".transactions";
+pub const URL_JOURNAL_KEY_WORD: &str = ".journal";

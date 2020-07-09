@@ -1,3 +1,5 @@
+use crate::utils::varint::varint_encode;
+
 #[derive(Debug, Clone, PartialEq, PartialOrd)]
 pub struct ChainHeight(u64);
 
@@ -27,5 +29,8 @@ impl ChainHeight {
     }
     pub fn as_u64(&self) -> u64 {
         self.0
+    }
+    pub fn serialize(&self) -> Vec<u8> {
+        varint_encode(self.as_u64())
     }
 }

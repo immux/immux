@@ -1,0 +1,8 @@
+[package]
+name = "immuxsys_dev_utils"
+version = "0.2.0"
+authors = ["Yiwang Network Technology Company, Limited"]
+edition = "2018"
+
+[dependencies]
+immuxsys = { path = "../.." }

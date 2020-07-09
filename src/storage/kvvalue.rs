@@ -1,4 +1,5 @@
 use crate::storage::executor::unit_content::UnitContent;
+use crate::utils::varint::varint_encode;
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct KVValue(Vec<u8>);
@@ -9,6 +10,13 @@ impl KVValue {
     }
     pub fn as_bytes(&self) -> &[u8] {
         &self.0
+    }
+    pub fn serialize(&self) -> Vec<u8> {
+        let mut serialized = Vec::new();
+        let bytes = self.as_bytes();
+        serialized.extend_from_slice(&varint_encode(bytes.len() as u64));
+        serialized.extend_from_slice(bytes);
+        return serialized;
     }
 }
 
