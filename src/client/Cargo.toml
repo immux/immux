@@ -1,9 +1,0 @@
-[package]
-name = "immuxsys_client"
-version = "0.2.0"
-authors = ["Yiwang Network Technology Company, Limited"]
-edition = "2018"
-
-[dependencies]
-reqwest = "0.9"
-immuxsys = { path = "../.." }

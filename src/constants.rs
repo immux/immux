@@ -14,11 +14,13 @@ pub const SUBCOMMAND_ABORT_TRANSACTION: &str = "abort_transaction";
 
 pub const SUBCOMMAND_SET_DESCRIPTION: &str = "Set the string key value pair.";
 pub const SUBCOMMAND_GET_DESCRIPTION: &str = "Get the string value of a given string key.";
-pub const SUBCOMMAND_REVERT_ONE_DESCRIPTION: &str = "Revert the string value of a given string key.";
+pub const SUBCOMMAND_REVERT_ONE_DESCRIPTION: &str =
+    "Revert the string value of a given string key.";
 pub const SUBCOMMAND_REVERT_ALL_DESCRIPTION: &str = "Revert the whole db.";
 pub const SUBCOMMAND_REMOVE_ONE_DESCRIPTION: &str = "Remove the key";
 pub const SUBCOMMAND_REMOVE_ALL_DESCRIPTION: &str = "Clear the whole db";
-pub const SUBCOMMAND_INSPECT_ONE_DESCRIPTION: &str = "Inspect the string value of a given string key.";
+pub const SUBCOMMAND_INSPECT_ONE_DESCRIPTION: &str =
+    "Inspect the string value of a given string key.";
 pub const SUBCOMMAND_INSPECT_ALL_DESCRIPTION: &str = "Inspect the whole log.";
 pub const SUBCOMMAND_CREATE_TRANSACTION_DESCRIPTION: &str = "Create transaction";
 pub const SUBCOMMAND_COMMIT_TRANSACTION_DESCRIPTION: &str = "Commit transaction";

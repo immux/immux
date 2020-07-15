@@ -1,4 +1,7 @@
-use crate::utils::ints::{u16_to_u8_array, u32_to_u8_array, u64_to_u8_array, u8_array_to_u16, u8_array_to_u32, u8_array_to_u64};
+use crate::utils::ints::{
+    u16_to_u8_array, u32_to_u8_array, u64_to_u8_array, u8_array_to_u16, u8_array_to_u32,
+    u8_array_to_u64,
+};
 
 /// Variable-length integer encoding, using simplistic Bitcoin's varint design:
 /// https://bitcointalk.org/index.php?topic=32849.msg410480#msg410480
@@ -35,7 +38,9 @@ pub fn varint_decode(data: &[u8]) -> Result<(u64, usize), VarIntError> {
             if data.len() < 9 {
                 return Err(VarIntError::UnexpectedFormat);
             } else {
-                let array = [data[1], data[2], data[3], data[4], data[5], data[6], data[7], data[8]];
+                let array = [
+                    data[1], data[2], data[3], data[4], data[5], data[6], data[7], data[8],
+                ];
                 return Ok((u8_array_to_u64(&array), 9));
             }
         }
@@ -123,7 +128,10 @@ mod varint_utils_tests {
     fn test_varint_64bit_encode() {
         let u = 0x1122334455667788;
         let encoding = varint_encode(u);
-        assert_eq!(encoding, [0xff, 0x88, 0x77, 0x66, 0x55, 0x44, 0x33, 0x22, 0x11])
+        assert_eq!(
+            encoding,
+            [0xff, 0x88, 0x77, 0x66, 0x55, 0x44, 0x33, 0x22, 0x11]
+        )
     }
 
     #[test]
@@ -159,7 +167,10 @@ mod varint_utils_tests {
             (0xffff, vec![0xfd, 0xff, 0xff]),
             (0x00010000, vec![0xfe, 0x00, 0x00, 0x01, 0x00]),
             (0xffffffff, vec![0xfe, 0xff, 0xff, 0xff, 0xff]),
-            (0x0100000000, vec![0xff, 0x00, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00]),
+            (
+                0x0100000000,
+                vec![0xff, 0x00, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00],
+            ),
         ];
 
         for (u, v) in cases {

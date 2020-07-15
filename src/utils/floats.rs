@@ -16,7 +16,9 @@ mod float_utils_test {
     fn spot_check_f64_array_reversibility() {
         fn is_reversible(f: f64) -> bool {
             let bytes = f64_to_u8_array(f);
-            let f_parsed = u8_array_to_f64(&[bytes[0], bytes[1], bytes[2], bytes[3], bytes[4], bytes[5], bytes[6], bytes[7]]);
+            let f_parsed = u8_array_to_f64(&[
+                bytes[0], bytes[1], bytes[2], bytes[3], bytes[4], bytes[5], bytes[6], bytes[7],
+            ]);
             return f == f_parsed;
         }
 

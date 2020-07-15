@@ -3,10 +3,10 @@
 
 /target
 **/*.rs.bk
-node_modules
 build
 tmp*
 foldr.json
-data-raw
+dev_utils/src/data_models/data-raw
+*svg
 
 tests/coverage-report

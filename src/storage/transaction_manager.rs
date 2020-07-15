@@ -48,7 +48,9 @@ impl TransactionManager {
         }
     }
 
-    pub fn generate_new_transaction_id(&mut self) -> Result<TransactionId, TransactionManagerError> {
+    pub fn generate_new_transaction_id(
+        &mut self,
+    ) -> Result<TransactionId, TransactionManagerError> {
         let next_transaction_id = self.current_transaction_id.increment()?;
         return Ok(next_transaction_id);
     }
@@ -61,16 +63,24 @@ impl TransactionManager {
         if let Some(keys) = self.affected_keys_in_transactions.get_mut(&transaction_id) {
             keys.push(key.to_owned());
         } else {
-            self.affected_keys_in_transactions.insert(transaction_id.clone(), vec![key.to_owned()]);
+            self.affected_keys_in_transactions
+                .insert(transaction_id.clone(), vec![key.to_owned()]);
         }
     }
 
     pub fn initialize_affected_keys(&mut self, transaction_id: &TransactionId) {
-        self.affected_keys_in_transactions.insert(transaction_id.clone(), vec![]);
+        self.affected_keys_in_transactions
+            .insert(transaction_id.clone(), vec![]);
     }
 
-    pub fn validate_transaction_id(&self, transaction_id: &TransactionId) -> Result<(), TransactionManagerError> {
-        return if self.affected_keys_in_transactions.contains_key(&transaction_id) {
+    pub fn validate_transaction_id(
+        &self,
+        transaction_id: &TransactionId,
+    ) -> Result<(), TransactionManagerError> {
+        return if self
+            .affected_keys_in_transactions
+            .contains_key(&transaction_id)
+        {
             Ok(())
         } else {
             Err(TransactionManagerError::TransactionNotAlive)

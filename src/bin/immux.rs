@@ -4,7 +4,9 @@ use immuxsys::constants as Constants;
 use immuxsys::storage::chain_height::ChainHeight;
 
 use clap::{App, Arg, SubCommand};
-use immuxsys::storage::executor::{errors::ExecutorResult, executor::Executor, unit_content::UnitContent, unit_key::UnitKey};
+use immuxsys::storage::executor::{
+    errors::ExecutorResult, executor::Executor, unit_content::UnitContent, unit_key::UnitKey,
+};
 use immuxsys::storage::transaction_manager::TransactionId;
 
 fn main() -> ExecutorResult<()> {
@@ -87,7 +89,10 @@ fn main() -> ExecutorResult<()> {
                         .required(false),
                 ),
         )
-        .subcommand(SubCommand::with_name(Constants::SUBCOMMAND_REMOVE_ALL).about(Constants::SUBCOMMAND_REMOVE_ALL_DESCRIPTION))
+        .subcommand(
+            SubCommand::with_name(Constants::SUBCOMMAND_REMOVE_ALL)
+                .about(Constants::SUBCOMMAND_REMOVE_ALL_DESCRIPTION),
+        )
         .subcommand(
             SubCommand::with_name(Constants::SUBCOMMAND_INSPECT_ONE)
                 .about(Constants::SUBCOMMAND_INSPECT_ONE_DESCRIPTION)
@@ -97,8 +102,14 @@ fn main() -> ExecutorResult<()> {
                         .required(true),
                 ),
         )
-        .subcommand(SubCommand::with_name(Constants::SUBCOMMAND_INSPECT_ALL).about(Constants::SUBCOMMAND_INSPECT_ALL_DESCRIPTION))
-        .subcommand(SubCommand::with_name(Constants::SUBCOMMAND_CREATE_TRANSACTION).about(Constants::SUBCOMMAND_CREATE_TRANSACTION_DESCRIPTION))
+        .subcommand(
+            SubCommand::with_name(Constants::SUBCOMMAND_INSPECT_ALL)
+                .about(Constants::SUBCOMMAND_INSPECT_ALL_DESCRIPTION),
+        )
+        .subcommand(
+            SubCommand::with_name(Constants::SUBCOMMAND_CREATE_TRANSACTION)
+                .about(Constants::SUBCOMMAND_CREATE_TRANSACTION_DESCRIPTION),
+        )
         .subcommand(
             SubCommand::with_name(Constants::SUBCOMMAND_COMMIT_TRANSACTION)
                 .about(Constants::SUBCOMMAND_COMMIT_TRANSACTION_DESCRIPTION)
@@ -132,7 +143,9 @@ fn main() -> ExecutorResult<()> {
 
             let mut executor = Executor::open(&path)?;
 
-            if let Some(transaction_id_str) = arg_matches.value_of(Constants::ARGUMENT_NAME_FOR_TRANSACTION_ID) {
+            if let Some(transaction_id_str) =
+                arg_matches.value_of(Constants::ARGUMENT_NAME_FOR_TRANSACTION_ID)
+            {
                 let transaction_id = transaction_id_str.parse::<u64>()?;
                 executor.set(
                     &UnitKey::new(&key.as_bytes()),
@@ -140,7 +153,11 @@ fn main() -> ExecutorResult<()> {
                     Some(TransactionId::new(transaction_id)),
                 )
             } else {
-                executor.set(&UnitKey::new(&key.as_bytes()), &UnitContent::String(value.to_string()), None)
+                executor.set(
+                    &UnitKey::new(&key.as_bytes()),
+                    &UnitContent::String(value.to_string()),
+                    None,
+                )
             }
         }
         (Constants::SUBCOMMAND_GET, Some(arg_matches)) => {
@@ -151,9 +168,14 @@ fn main() -> ExecutorResult<()> {
             let path = PathBuf::from(Constants::TEMP_LOG_FILE_PATH);
             let mut executor = Executor::open(&path)?;
 
-            if let Some(transaction_id_str) = arg_matches.value_of(Constants::ARGUMENT_NAME_FOR_TRANSACTION_ID) {
+            if let Some(transaction_id_str) =
+                arg_matches.value_of(Constants::ARGUMENT_NAME_FOR_TRANSACTION_ID)
+            {
                 let transaction_id = transaction_id_str.parse::<u64>()?;
-                match executor.get(&UnitKey::new(&key.as_bytes()), Some(TransactionId::new(transaction_id)))? {
+                match executor.get(
+                    &UnitKey::new(&key.as_bytes()),
+                    Some(TransactionId::new(transaction_id)),
+                )? {
                     Some(result) => {
                         println!("{:?}", result);
                     }
@@ -187,7 +209,9 @@ fn main() -> ExecutorResult<()> {
             let mut executor = Executor::open(&path)?;
             let height = height_str.parse::<u64>()?;
 
-            if let Some(transaction_id_str) = arg_matches.value_of(Constants::ARGUMENT_NAME_FOR_TRANSACTION_ID) {
+            if let Some(transaction_id_str) =
+                arg_matches.value_of(Constants::ARGUMENT_NAME_FOR_TRANSACTION_ID)
+            {
                 let transaction_id = transaction_id_str.parse::<u64>()?;
                 executor.revert_one(
                     &UnitKey::new(&key.as_bytes()),
@@ -195,7 +219,11 @@ fn main() -> ExecutorResult<()> {
                     Some(TransactionId::new(transaction_id)),
                 )
             } else {
-                executor.revert_one(&UnitKey::new(&key.as_bytes()), &ChainHeight::new(height), None)
+                executor.revert_one(
+                    &UnitKey::new(&key.as_bytes()),
+                    &ChainHeight::new(height),
+                    None,
+                )
             }
         }
         (Constants::SUBCOMMAND_REVERT_ALL, Some(arg_matches)) => {
@@ -218,9 +246,14 @@ fn main() -> ExecutorResult<()> {
 
             let mut executor = Executor::open(&path)?;
 
-            if let Some(transaction_id_str) = arg_matches.value_of(Constants::ARGUMENT_NAME_FOR_TRANSACTION_ID) {
+            if let Some(transaction_id_str) =
+                arg_matches.value_of(Constants::ARGUMENT_NAME_FOR_TRANSACTION_ID)
+            {
                 let transaction_id = transaction_id_str.parse::<u64>()?;
-                executor.remove_one(&UnitKey::new(&key.as_bytes()), Some(TransactionId::new(transaction_id)))
+                executor.remove_one(
+                    &UnitKey::new(&key.as_bytes()),
+                    Some(TransactionId::new(transaction_id)),
+                )
             } else {
                 executor.remove_one(&UnitKey::new(&key.as_bytes()), None)
             }
