@@ -42,43 +42,44 @@ pub fn run_server(mut executor: Executor, port: u16) -> ServerResult<()> {
     match Server::http(address) {
         Ok(server) => {
             for mut request in server.incoming_requests() {
-                let (status, body): (u16, String) = match handle_request(request.borrow_mut(), &mut executor) {
-                    Err(error) => (500, format!("Server error {:?}", error)),
-                    Ok(outcome) => match outcome {
-                        Outcome::Select(outcome) => {
-                            let body = match outcome {
-                                None => String::from(""),
-                                Some(content) => content.to_string(),
-                            };
-                            (200, body)
-                        }
-                        Outcome::InspectOne(outcome) => {
-                            let mut body = String::new();
-                            for (instruction, height) in outcome {
-                                body += &instruction.to_string();
-                                body += "\t";
-                                body += &format!("height: {:?}", height);
-                                body += "\r\n";
+                let (status, body): (u16, String) =
+                    match handle_request(request.borrow_mut(), &mut executor) {
+                        Err(error) => (500, format!("Server error {:?}", error)),
+                        Ok(outcome) => match outcome {
+                            Outcome::Select(outcome) => {
+                                let body = match outcome {
+                                    None => String::from(""),
+                                    Some(content) => content.to_string(),
+                                };
+                                (200, body)
                             }
-                            (200, body)
-                        }
-                        Outcome::InspectAll(outcome) => {
-                            let mut body = String::new();
-                            for (instruction, height) in outcome {
-                                body += &instruction.to_string();
-                                body += "\t";
-                                body += &format!("height: {:?}", height);
-                                body += "\r\n";
+                            Outcome::InspectOne(outcome) => {
+                                let mut body = String::new();
+                                for (instruction, height) in outcome {
+                                    body += &instruction.to_string();
+                                    body += "\t";
+                                    body += &format!("height: {:?}", height);
+                                    body += "\r\n";
+                                }
+                                (200, body)
                             }
-                            (200, body)
-                        }
-                        Outcome::CreateTransaction(transaction_id) => {
-                            let body = transaction_id.as_u64().to_string();
-                            (200, body)
-                        }
-                        _ => (200, String::from("Unspecified outcome")),
-                    },
-                };
+                            Outcome::InspectAll(outcome) => {
+                                let mut body = String::new();
+                                for (instruction, height) in outcome {
+                                    body += &instruction.to_string();
+                                    body += "\t";
+                                    body += &format!("height: {:?}", height);
+                                    body += "\r\n";
+                                }
+                                (200, body)
+                            }
+                            Outcome::CreateTransaction(transaction_id) => {
+                                let body = transaction_id.as_u64().to_string();
+                                (200, body)
+                            }
+                            _ => (200, String::from("Unspecified outcome")),
+                        },
+                    };
 
                 let response = Response::from_string(body).with_status_code(status);
                 match request.respond(response) {
@@ -96,7 +97,10 @@ fn handle_request(request: &mut Request, executor: &mut Executor) -> ServerResul
     let instruction = parse_http_request(request)?;
 
     match instruction {
-        Instruction::Select { key, transaction_id } => {
+        Instruction::Select {
+            key,
+            transaction_id,
+        } => {
             let result = executor.get(&key, transaction_id)?;
             return Ok(Outcome::Select(result));
         }
@@ -140,15 +144,26 @@ fn handle_request(request: &mut Request, executor: &mut Executor) -> ServerResul
             executor.abort_transaction(transaction_id)?;
             return Ok(Outcome::TransactionAbortSuccess);
         }
-        Instruction::TransactionalInsert { key, content, transaction_id } => {
+        Instruction::TransactionalInsert {
+            key,
+            content,
+            transaction_id,
+        } => {
             executor.set(&key, &content, Some(transaction_id))?;
             return Ok(Outcome::TransactionalInsertSuccess);
         }
-        Instruction::TransactionalRemoveOne { key, transaction_id } => {
+        Instruction::TransactionalRemoveOne {
+            key,
+            transaction_id,
+        } => {
             executor.remove_one(&key, Some(transaction_id))?;
             return Ok(Outcome::TransactionalRemoveOneSuccess);
         }
-        Instruction::TransactionalRevertOne { key, height, transaction_id } => {
+        Instruction::TransactionalRevertOne {
+            key,
+            height,
+            transaction_id,
+        } => {
             executor.revert_one(&key, &height, Some(transaction_id))?;
             return Ok(Outcome::TransactionalRevertOneSuccess);
         }
@@ -163,6 +178,7 @@ fn parse_http_request(request: &mut Request) -> ServerResult<Instruction> {
     }
 
     let url_info = parse_path(&request.url())?;
+
     let segments: Vec<&str> = url_info.main_path.split("/").collect();
 
     match request.method() {
@@ -173,7 +189,9 @@ fn parse_http_request(request: &mut Request) -> ServerResult<Instruction> {
                 let _grouping_str = segments[3];
                 let unit_key_str = segments[4];
 
-                if url_transactions_key_word != Constants::URL_TRANSACTIONS_KEY_WORD || unit_key_str.is_empty() {
+                if url_transactions_key_word != Constants::URL_TRANSACTIONS_KEY_WORD
+                    || unit_key_str.is_empty()
+                {
                     return Err(ServerError::UrlParsingError);
                 }
 
@@ -191,7 +209,9 @@ fn parse_http_request(request: &mut Request) -> ServerResult<Instruction> {
                 let unit_key_str = segments[2];
                 let url_journal_key_word = segments[3];
 
-                if url_journal_key_word != Constants::URL_JOURNAL_KEY_WORD || unit_key_str.is_empty() {
+                if url_journal_key_word != Constants::URL_JOURNAL_KEY_WORD
+                    || unit_key_str.is_empty()
+                {
                     return Err(ServerError::UrlParsingError);
                 }
 
@@ -226,7 +246,9 @@ fn parse_http_request(request: &mut Request) -> ServerResult<Instruction> {
                 let _grouping_str = segments[3];
                 let unit_key_str = segments[4];
 
-                if url_transactions_key_word != Constants::URL_TRANSACTIONS_KEY_WORD || unit_key_str.is_empty() {
+                if url_transactions_key_word != Constants::URL_TRANSACTIONS_KEY_WORD
+                    || unit_key_str.is_empty()
+                {
                     return Err(ServerError::UrlParsingError);
                 }
 
@@ -245,7 +267,11 @@ fn parse_http_request(request: &mut Request) -> ServerResult<Instruction> {
                 } else {
                     let content = UnitContent::String(incoming_body);
                     let transaction_id = TransactionId::new(transaction_id);
-                    let instruction = Instruction::TransactionalInsert { key: unit_key, content, transaction_id };
+                    let instruction = Instruction::TransactionalInsert {
+                        key: unit_key,
+                        content,
+                        transaction_id,
+                    };
                     return Ok(instruction);
                 }
             } else if segments.len() >= 3 {
@@ -260,11 +286,17 @@ fn parse_http_request(request: &mut Request) -> ServerResult<Instruction> {
 
                 if let Ok(height) = url_info.extract_numeric_query(Constants::HEIGHT) {
                     let height = ChainHeight::new(height);
-                    let instruction = Instruction::RevertOne { key: unit_key, height };
+                    let instruction = Instruction::RevertOne {
+                        key: unit_key,
+                        height,
+                    };
                     return Ok(instruction);
                 } else {
                     let content = UnitContent::String(incoming_body);
-                    let instruction = Instruction::Insert { key: unit_key, content };
+                    let instruction = Instruction::Insert {
+                        key: unit_key,
+                        content,
+                    };
                     return Ok(instruction);
                 }
             } else if let Ok(height) = url_info.extract_numeric_query(Constants::HEIGHT) {
@@ -298,7 +330,9 @@ fn parse_http_request(request: &mut Request) -> ServerResult<Instruction> {
 
                 let instruction = Instruction::TransactionCommit { transaction_id };
                 return Ok(instruction);
-            } else if let Some(_) = url_info.extract_string_query(Constants::ABORT_TRANSACTION_KEY_WORD) {
+            } else if let Some(_) =
+                url_info.extract_string_query(Constants::ABORT_TRANSACTION_KEY_WORD)
+            {
                 if transaction_id_str.is_empty() {
                     return Err(ServerError::UrlParsingError);
                 }
@@ -320,7 +354,10 @@ fn parse_http_request(request: &mut Request) -> ServerResult<Instruction> {
                 let _grouping_str = segments[3];
                 let unit_key_str = segments[4];
 
-                if unit_key_str.is_empty() || transaction_id_str.is_empty() || url_transactions_key_word != Constants::URL_TRANSACTIONS_KEY_WORD {
+                if unit_key_str.is_empty()
+                    || transaction_id_str.is_empty()
+                    || url_transactions_key_word != Constants::URL_TRANSACTIONS_KEY_WORD
+                {
                     return Err(ServerError::UrlParsingError);
                 }
 
@@ -328,7 +365,10 @@ fn parse_http_request(request: &mut Request) -> ServerResult<Instruction> {
                 let transaction_id = TransactionId::new(transaction_id);
                 let unit_key = UnitKey::from(unit_key_str);
 
-                let instruction = Instruction::TransactionalRemoveOne { key: unit_key, transaction_id };
+                let instruction = Instruction::TransactionalRemoveOne {
+                    key: unit_key,
+                    transaction_id,
+                };
                 return Ok(instruction);
             } else if segments.len() >= 3 {
                 let _grouping_str = segments[1];

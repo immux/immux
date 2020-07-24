@@ -1,5 +1,5 @@
-use std::fmt::Formatter;
 use reqwest::StatusCode;
+use std::fmt::Formatter;
 
 #[derive(Debug)]
 pub enum ImmuxDBClientError {

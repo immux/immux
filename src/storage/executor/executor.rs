@@ -22,14 +22,23 @@ impl Executor {
         return Ok(executor);
     }
 
-    pub fn set(&mut self, key: &UnitKey, value: &UnitContent, transaction_id: Option<TransactionId>) -> ExecutorResult<()> {
+    pub fn set(
+        &mut self,
+        key: &UnitKey,
+        value: &UnitContent,
+        transaction_id: Option<TransactionId>,
+    ) -> ExecutorResult<()> {
         let kv_key = KVKey::from(key);
         let kv_value = KVValue::from(value);
         self.store_engine.set(&kv_key, &kv_value, transaction_id)?;
         return Ok(());
     }
 
-    pub fn get(&mut self, key: &UnitKey, transaction_id: Option<TransactionId>) -> ExecutorResult<Option<UnitContent>> {
+    pub fn get(
+        &mut self,
+        key: &UnitKey,
+        transaction_id: Option<TransactionId>,
+    ) -> ExecutorResult<Option<UnitContent>> {
         let kv_key = KVKey::from(key);
         match self.store_engine.get(&kv_key, transaction_id)? {
             None => Ok(None),
@@ -40,9 +49,15 @@ impl Executor {
         }
     }
 
-    pub fn revert_one(&mut self, key: &UnitKey, height: &ChainHeight, transaction_id: Option<TransactionId>) -> ExecutorResult<()> {
+    pub fn revert_one(
+        &mut self,
+        key: &UnitKey,
+        height: &ChainHeight,
+        transaction_id: Option<TransactionId>,
+    ) -> ExecutorResult<()> {
         let kv_key = KVKey::from(key);
-        self.store_engine.revert_one(&kv_key, height, transaction_id)?;
+        self.store_engine
+            .revert_one(&kv_key, height, transaction_id)?;
         return Ok(());
     }
 
@@ -51,7 +66,11 @@ impl Executor {
         return Ok(());
     }
 
-    pub fn remove_one(&mut self, key: &UnitKey, transaction_id: Option<TransactionId>) -> ExecutorResult<()> {
+    pub fn remove_one(
+        &mut self,
+        key: &UnitKey,
+        transaction_id: Option<TransactionId>,
+    ) -> ExecutorResult<()> {
         let kv_key = KVKey::from(key);
         self.store_engine.remove_one(&kv_key, transaction_id)?;
         return Ok(());
@@ -76,7 +95,10 @@ impl Executor {
         return Ok(result?);
     }
 
-    pub fn inspect_one(&mut self, target_key: &UnitKey) -> ExecutorResult<Vec<(Instruction, ChainHeight)>> {
+    pub fn inspect_one(
+        &mut self,
+        target_key: &UnitKey,
+    ) -> ExecutorResult<Vec<(Instruction, ChainHeight)>> {
         let kv_key = KVKey::from(target_key);
         let result: Result<Vec<_>, UnitContentError> = self
             .store_engine

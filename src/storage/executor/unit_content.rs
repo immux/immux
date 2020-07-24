@@ -137,35 +137,48 @@ impl UnitContent {
                         }
                     }
                     ContentTypePrefix::String => {
-                        let (length, offset) = varint_decode(&remaining_bytes).map_err(|_| UnitContentError::UnexpectedLengthBytes)?;
+                        let (length, offset) = varint_decode(&remaining_bytes)
+                            .map_err(|_| UnitContentError::UnexpectedLengthBytes)?;
                         let string_bytes = &remaining_bytes[offset..offset + length as usize];
                         let content_string = String::from_utf8_lossy(string_bytes).to_string();
-                        return Ok((UnitContent::String(content_string), 1 + offset + length as usize));
+                        return Ok((
+                            UnitContent::String(content_string),
+                            1 + offset + length as usize,
+                        ));
                     }
                     ContentTypePrefix::Array => {
                         let mut result: Vec<UnitContent> = Vec::with_capacity(1);
-                        let (total_length, offset) = varint_decode(&remaining_bytes).map_err(|_| UnitContentError::UnexpectedLengthBytes)?;
-                        let contents_bytes = &remaining_bytes[offset..offset + total_length as usize];
+                        let (total_length, offset) = varint_decode(&remaining_bytes)
+                            .map_err(|_| UnitContentError::UnexpectedLengthBytes)?;
+                        let contents_bytes =
+                            &remaining_bytes[offset..offset + total_length as usize];
 
                         let mut position = 0;
                         while position < contents_bytes.len() {
-                            let (content, offset) = UnitContent::parse(&contents_bytes[position..])?;
+                            let (content, offset) =
+                                UnitContent::parse(&contents_bytes[position..])?;
                             result.push(content);
                             position += offset;
                         }
 
-                        return Ok((UnitContent::Array(result), 1 + offset + total_length as usize));
+                        return Ok((
+                            UnitContent::Array(result),
+                            1 + offset + total_length as usize,
+                        ));
                     }
                     ContentTypePrefix::Map => {
                         let mut result = HashMap::new();
-                        let (total_length, offset) = varint_decode(&remaining_bytes).map_err(|_| UnitContentError::UnexpectedLengthBytes)?;
+                        let (total_length, offset) = varint_decode(&remaining_bytes)
+                            .map_err(|_| UnitContentError::UnexpectedLengthBytes)?;
                         let map_bytes = &remaining_bytes[offset..offset + total_length as usize];
 
                         let mut position = 0;
                         while position < map_bytes.len() {
-                            let (string_length, offset) = varint_decode(&map_bytes[position..]).map_err(|_| UnitContentError::UnexpectedLengthBytes)?;
+                            let (string_length, offset) = varint_decode(&map_bytes[position..])
+                                .map_err(|_| UnitContentError::UnexpectedLengthBytes)?;
                             position += offset;
-                            let string_bytes = &map_bytes[position..position + string_length as usize];
+                            let string_bytes =
+                                &map_bytes[position..position + string_length as usize];
                             position += string_length as usize;
 
                             let (content, offset) = UnitContent::parse(&map_bytes[position..])?;
@@ -237,7 +250,14 @@ mod unit_content_tests {
     fn weak_permutation_test() {
         let array = [1, 2, 3];
         let actual_result = permutation(&array);
-        let expected_result = vec![[1, 2, 3], [1, 3, 2], [2, 1, 3], [2, 3, 1], [3, 1, 2], [3, 2, 1]];
+        let expected_result = vec![
+            [1, 2, 3],
+            [1, 3, 2],
+            [2, 1, 3],
+            [2, 3, 1],
+            [3, 1, 2],
+            [3, 2, 1],
+        ];
 
         assert_eq!(actual_result, expected_result);
     }
@@ -297,7 +317,10 @@ mod unit_content_tests {
             (Some(UnitContent::Nil), vec![vec![0x00]]),
             (Some(UnitContent::Bool(true)), vec![vec![0x11, 0x01]]),
             (Some(UnitContent::Bool(false)), vec![vec![0x11, 0x00]]),
-            (Some(UnitContent::Float64(1.5)), vec![vec![0x12, 0, 0, 0, 0, 0, 0, 0xf8, 0x3f]]),
+            (
+                Some(UnitContent::Float64(1.5)),
+                vec![vec![0x12, 0, 0, 0, 0, 0, 0, 0xf8, 0x3f]],
+            ),
             (
                 Some(UnitContent::String(String::from("hello"))),
                 vec![vec![0x10, 0x05, 0x68, 0x65, 0x6c, 0x6c, 0x6f]],

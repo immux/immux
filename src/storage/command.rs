@@ -104,21 +104,32 @@ impl Command {
                 command_bytes.push(CommandPrefix::TransactionStart as u8);
                 command_bytes.extend(transaction_id.serialize());
             }
-            Command::TransactionalSet { key, value, transaction_id } => {
+            Command::TransactionalSet {
+                key,
+                value,
+                transaction_id,
+            } => {
                 command_bytes.push(CommandPrefix::TransactionalSet as u8);
 
                 command_bytes.extend(key.serialize());
                 command_bytes.extend(value.serialize());
                 command_bytes.extend(transaction_id.serialize());
             }
-            Command::TransactionalRevertOne { key, height, transaction_id } => {
+            Command::TransactionalRevertOne {
+                key,
+                height,
+                transaction_id,
+            } => {
                 command_bytes.push(CommandPrefix::TransactionalRevertOne as u8);
 
                 command_bytes.extend(key.serialize());
                 command_bytes.extend(height.serialize());
                 command_bytes.extend(transaction_id.serialize());
             }
-            Command::TransactionalRemoveOne { key, transaction_id } => {
+            Command::TransactionalRemoveOne {
+                key,
+                transaction_id,
+            } => {
                 command_bytes.push(CommandPrefix::TransactionalRemoveOne as u8);
                 command_bytes.extend(key.serialize());
                 command_bytes.extend(transaction_id.serialize());

@@ -17,7 +17,9 @@ pub fn u128_to_u8_array(x: u128) -> [u8; 16] {
     let b1 = ((x >> 8) & 0xff) as u8;
     let b0 = ((x >> 0) & 0xff) as u8;
 
-    [b0, b1, b2, b3, b4, b5, b6, b7, b8, b9, b10, b11, b12, b13, b14, b15]
+    [
+        b0, b1, b2, b3, b4, b5, b6, b7, b8, b9, b10, b11, b12, b13, b14, b15,
+    ]
 }
 
 pub fn u8_array_to_u128(data: &[u8; 16]) -> u128 {
@@ -70,7 +72,11 @@ pub fn u8_array_to_u64(data: &[u8; 8]) -> u64 {
 // u32
 
 pub fn u8_array_to_u32(data: &[u8; 4]) -> u32 {
-    (((data[0] as u32) << 0) + ((data[1] as u32) << 8) + ((data[2] as u32) << 16) + ((data[3] as u32) << 24)).into()
+    (((data[0] as u32) << 0)
+        + ((data[1] as u32) << 8)
+        + ((data[2] as u32) << 16)
+        + ((data[3] as u32) << 24))
+        .into()
 }
 
 pub fn u32_to_u8_array(x: u32) -> [u8; 4] {
@@ -130,15 +136,19 @@ pub fn u16_to_u8_array(x: u16) -> [u8; 2] {
 #[cfg(test)]
 mod int_utils_test {
     use crate::utils::ints::{
-        get_bit_u16, get_bit_u32, set_bit_u16, set_bit_u32, u128_to_u8_array, u16_to_u8_array, u32_to_u8_array, u64_to_u8_array, u8_array_to_u128,
-        u8_array_to_u16, u8_array_to_u32, u8_array_to_u64,
+        get_bit_u16, get_bit_u32, set_bit_u16, set_bit_u32, u128_to_u8_array, u16_to_u8_array,
+        u32_to_u8_array, u64_to_u8_array, u8_array_to_u128, u8_array_to_u16, u8_array_to_u32,
+        u8_array_to_u64,
     };
 
     // u128
 
     #[test]
     fn test_u128_to_u8_array() {
-        assert_eq!(u128_to_u8_array(0), [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]);
+        assert_eq!(
+            u128_to_u8_array(0),
+            [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+        );
         assert_eq!(
             u128_to_u8_array(std::u64::MAX.into()),
             [255, 255, 255, 255, 255, 255, 255, 255, 0, 0, 0, 0, 0, 0, 0, 0]
@@ -151,13 +161,18 @@ mod int_utils_test {
 
     #[test]
     fn test_u8_array_to_u128() {
-        assert_eq!(u8_array_to_u128(&[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]), 0,);
+        assert_eq!(
+            u8_array_to_u128(&[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]),
+            0,
+        );
         assert_eq!(
             u8_array_to_u128(&[255, 255, 255, 255, 255, 255, 255, 255, 0, 0, 0, 0, 0, 0, 0, 0]),
             std::u64::MAX.into(),
         );
         assert_eq!(
-            u8_array_to_u128(&[255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255,]),
+            u8_array_to_u128(&[
+                255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255,
+            ]),
             std::u128::MAX,
         );
     }
@@ -167,15 +182,27 @@ mod int_utils_test {
     #[test]
     fn test_u64_to_u8_array() {
         assert_eq!(u64_to_u8_array(0), [0, 0, 0, 0, 0, 0, 0, 0]);
-        assert_eq!(u64_to_u8_array(std::u32::MAX.into()), [255, 255, 255, 255, 0, 0, 0, 0]);
-        assert_eq!(u64_to_u8_array(std::u64::MAX), [255, 255, 255, 255, 255, 255, 255, 255]);
+        assert_eq!(
+            u64_to_u8_array(std::u32::MAX.into()),
+            [255, 255, 255, 255, 0, 0, 0, 0]
+        );
+        assert_eq!(
+            u64_to_u8_array(std::u64::MAX),
+            [255, 255, 255, 255, 255, 255, 255, 255]
+        );
     }
 
     #[test]
     fn test_u8_array_to_u64() {
         assert_eq!(0, u8_array_to_u64(&[0, 0, 0, 0, 0, 0, 0, 0]));
-        assert_eq!(std::u32::MAX as u64, u8_array_to_u64(&[255, 255, 255, 255, 0, 0, 0, 0]));
-        assert_eq!(std::u64::MAX, u8_array_to_u64(&[255, 255, 255, 255, 255, 255, 255, 255]));
+        assert_eq!(
+            std::u32::MAX as u64,
+            u8_array_to_u64(&[255, 255, 255, 255, 0, 0, 0, 0])
+        );
+        assert_eq!(
+            std::u64::MAX,
+            u8_array_to_u64(&[255, 255, 255, 255, 255, 255, 255, 255])
+        );
     }
 
     #[test]

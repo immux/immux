@@ -12,15 +12,36 @@ tiny_http = "0.6"
 url = "1.7"
 
 [dev-dependencies]
-immuxsys_client = { path = "src/client" }
-immuxsys_dev_utils = { path = "src/dev_utils" }
+immuxsys_client = { path = "./client" }
+immuxsys_dev_utils = { path = "./dev_utils" }
+serde = { version = "1.0", features = ["derive"] }
 
 [[test]]
 name = "test_kv"
 path = "src/storage/tests/test_kv.rs"
 
+[[bench]]
+name = "covid"
+harness = false
+path = "benches/covid.rs"
+
+[[bench]]
+name = "berka99"
+harness = false
+path = "benches/berka99.rs"
+
+[[bench]]
+name = "anzsic06"
+harness = false
+path = "benches/anzsic06.rs"
+
+[[bench]]
+name = "census90"
+harness = false
+path = "benches/census90.rs"
+
 [workspace]
 members = [
-    "src/client",
-    "src/dev_utils",
+    "./client",
+    "./dev_utils",
 ]

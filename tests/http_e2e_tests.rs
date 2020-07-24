@@ -1,6 +1,7 @@
 #[cfg(test)]
 mod http_e2e_tests {
     use std::collections::HashMap;
+    use std::error::Error;
     use std::thread;
 
     use immuxsys::constants as Constants;
@@ -9,7 +10,98 @@ mod http_e2e_tests {
     use immuxsys::storage::executor::unit_key::UnitKey;
     use immuxsys::storage::transaction_manager::TransactionId;
     use immuxsys_client::client::ImmuxDBClient;
-    use immuxsys_dev_utils::dev_utils::{launch_db, notified_sleep};
+    use immuxsys_dev_utils::data_models::{
+        berka99::Account, berka99::Card, berka99::Client, berka99::Disp, berka99::District,
+        berka99::Loan, berka99::Order, berka99::Trans, business::Business, census90::CensusEntry,
+        covid::Covid,
+    };
+    use immuxsys_dev_utils::dev_utils::{
+        csv_to_json_table, e2e_verify_correctness, launch_db, notified_sleep,
+    };
+
+    #[test]
+    fn e2e_real_data_get_set() {
+        let port = 20022;
+        thread::spawn(move || launch_db("e2e_real_data_get_set", port));
+        notified_sleep(5);
+
+        let host = &format!("{}:{}", Constants::SERVER_END_POINT, port);
+        let client = ImmuxDBClient::new(host).unwrap();
+
+        let paths = [
+            "dev_utils/src/data_models/data-raw/account.asc",
+            "dev_utils/src/data_models/data-raw/card.asc",
+            "dev_utils/src/data_models/data-raw/client.asc",
+            "dev_utils/src/data_models/data-raw/disp.asc",
+            "dev_utils/src/data_models/data-raw/district.asc",
+            "dev_utils/src/data_models/data-raw/loan.asc",
+            "dev_utils/src/data_models/data-raw/order.asc",
+            "dev_utils/src/data_models/data-raw/trans.asc",
+            "dev_utils/src/data_models/data-raw/anzsic06.csv",
+            "dev_utils/src/data_models/data-raw/census90.txt",
+            "dev_utils/src/data_models/data-raw/covid.csv",
+        ];
+        let row_limit = 1000;
+
+        let dataset: Vec<(String, Vec<(UnitKey, UnitContent)>)> = paths
+            .iter()
+            .map(
+                |path| -> (String, Result<Vec<(UnitKey, UnitContent)>, Box<dyn Error>>) {
+                    let path_segments: Vec<&str> = path.split("/").collect();
+                    let file_segments: Vec<&str> =
+                        path_segments.last().unwrap().split(".").collect();
+                    let file_name = file_segments[0];
+
+                    let data = match file_name.as_ref() {
+                        "account" => {
+                            csv_to_json_table::<Account>(&path, file_name, b';', row_limit)
+                        }
+                        "card" => csv_to_json_table::<Card>(&path, file_name, b';', row_limit),
+                        "client" => csv_to_json_table::<Client>(&path, file_name, b';', row_limit),
+                        "disp" => csv_to_json_table::<Disp>(&path, file_name, b';', row_limit),
+                        "district" => {
+                            csv_to_json_table::<District>(&path, file_name, b';', row_limit)
+                        }
+                        "loan" => csv_to_json_table::<Loan>(&path, file_name, b';', row_limit),
+                        "order" => csv_to_json_table::<Order>(&path, file_name, b';', row_limit),
+                        "trans" => csv_to_json_table::<Trans>(&path, file_name, b';', row_limit),
+                        "anzsic06" => {
+                            csv_to_json_table::<Business>(&path, file_name, b',', row_limit)
+                        }
+                        "census90" => {
+                            csv_to_json_table::<CensusEntry>(&path, file_name, b',', row_limit)
+                        }
+                        "covid" => csv_to_json_table::<Covid>(&path, file_name, b',', row_limit),
+                        _ => panic!("Unexpected table {}", file_name),
+                    };
+                    return (file_name.to_string(), data);
+                },
+            )
+            .map(|result| -> (String, Vec<(UnitKey, UnitContent)>) {
+                match result.1 {
+                    Err(error) => {
+                        eprintln!("file error: {}", error);
+                        return (String::from("error"), vec![]);
+                    }
+                    Ok(table) => return (result.0, table),
+                }
+            })
+            .collect();
+
+        for (grouping, table) in dataset.iter() {
+            for (key, content) in table.iter() {
+                client.set_unit(&grouping, &key, &content).unwrap();
+            }
+        }
+
+        for (grouping, table) in dataset.iter() {
+            assert!(e2e_verify_correctness(
+                &grouping,
+                &table.as_slice(),
+                &client
+            ));
+        }
+    }
 
     #[test]
     fn e2e_single_unit_get_set() {
@@ -61,7 +153,9 @@ mod http_e2e_tests {
             client.set_unit(&grouping, &unit_key, &content).unwrap();
         }
 
-        client.revert_one(&grouping, &unit_key, &target_height).unwrap();
+        client
+            .revert_one(&grouping, &unit_key, &target_height)
+            .unwrap();
         let expected_output = &contents[target_height.as_u64() as usize].to_string();
         let (status_code, actual_output) = &client.get_by_key(&grouping, &unit_key).unwrap();
 
@@ -179,7 +273,9 @@ mod http_e2e_tests {
         let key_content_pairs = get_key_content_pairs();
 
         for (key, content) in key_content_pairs.iter() {
-            client.transactional_set_unit(&grouping, &key, &content, &transaction_id).unwrap();
+            client
+                .transactional_set_unit(&grouping, &key, &content, &transaction_id)
+                .unwrap();
         }
 
         client.commit_transaction(&transaction_id).unwrap();
@@ -209,7 +305,9 @@ mod http_e2e_tests {
         let key_content_pairs = get_key_content_pairs();
 
         for (key, content) in key_content_pairs.iter() {
-            client.transactional_set_unit(&grouping, &key, &content, &transaction_id).unwrap();
+            client
+                .transactional_set_unit(&grouping, &key, &content, &transaction_id)
+                .unwrap();
         }
 
         client.abort_transaction(&transaction_id).unwrap();
@@ -239,10 +337,14 @@ mod http_e2e_tests {
 
         let transaction_id = TransactionId::new(transaction_id_str.parse::<u64>().unwrap());
 
-        client.transactional_set_unit(&grouping, &unit_key, &content, &transaction_id).unwrap();
+        client
+            .transactional_set_unit(&grouping, &unit_key, &content, &transaction_id)
+            .unwrap();
 
         {
-            let (status_code, actual_output) = client.transactional_get(&grouping, &unit_key, &transaction_id).unwrap();
+            let (status_code, actual_output) = client
+                .transactional_get(&grouping, &unit_key, &transaction_id)
+                .unwrap();
             assert_eq!(status_code.as_u16(), 200);
             let expected_output = content.to_string();
             assert_eq!(actual_output, expected_output);
@@ -287,7 +389,9 @@ mod http_e2e_tests {
 
         let transaction_id = TransactionId::new(transaction_id_str.parse::<u64>().unwrap());
 
-        client.transactional_remove_one(&transaction_id, &grouping, &target_key).unwrap();
+        client
+            .transactional_remove_one(&transaction_id, &grouping, &target_key)
+            .unwrap();
 
         for (key, content) in key_content_pairs.iter() {
             let (status_code, actual_output) = client.get_by_key(&grouping, &key).unwrap();
@@ -344,7 +448,9 @@ mod http_e2e_tests {
 
         let transaction_id = TransactionId::new(transaction_id_str.parse::<u64>().unwrap());
 
-        client.transactional_revert_one(&grouping, &key, &target_height, &transaction_id).unwrap();
+        client
+            .transactional_revert_one(&grouping, &key, &target_height, &transaction_id)
+            .unwrap();
 
         let (status_code, actual_output) = &client.get_by_key(&grouping, &key).unwrap();
         let expected_output = &contents.last().unwrap().to_string();
@@ -383,7 +489,9 @@ mod http_e2e_tests {
         client.remove_all().unwrap();
 
         for (key, _content) in key_content_pairs.iter() {
-            let (status_code, actual_output) = client.transactional_get(&grouping, &key, &transaction_id).unwrap();
+            let (status_code, actual_output) = client
+                .transactional_get(&grouping, &key, &transaction_id)
+                .unwrap();
             assert_eq!(status_code.as_u16(), 200);
             assert!(actual_output.is_empty())
         }
@@ -416,12 +524,16 @@ mod http_e2e_tests {
 
         for (index, (key, content)) in key_content_pairs.iter().enumerate() {
             if index <= target_height.as_u64() as usize {
-                let (status_code, actual_output) = client.transactional_get(&grouping, &key, &transaction_id).unwrap();
+                let (status_code, actual_output) = client
+                    .transactional_get(&grouping, &key, &transaction_id)
+                    .unwrap();
                 let expected_output = content.to_string();
                 assert_eq!(status_code.as_u16(), 200);
                 assert_eq!(actual_output, expected_output);
             } else {
-                let (status_code, actual_output) = client.transactional_get(&grouping, &key, &transaction_id).unwrap();
+                let (status_code, actual_output) = client
+                    .transactional_get(&grouping, &key, &transaction_id)
+                    .unwrap();
                 assert_eq!(status_code.as_u16(), 200);
                 assert!(actual_output.is_empty());
             }
@@ -530,8 +642,12 @@ mod http_e2e_tests {
         for kv_pairs in mixed_kv_pairs {
             let kv_1 = kv_pairs.0;
             let kv_2 = kv_pairs.1;
-            client.transactional_set_unit(&grouping, &kv_1.0, &kv_1.1, &transaction_id_1).unwrap();
-            client.transactional_set_unit(&grouping, &kv_2.0, &kv_2.1, &transaction_id_2).unwrap();
+            client
+                .transactional_set_unit(&grouping, &kv_1.0, &kv_1.1, &transaction_id_1)
+                .unwrap();
+            client
+                .transactional_set_unit(&grouping, &kv_2.0, &kv_2.1, &transaction_id_2)
+                .unwrap();
         }
 
         client.commit_transaction(&transaction_id_1).unwrap();
@@ -565,7 +681,9 @@ mod http_e2e_tests {
         let transaction_id = TransactionId::new(transaction_id_str.parse::<u64>().unwrap());
 
         {
-            let (status_code, actual_value) = client.transactional_get(&grouping, &key, &transaction_id).unwrap();
+            let (status_code, actual_value) = client
+                .transactional_get(&grouping, &key, &transaction_id)
+                .unwrap();
             let expected_value = value.to_string();
             assert_eq!(status_code.as_u16(), 200);
             assert_eq!(actual_value, expected_value);
@@ -584,7 +702,7 @@ mod http_e2e_tests {
 
         let key = UnitKey::from("a");
         let origin_value = UnitContent::String(String::from("1"));
-        let value_in_transaction =  UnitContent::String(String::from("2"));
+        let value_in_transaction = UnitContent::String(String::from("2"));
 
         client.set_unit(&grouping, &key, &origin_value).unwrap();
 
@@ -600,7 +718,9 @@ mod http_e2e_tests {
         }
 
         {
-            client.transactional_set_unit(&grouping, &key, &value_in_transaction, &transaction_id).unwrap();
+            client
+                .transactional_set_unit(&grouping, &key, &value_in_transaction, &transaction_id)
+                .unwrap();
 
             let (status_code, actual_value) = client.get_by_key(&grouping, &key).unwrap();
             let expected_value = &origin_value.to_string();
@@ -611,7 +731,9 @@ mod http_e2e_tests {
         client.commit_transaction(&transaction_id).unwrap();
 
         {
-            let (status_code, actual_value) = client.transactional_get(&grouping, &key, &transaction_id).unwrap();
+            let (status_code, actual_value) = client
+                .transactional_get(&grouping, &key, &transaction_id)
+                .unwrap();
             let expected_value = &value_in_transaction.to_string();
             assert_eq!(status_code.as_u16(), 200);
             assert_eq!(&actual_value, expected_value);
@@ -620,12 +742,18 @@ mod http_e2e_tests {
 
     fn get_key_content_pairs() -> Vec<(UnitKey, UnitContent)> {
         let mut map = HashMap::new();
-        map.insert(String::from("key1"), UnitContent::String(String::from("string in map")));
+        map.insert(
+            String::from("key1"),
+            UnitContent::String(String::from("string in map")),
+        );
         map.insert(String::from("key2"), UnitContent::Nil);
         map.insert(String::from("key3"), UnitContent::Bool(false));
 
         [
-            (UnitKey::from("key1"), UnitContent::String(String::from("this is a string"))),
+            (
+                UnitKey::from("key1"),
+                UnitContent::String(String::from("this is a string")),
+            ),
             (UnitKey::from("key2"), UnitContent::Nil),
             (UnitKey::from("key3"), UnitContent::Float64(12.0)),
             (UnitKey::from("key4"), UnitContent::Bool(true)),
