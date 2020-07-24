@@ -31,9 +31,9 @@ harness = false
 path = "benches/berka99.rs"
 
 [[bench]]
-name = "business_demography_statistics"
+name = "anzsic06"
 harness = false
-path = "benches/business_demography_statistics.rs"
+path = "benches/anzsic06.rs"
 
 [[bench]]
 name = "census90"

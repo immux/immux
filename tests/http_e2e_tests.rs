@@ -37,7 +37,7 @@ mod http_e2e_tests {
             "dev_utils/src/data_models/data-raw/loan.asc",
             "dev_utils/src/data_models/data-raw/order.asc",
             "dev_utils/src/data_models/data-raw/trans.asc",
-            "dev_utils/src/data_models/data-raw/business_demography_statistics.csv",
+            "dev_utils/src/data_models/data-raw/anzsic06.csv",
             "dev_utils/src/data_models/data-raw/census90.txt",
             "dev_utils/src/data_models/data-raw/covid.csv",
         ];
@@ -65,7 +65,7 @@ mod http_e2e_tests {
                         "loan" => csv_to_json_table::<Loan>(&path, file_name, b';', row_limit),
                         "order" => csv_to_json_table::<Order>(&path, file_name, b';', row_limit),
                         "trans" => csv_to_json_table::<Trans>(&path, file_name, b';', row_limit),
-                        "business_demography_statistics" => {
+                        "anzsic06" => {
                             csv_to_json_table::<Business>(&path, file_name, b',', row_limit)
                         }
                         "census90" => {

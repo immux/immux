@@ -13,7 +13,7 @@ use immuxsys_dev_utils::dev_utils::{
 
 fn main() {
     let port = 20020;
-    let bench_name = "business_demography_statistics";
+    let bench_name = "anzsic06";
     let row_limit = read_usize_from_arguments(1).unwrap_or(100_000);
     let report_period = read_usize_from_arguments(2).unwrap_or(10_000);
     let verify_correctness = read_usize_from_arguments(3).unwrap_or(0) > 0;
@@ -26,7 +26,7 @@ fn main() {
     thread::spawn(move || launch_db("bench_business", port));
     notified_sleep(5);
 
-    let paths = vec!["business_demography_statistics"];
+    let paths = vec!["anzsic06"];
     let dataset: Vec<(String, Vec<(UnitKey, UnitContent)>)> = paths
         .iter()
         .map(
@@ -34,7 +34,7 @@ fn main() {
                 let csv_path = format!("dev_utils/src/data_models/data-raw/{}.csv", table_name);
 
                 let data = match table_name.as_ref() {
-                    "business_demography_statistics" => {
+                    "anzsic06" => {
                         csv_to_json_table::<Business>(&csv_path, table_name, b',', row_limit)
                     }
                     _ => panic!("Unexpected table {}", table_name),
