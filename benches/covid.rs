@@ -2,13 +2,11 @@ use std::error::Error;
 use std::thread;
 
 use immuxsys::constants as Constants;
-use immuxsys::storage::executor::unit_content::UnitContent;
-use immuxsys::storage::executor::unit_key::UnitKey;
 use immuxsys_client::client::ImmuxDBClient;
 use immuxsys_dev_utils::data_models::covid::Covid;
 use immuxsys_dev_utils::dev_utils::{
     csv_to_json_table, e2e_verify_correctness, launch_db, measure_iteration, notified_sleep,
-    read_usize_from_arguments,
+    read_usize_from_arguments, UnitList,
 };
 
 fn main() {
@@ -27,19 +25,18 @@ fn main() {
     notified_sleep(5);
 
     let paths = vec!["covid"];
-    let dataset: Vec<(String, Vec<(UnitKey, UnitContent)>)> = paths
+
+    let dataset: Vec<(String, UnitList)> = paths
         .iter()
-        .map(
-            |table_name| -> (String, Result<Vec<(UnitKey, UnitContent)>, Box<dyn Error>>) {
-                let csv_path = format!("dev_utils/src/data_models/data-raw/{}.csv", table_name);
-                let data = match table_name.as_ref() {
-                    "covid" => csv_to_json_table::<Covid>(&csv_path, table_name, b',', row_limit),
-                    _ => panic!("Unexpected table {}", table_name),
-                };
-                return (table_name.to_string(), data);
-            },
-        )
-        .map(|result| -> (String, Vec<(UnitKey, UnitContent)>) {
+        .map(|table_name| -> (String, Result<UnitList, Box<dyn Error>>) {
+            let csv_path = format!("dev_utils/src/data_models/data-raw/{}.csv", table_name);
+            let data = match table_name.as_ref() {
+                "covid" => csv_to_json_table::<Covid>(&csv_path, table_name, b',', row_limit),
+                _ => panic!("Unexpected table {}", table_name),
+            };
+            return (table_name.to_string(), data);
+        })
+        .map(|result| -> (String, UnitList) {
             match result.1 {
                 Err(error) => {
                     eprintln!("CSV error: {}", error);
@@ -77,6 +74,6 @@ fn main() {
         for (table_name, table) in &dataset {
             assert!(e2e_verify_correctness(table_name, table, &client));
         }
-        println!("Verifying finished");
+        println!("Verifying correctness finished");
     }
 }

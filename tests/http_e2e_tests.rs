@@ -16,7 +16,7 @@ mod http_e2e_tests {
         covid::Covid,
     };
     use immuxsys_dev_utils::dev_utils::{
-        csv_to_json_table, e2e_verify_correctness, launch_db, notified_sleep,
+        csv_to_json_table, e2e_verify_correctness, launch_db, notified_sleep, UnitList,
     };
 
     #[test]
@@ -43,41 +43,32 @@ mod http_e2e_tests {
         ];
         let row_limit = 1000;
 
-        let dataset: Vec<(String, Vec<(UnitKey, UnitContent)>)> = paths
+        let dataset: Vec<(String, UnitList)> = paths
             .iter()
-            .map(
-                |path| -> (String, Result<Vec<(UnitKey, UnitContent)>, Box<dyn Error>>) {
-                    let path_segments: Vec<&str> = path.split("/").collect();
-                    let file_segments: Vec<&str> =
-                        path_segments.last().unwrap().split(".").collect();
-                    let file_name = file_segments[0];
+            .map(|path| -> (String, Result<UnitList, Box<dyn Error>>) {
+                let path_segments: Vec<&str> = path.split("/").collect();
+                let file_segments: Vec<&str> = path_segments.last().unwrap().split(".").collect();
+                let file_name = file_segments[0];
 
-                    let data = match file_name.as_ref() {
-                        "account" => {
-                            csv_to_json_table::<Account>(&path, file_name, b';', row_limit)
-                        }
-                        "card" => csv_to_json_table::<Card>(&path, file_name, b';', row_limit),
-                        "client" => csv_to_json_table::<Client>(&path, file_name, b';', row_limit),
-                        "disp" => csv_to_json_table::<Disp>(&path, file_name, b';', row_limit),
-                        "district" => {
-                            csv_to_json_table::<District>(&path, file_name, b';', row_limit)
-                        }
-                        "loan" => csv_to_json_table::<Loan>(&path, file_name, b';', row_limit),
-                        "order" => csv_to_json_table::<Order>(&path, file_name, b';', row_limit),
-                        "trans" => csv_to_json_table::<Trans>(&path, file_name, b';', row_limit),
-                        "anzsic06" => {
-                            csv_to_json_table::<Business>(&path, file_name, b',', row_limit)
-                        }
-                        "census90" => {
-                            csv_to_json_table::<CensusEntry>(&path, file_name, b',', row_limit)
-                        }
-                        "covid" => csv_to_json_table::<Covid>(&path, file_name, b',', row_limit),
-                        _ => panic!("Unexpected table {}", file_name),
-                    };
-                    return (file_name.to_string(), data);
-                },
-            )
-            .map(|result| -> (String, Vec<(UnitKey, UnitContent)>) {
+                let data = match file_name.as_ref() {
+                    "account" => csv_to_json_table::<Account>(&path, file_name, b';', row_limit),
+                    "card" => csv_to_json_table::<Card>(&path, file_name, b';', row_limit),
+                    "client" => csv_to_json_table::<Client>(&path, file_name, b';', row_limit),
+                    "disp" => csv_to_json_table::<Disp>(&path, file_name, b';', row_limit),
+                    "district" => csv_to_json_table::<District>(&path, file_name, b';', row_limit),
+                    "loan" => csv_to_json_table::<Loan>(&path, file_name, b';', row_limit),
+                    "order" => csv_to_json_table::<Order>(&path, file_name, b';', row_limit),
+                    "trans" => csv_to_json_table::<Trans>(&path, file_name, b';', row_limit),
+                    "anzsic06" => csv_to_json_table::<Business>(&path, file_name, b',', row_limit),
+                    "census90" => {
+                        csv_to_json_table::<CensusEntry>(&path, file_name, b',', row_limit)
+                    }
+                    "covid" => csv_to_json_table::<Covid>(&path, file_name, b',', row_limit),
+                    _ => panic!("Unexpected table {}", file_name),
+                };
+                return (file_name.to_string(), data);
+            })
+            .map(|result| -> (String, UnitList) {
                 match result.1 {
                     Err(error) => {
                         eprintln!("file error: {}", error);
@@ -611,7 +602,7 @@ mod http_e2e_tests {
 
         let shared_keys = [UnitKey::from("a"), UnitKey::from("b"), UnitKey::from("c")];
 
-        let key_value_pairs_1: Vec<(UnitKey, UnitContent)> = shared_keys
+        let key_value_pairs_1: UnitList = shared_keys
             .iter()
             .enumerate()
             .map(|(index, key)| {
@@ -620,7 +611,7 @@ mod http_e2e_tests {
             })
             .collect();
 
-        let key_value_pairs_2: Vec<(UnitKey, UnitContent)> = shared_keys
+        let key_value_pairs_2: UnitList = shared_keys
             .iter()
             .enumerate()
             .map(|(index, key)| {
@@ -740,7 +731,7 @@ mod http_e2e_tests {
         }
     }
 
-    fn get_key_content_pairs() -> Vec<(UnitKey, UnitContent)> {
+    fn get_key_content_pairs() -> UnitList {
         let mut map = HashMap::new();
         map.insert(
             String::from("key1"),

@@ -80,6 +80,18 @@ impl ImmuxDBClient {
         }
     }
 
+    pub fn inspect_all(&self) -> ClientResult {
+        let url = format!("http://{}/{}", &self.host, Constants::URL_JOURNAL_KEY_WORD,);
+
+        let mut response = self.client.get(&url).send()?;
+        let status_code = response.status();
+
+        match response.text() {
+            Ok(text) => Ok((status_code, text)),
+            Err(error) => Err(ImmuxDBClientError::Reqwest(error.into())),
+        }
+    }
+
     pub fn get_by_grouping(&self, _grouping: &str) -> ClientResult {
         return Err(ImmuxDBClientError::Unimplemented);
     }

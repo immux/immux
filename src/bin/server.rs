@@ -8,7 +8,7 @@ use immuxsys::storage::executor::executor::Executor;
 fn main() -> ServerResult<()> {
     let path = PathBuf::from(Constants::TEMP_LOG_FILE_PATH);
     let executor = Executor::open(&path)?;
-    let default_port = 6324;
+    let default_port = Constants::SERVER_DEFAULT_PORT;
     run_server(executor, default_port)?;
     return Ok(());
 }
