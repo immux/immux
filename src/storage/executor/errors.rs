@@ -1,6 +1,8 @@
+use std::fmt::Formatter;
+use std::num::ParseIntError;
+
 use crate::storage::errors::KVError;
 use crate::storage::executor::unit_content::UnitContentError;
-use std::num::ParseIntError;
 
 #[derive(Debug)]
 pub enum ExecutorError {
@@ -24,6 +26,18 @@ impl From<UnitContentError> for ExecutorError {
 impl From<ParseIntError> for ExecutorError {
     fn from(err: ParseIntError) -> ExecutorError {
         ExecutorError::ParseIntError(err)
+    }
+}
+
+impl std::error::Error for ExecutorError {
+    fn description(&self) -> &str {
+        return "Executor error";
+    }
+}
+
+impl std::fmt::Display for ExecutorError {
+    fn fmt(&self, _f: &mut Formatter) -> Result<(), std::fmt::Error> {
+        return Ok(());
     }
 }
 

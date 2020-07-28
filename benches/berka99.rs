@@ -2,15 +2,13 @@ use std::error::Error;
 use std::thread;
 
 use immuxsys::constants as Constants;
-use immuxsys::storage::executor::unit_content::UnitContent;
-use immuxsys::storage::executor::unit_key::UnitKey;
 use immuxsys_client::client::ImmuxDBClient;
 use immuxsys_dev_utils::data_models::berka99::{
     Account, Card, Client, Disp, District, Loan, Order, Trans,
 };
 use immuxsys_dev_utils::dev_utils::{
     csv_to_json_table, e2e_verify_correctness, launch_db, measure_iteration, notified_sleep,
-    read_usize_from_arguments,
+    read_usize_from_arguments, UnitList,
 };
 
 fn main() {
@@ -31,30 +29,25 @@ fn main() {
     let paths = vec![
         "account", "card", "client", "disp", "district", "loan", "order", "trans",
     ];
-    let dataset: Vec<(String, Vec<(UnitKey, UnitContent)>)> = paths
+
+    let dataset: Vec<(String, UnitList)> = paths
         .iter()
-        .map(
-            |table_name| -> (String, Result<Vec<(UnitKey, UnitContent)>, Box<dyn Error>>) {
-                let csv_path = format!("dev_utils/src/data_models/data-raw/{}.asc", table_name);
-                let data = match table_name.as_ref() {
-                    "account" => {
-                        csv_to_json_table::<Account>(&csv_path, table_name, b';', row_limit)
-                    }
-                    "card" => csv_to_json_table::<Card>(&csv_path, table_name, b';', row_limit),
-                    "client" => csv_to_json_table::<Client>(&csv_path, table_name, b';', row_limit),
-                    "disp" => csv_to_json_table::<Disp>(&csv_path, table_name, b';', row_limit),
-                    "district" => {
-                        csv_to_json_table::<District>(&csv_path, table_name, b';', row_limit)
-                    }
-                    "loan" => csv_to_json_table::<Loan>(&csv_path, table_name, b';', row_limit),
-                    "order" => csv_to_json_table::<Order>(&csv_path, table_name, b';', row_limit),
-                    "trans" => csv_to_json_table::<Trans>(&csv_path, table_name, b';', row_limit),
-                    _ => panic!("Unexpected table {}", table_name),
-                };
-                return (table_name.to_string(), data);
-            },
-        )
-        .map(|result| -> (String, Vec<(UnitKey, UnitContent)>) {
+        .map(|table_name| -> (String, Result<UnitList, Box<dyn Error>>) {
+            let csv_path = format!("dev_utils/src/data_models/data-raw/{}.asc", table_name);
+            let data = match table_name.as_ref() {
+                "account" => csv_to_json_table::<Account>(&csv_path, table_name, b';', row_limit),
+                "card" => csv_to_json_table::<Card>(&csv_path, table_name, b';', row_limit),
+                "client" => csv_to_json_table::<Client>(&csv_path, table_name, b';', row_limit),
+                "disp" => csv_to_json_table::<Disp>(&csv_path, table_name, b';', row_limit),
+                "district" => csv_to_json_table::<District>(&csv_path, table_name, b';', row_limit),
+                "loan" => csv_to_json_table::<Loan>(&csv_path, table_name, b';', row_limit),
+                "order" => csv_to_json_table::<Order>(&csv_path, table_name, b';', row_limit),
+                "trans" => csv_to_json_table::<Trans>(&csv_path, table_name, b';', row_limit),
+                _ => panic!("Unexpected table {}", table_name),
+            };
+            return (table_name.to_string(), data);
+        })
+        .map(|result| -> (String, UnitList) {
             match result.1 {
                 Err(error) => {
                     eprintln!("CSV error: {}", error);
@@ -111,6 +104,6 @@ fn main() {
         for (table_name, table) in &dataset {
             assert!(e2e_verify_correctness(table_name, table, &client));
         }
-        println!("Verifying finished");
+        println!("Verifying correctness finished");
     }
 }

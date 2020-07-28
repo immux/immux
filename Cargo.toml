@@ -40,6 +40,46 @@ name = "census90"
 harness = false
 path = "benches/census90.rs"
 
+[[bench]]
+name = "launch_db"
+harness = false
+path = "benches/launch_db.rs"
+
+[[bench]]
+name = "remove_single_unit"
+harness = false
+path = "benches/remove_single_unit.rs"
+
+[[bench]]
+name = "revert_single_unit"
+harness = false
+path = "benches/revert_single_unit.rs"
+
+[[bench]]
+name = "transactional_set"
+harness = false
+path = "benches/transactional_set.rs"
+
+[[bench]]
+name = "revert_all"
+harness = false
+path = "benches/revert_all.rs"
+
+[[bench]]
+name = "remove_all"
+harness = false
+path = "benches/remove_all.rs"
+
+[[bench]]
+name = "inspect_one"
+harness = false
+path = "benches/inspect_one.rs"
+
+[[bench]]
+name = "inspect_all"
+harness = false
+path = "benches/inspect_all.rs"
+
 [workspace]
 members = [
     "./client",

@@ -16,6 +16,8 @@ use immuxsys_client::client::ImmuxDBClient;
 pub use serde::de::{Deserialize, DeserializeOwned};
 pub use serde::ser::Serialize;
 
+pub type UnitList = Vec<(UnitKey, UnitContent)>;
+
 pub fn reset_db_dir(path: &str) -> io::Result<()> {
     println!("Initializing database in {}", path);
     create_dir_all(&path)?;
@@ -53,17 +55,65 @@ pub fn read_usize_from_arguments(position: usize) -> Result<usize, ParseIntError
         .parse::<usize>()
 }
 
+pub fn csv_to_json_table_with_size<J: DeserializeOwned + Serialize>(
+    csv_file_path: &str,
+    table_name: &str,
+    delimiter: u8,
+    bytes_limit: usize,
+) -> Result<(UnitList, usize), Box<dyn Error>> {
+    let reading = read(csv_file_path)?;
+    let mut csv_parsing = csv::ReaderBuilder::new()
+        .delimiter(delimiter)
+        .from_reader(reading.as_slice());
+    let mut read_bytes: usize = 0;
+    let mut data: UnitList = vec![];
+
+    for (index, result) in csv_parsing.records().enumerate() {
+        if read_bytes > bytes_limit {
+            break;
+        }
+        match result {
+            Ok(string_record) => {
+                let journal: J = string_record.deserialize(None)?;
+                let string = serde_json::to_string(&journal)?;
+                let mut unit_key_str = table_name.to_string();
+                unit_key_str.push_str(&index.to_string());
+                let unit_key = UnitKey::from(unit_key_str.as_str());
+                let content = UnitContent::String(string);
+
+                read_bytes += unit_key.as_bytes().len();
+                read_bytes += content.marshal().len();
+
+                data.push((unit_key, content));
+            }
+            Err(_err) => {
+                let mut unit_key_str = table_name.to_string();
+                unit_key_str.push_str(&index.to_string());
+                let unit_key = UnitKey::from(unit_key_str.as_str());
+                let content = UnitContent::String(String::from("json:error"));
+
+                read_bytes += unit_key.as_bytes().len();
+                read_bytes += content.marshal().len();
+
+                data.push((unit_key, content));
+            }
+        }
+    }
+
+    return Ok((data, read_bytes));
+}
+
 pub fn csv_to_json_table<J: DeserializeOwned + Serialize>(
     csv_file_path: &str,
     table_name: &str,
     delimiter: u8,
     row_limit: usize,
-) -> Result<Vec<(UnitKey, UnitContent)>, Box<dyn Error>> {
+) -> Result<UnitList, Box<dyn Error>> {
     let reading = read(csv_file_path)?;
     let mut csv_parsing = csv::ReaderBuilder::new()
         .delimiter(delimiter)
         .from_reader(reading.as_slice());
-    let data: Vec<(UnitKey, UnitContent)> = csv_parsing
+    let data: UnitList = csv_parsing
         .records()
         .enumerate()
         .map(|(index, result)| -> io::Result<(UnitKey, UnitContent)> {
@@ -92,6 +142,16 @@ pub fn csv_to_json_table<J: DeserializeOwned + Serialize>(
         .take(row_limit)
         .collect();
     return Ok(data);
+}
+
+pub fn measure_single_operation<F, A, T>(operate: F, arg: &A) -> Result<f64, Box<dyn Error>>
+where
+    F: Fn(&A) -> Result<T, Box<dyn Error>>,
+{
+    let start = Instant::now();
+    operate(&arg)?;
+    let elapsed = start.elapsed().as_millis();
+    Ok(elapsed as f64)
 }
 
 pub fn measure_iteration<D, F, T>(

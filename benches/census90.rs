@@ -79,6 +79,6 @@ fn main() {
             &table.as_slice(),
             &client
         ));
-        println!("Verifying finished");
+        println!("Verifying correctness finished");
     }
 }

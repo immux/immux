@@ -23,7 +23,7 @@ fn main() {
         bench_name, row_limit, report_period
     );
 
-    thread::spawn(move || launch_db("bench_business", port));
+    thread::spawn(move || launch_db("bench_anzsic06", port));
     notified_sleep(5);
 
     let paths = vec!["anzsic06"];
@@ -98,6 +98,6 @@ fn main() {
         for (table_name, table) in &dataset {
             assert!(e2e_verify_correctness(table_name, table, &client));
         }
-        println!("Verifying finished");
+        println!("Verifying correctness finished");
     }
 }
