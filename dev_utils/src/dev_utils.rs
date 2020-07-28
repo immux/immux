@@ -112,15 +112,21 @@ where
         count += 1;
         if count % report_period == 0 {
             let elapsed = start.elapsed().as_millis();
-            let average_time = elapsed as f64 / report_period as f64;
+            let mut average_time = elapsed as f64 / report_period as f64;
+            let mut time_unit = "ms";
+            if average_time < 1.0 {
+                average_time *= 1000.0;
+                time_unit = "ns"
+            }
             println!(
-                "took {}ms to execute {} {} operations ({}/{} done), average {:.2}ms per item",
+                "took {}ms to execute {} {} operations ({}/{} done), average {:.2}{} per item",
                 elapsed,
                 report_period,
                 operation_name,
                 count,
                 data.len(),
-                average_time
+                average_time,
+                time_unit,
             );
             start = Instant::now();
             times.push((count as f64, average_time));
