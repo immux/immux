@@ -1,7 +1,7 @@
 use std::collections::{HashMap, HashSet};
 use std::fs::{create_dir_all, File, OpenOptions};
 use std::io::Read;
-use std::io::{BufReader, BufWriter, Seek, SeekFrom, Write};
+use std::io::{BufReader, Seek, SeekFrom};
 use std::path::{Path, PathBuf};
 
 use crate::constants as Constants;
@@ -12,11 +12,12 @@ use crate::storage::errors::{KVError, KVResult};
 use crate::storage::kvkey::KVKey;
 use crate::storage::kvvalue::KVValue;
 use crate::storage::log_pointer::LogPointer;
+use crate::storage::log_writer::LogWriter;
 use crate::storage::transaction_manager::{TransactionId, TransactionManager};
 
 pub struct LogKeyValueStore {
     reader: BufReader<File>,
-    writer: BufWriter<File>,
+    writer: LogWriter,
     key_pointer_map: HashMap<KVKey, HashMap<Option<TransactionId>, LogPointer>>,
     current_height: ChainHeight,
     transaction_manager: TransactionManager,
@@ -32,7 +33,7 @@ impl LogKeyValueStore {
             .create(true)
             .append(true)
             .open(&log_file_path.to_owned())?;
-        let writer = BufWriter::new(writer_file_option);
+        let writer = LogWriter::new(writer_file_option)?;
 
         let reader_file_option = OpenOptions::new()
             .read(true)
@@ -602,10 +603,10 @@ fn update_key_pointer_map(
     }
 }
 
-fn append_command(command: Command, writer: &mut BufWriter<File>) -> KVResult<LogPointer> {
+fn append_command(command: Command, writer: &mut LogWriter) -> KVResult<LogPointer> {
     let command_bytes: Vec<u8> = command.serialize();
 
-    let current_pos = writer.seek(SeekFrom::Current(0))?;
+    let current_pos = writer.get_current_pos();
     writer.write_all(command_bytes.as_slice())?;
     writer.flush()?;
 
