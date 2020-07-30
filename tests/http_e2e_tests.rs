@@ -33,11 +33,19 @@ mod http_e2e_tests {
         let unit_key = UnitKey::new("key".as_bytes());
         let expected_content = UnitContent::String("content".to_string());
 
-        client.set_unit(&grouping, &unit_key, &expected_content).unwrap();
+        client
+            .set_unit(&grouping, &unit_key, &expected_content)
+            .unwrap();
 
         let (code, actual_output) = client.get_by_key(&grouping, &unit_key).unwrap();
 
         assert_eq!(actual_output, expected_content.to_string());
+        assert_eq!(code, 200);
+
+        let grouping = Grouping::new("the_other_grouping".as_bytes());
+        let (code, actual_output) = client.get_by_key(&grouping, &unit_key).unwrap();
+
+        assert!(actual_output.is_empty());
         assert_eq!(code, 200);
     }
 

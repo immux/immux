@@ -2,6 +2,7 @@ use std::error::Error;
 use std::thread;
 
 use immuxsys::constants as Constants;
+use immuxsys::storage::executor::grouping::Grouping;
 use immuxsys_client::client::ImmuxDBClient;
 use immuxsys_dev_utils::data_models::census90::CensusEntry;
 use immuxsys_dev_utils::dev_utils::{
@@ -9,7 +10,6 @@ use immuxsys_dev_utils::dev_utils::{
     read_usize_from_arguments,
 };
 use immuxsys_dev_utils::least_squares::solve;
-use immuxsys::storage::executor::grouping::Grouping;
 
 fn main() {
     let port = 20021;

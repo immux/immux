@@ -2,11 +2,11 @@ use std::error::Error;
 use std::thread;
 
 use immuxsys::constants as Constants;
+use immuxsys::storage::executor::grouping::Grouping;
 use immuxsys::storage::executor::unit_content::UnitContent;
 use immuxsys::storage::executor::unit_key::UnitKey;
 use immuxsys_client::client::ImmuxDBClient;
 use immuxsys_dev_utils::data_models::business::Business;
-use immuxsys::storage::executor::grouping::Grouping;
 use immuxsys_dev_utils::dev_utils::{
     csv_to_json_table, e2e_verify_correctness, launch_db, measure_iteration, notified_sleep,
     read_usize_from_arguments,
@@ -31,7 +31,10 @@ fn main() {
     let dataset: Vec<(Grouping, Vec<(UnitKey, UnitContent)>)> = paths
         .iter()
         .map(
-            |table_name| -> (Grouping, Result<Vec<(UnitKey, UnitContent)>, Box<dyn Error>>) {
+            |table_name| -> (
+                Grouping,
+                Result<Vec<(UnitKey, UnitContent)>, Box<dyn Error>>,
+            ) {
                 let csv_path = format!("dev_utils/src/data_models/data-raw/{}.csv", table_name);
 
                 let data = match table_name.as_ref() {

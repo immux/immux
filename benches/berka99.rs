@@ -2,6 +2,7 @@ use std::error::Error;
 use std::thread;
 
 use immuxsys::constants as Constants;
+use immuxsys::storage::executor::grouping::Grouping;
 use immuxsys_client::client::ImmuxDBClient;
 use immuxsys_dev_utils::data_models::berka99::{
     Account, Card, Client, Disp, District, Loan, Order, Trans,
@@ -10,7 +11,6 @@ use immuxsys_dev_utils::dev_utils::{
     csv_to_json_table, e2e_verify_correctness, launch_db, measure_iteration, notified_sleep,
     read_usize_from_arguments, UnitList,
 };
-use immuxsys::storage::executor::grouping::Grouping;
 
 fn main() {
     let port = 22190;
@@ -33,21 +33,27 @@ fn main() {
 
     let dataset: Vec<(Grouping, UnitList)> = paths
         .iter()
-        .map(|table_name| -> (Grouping, Result<UnitList, Box<dyn Error>>) {
-            let csv_path = format!("dev_utils/src/data_models/data-raw/{}.asc", table_name);
-            let data = match table_name.as_ref() {
-                "account" => csv_to_json_table::<Account>(&csv_path, table_name, b';', row_limit),
-                "card" => csv_to_json_table::<Card>(&csv_path, table_name, b';', row_limit),
-                "client" => csv_to_json_table::<Client>(&csv_path, table_name, b';', row_limit),
-                "disp" => csv_to_json_table::<Disp>(&csv_path, table_name, b';', row_limit),
-                "district" => csv_to_json_table::<District>(&csv_path, table_name, b';', row_limit),
-                "loan" => csv_to_json_table::<Loan>(&csv_path, table_name, b';', row_limit),
-                "order" => csv_to_json_table::<Order>(&csv_path, table_name, b';', row_limit),
-                "trans" => csv_to_json_table::<Trans>(&csv_path, table_name, b';', row_limit),
-                _ => panic!("Unexpected table {}", table_name),
-            };
-            return (Grouping::new(table_name.as_bytes()), data);
-        })
+        .map(
+            |table_name| -> (Grouping, Result<UnitList, Box<dyn Error>>) {
+                let csv_path = format!("dev_utils/src/data_models/data-raw/{}.asc", table_name);
+                let data = match table_name.as_ref() {
+                    "account" => {
+                        csv_to_json_table::<Account>(&csv_path, table_name, b';', row_limit)
+                    }
+                    "card" => csv_to_json_table::<Card>(&csv_path, table_name, b';', row_limit),
+                    "client" => csv_to_json_table::<Client>(&csv_path, table_name, b';', row_limit),
+                    "disp" => csv_to_json_table::<Disp>(&csv_path, table_name, b';', row_limit),
+                    "district" => {
+                        csv_to_json_table::<District>(&csv_path, table_name, b';', row_limit)
+                    }
+                    "loan" => csv_to_json_table::<Loan>(&csv_path, table_name, b';', row_limit),
+                    "order" => csv_to_json_table::<Order>(&csv_path, table_name, b';', row_limit),
+                    "trans" => csv_to_json_table::<Trans>(&csv_path, table_name, b';', row_limit),
+                    _ => panic!("Unexpected table {}", table_name),
+                };
+                return (Grouping::new(table_name.as_bytes()), data);
+            },
+        )
         .map(|result| -> (Grouping, UnitList) {
             match result.1 {
                 Err(error) => {

@@ -1,12 +1,12 @@
 use std::thread;
 
 use immuxsys::constants as Constants;
+use immuxsys::storage::executor::grouping::Grouping;
 use immuxsys_client::client::ImmuxDBClient;
 use immuxsys_dev_utils::data_models::census90::CensusEntry;
 use immuxsys_dev_utils::dev_utils::{
     csv_to_json_table_with_size, launch_db, measure_single_operation, notified_sleep,
 };
-use immuxsys::storage::executor::grouping::Grouping;
 
 #[derive(Clone)]
 struct BenchSpec {

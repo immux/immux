@@ -1,12 +1,12 @@
 use std::thread;
 
 use immuxsys::constants as Constants;
+use immuxsys::storage::executor::grouping::Grouping;
 use immuxsys_client::client::ImmuxDBClient;
 use immuxsys_dev_utils::data_models::census90::CensusEntry;
 use immuxsys_dev_utils::dev_utils::{
     csv_to_json_table, launch_db, measure_iteration, notified_sleep, read_usize_from_arguments,
 };
-use immuxsys::storage::executor::grouping::Grouping;
 
 fn main() {
     let port = 4450;
