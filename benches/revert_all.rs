@@ -5,6 +5,7 @@ use immuxsys::constants as Constants;
 use immuxsys::storage::chain_height::ChainHeight;
 use immuxsys_client::client::ImmuxDBClient;
 use immuxsys_dev_utils::data_models::census90::CensusEntry;
+use immuxsys::storage::executor::grouping::Grouping;
 use immuxsys_dev_utils::dev_utils::{
     csv_to_json_table, launch_db, measure_single_operation, notified_sleep,
     read_usize_from_arguments,
@@ -24,10 +25,10 @@ fn main() {
     thread::spawn(move || launch_db("bench_revert_all", port));
     notified_sleep(5);
 
-    let grouping = String::from("census90");
+    let grouping = Grouping::new("census90".as_bytes());
     let table = csv_to_json_table::<CensusEntry>(
         "dev_utils/src/data_models/data-raw/census90.txt",
-        &grouping,
+        &grouping.to_string(),
         b',',
         row_limit,
     )

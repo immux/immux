@@ -6,6 +6,7 @@ mod http_e2e_tests {
 
     use immuxsys::constants as Constants;
     use immuxsys::storage::chain_height::ChainHeight;
+    use immuxsys::storage::executor::grouping::Grouping;
     use immuxsys::storage::executor::unit_content::UnitContent;
     use immuxsys::storage::executor::unit_key::UnitKey;
     use immuxsys::storage::transaction_manager::TransactionId;
@@ -18,6 +19,27 @@ mod http_e2e_tests {
     use immuxsys_dev_utils::dev_utils::{
         csv_to_json_table, e2e_verify_correctness, launch_db, notified_sleep, UnitList,
     };
+
+    #[test]
+    fn grouping_get_set() {
+        let port = 20030;
+        thread::spawn(move || launch_db("grouping_get_set", port));
+        notified_sleep(5);
+
+        let host = &format!("{}:{}", Constants::SERVER_END_POINT, port);
+        let client = ImmuxDBClient::new(host).unwrap();
+
+        let grouping = Grouping::new("any_grouping".as_bytes());
+        let unit_key = UnitKey::new("key".as_bytes());
+        let expected_content = UnitContent::String("content".to_string());
+
+        client.set_unit(&grouping, &unit_key, &expected_content).unwrap();
+
+        let (code, actual_output) = client.get_by_key(&grouping, &unit_key).unwrap();
+
+        assert_eq!(actual_output, expected_content.to_string());
+        assert_eq!(code, 200);
+    }
 
     #[test]
     fn e2e_real_data_get_set() {
@@ -81,13 +103,15 @@ mod http_e2e_tests {
 
         for (grouping, table) in dataset.iter() {
             for (key, content) in table.iter() {
-                client.set_unit(&grouping, &key, &content).unwrap();
+                client
+                    .set_unit(&Grouping::new(&grouping.as_bytes()), &key, &content)
+                    .unwrap();
             }
         }
 
         for (grouping, table) in dataset.iter() {
             assert!(e2e_verify_correctness(
-                &grouping,
+                &Grouping::new(&grouping.as_bytes()),
                 &table.as_slice(),
                 &client
             ));
@@ -107,11 +131,15 @@ mod http_e2e_tests {
         let key_content_pairs = get_key_content_pairs();
 
         for (key, content) in key_content_pairs.iter() {
-            client.set_unit(&grouping, &key, &content).unwrap();
+            client
+                .set_unit(&Grouping::new(&grouping.as_bytes()), &key, &content)
+                .unwrap();
         }
 
         for (key, content) in key_content_pairs.iter() {
-            let (status_code, actual_output) = client.get_by_key(&grouping, &key).unwrap();
+            let (status_code, actual_output) = client
+                .get_by_key(&Grouping::new(&grouping.as_bytes()), &key)
+                .unwrap();
             let expected_output = content.to_string();
             assert_eq!(actual_output, expected_output);
             assert_eq!(status_code.as_u16(), 200);
@@ -141,14 +169,22 @@ mod http_e2e_tests {
         ];
 
         for content in contents.iter() {
-            client.set_unit(&grouping, &unit_key, &content).unwrap();
+            client
+                .set_unit(&Grouping::new(&grouping.as_bytes()), &unit_key, &content)
+                .unwrap();
         }
 
         client
-            .revert_one(&grouping, &unit_key, &target_height)
+            .revert_one(
+                &Grouping::new(&grouping.as_bytes()),
+                &unit_key,
+                &target_height,
+            )
             .unwrap();
         let expected_output = &contents[target_height.as_u64() as usize].to_string();
-        let (status_code, actual_output) = &client.get_by_key(&grouping, &unit_key).unwrap();
+        let (status_code, actual_output) = &client
+            .get_by_key(&Grouping::new(&grouping.as_bytes()), &unit_key)
+            .unwrap();
 
         assert_eq!(actual_output, expected_output);
         assert_eq!(status_code.as_u16(), 200);
@@ -169,18 +205,26 @@ mod http_e2e_tests {
         let (target_key, _target_content) = &key_content_pairs[target_pair_index];
 
         for (key, content) in key_content_pairs.iter() {
-            client.set_unit(&grouping, &key, &content).unwrap();
+            client
+                .set_unit(&Grouping::new(&grouping.as_bytes()), &key, &content)
+                .unwrap();
         }
 
-        client.remove_one(&grouping, target_key).unwrap();
+        client
+            .remove_one(&Grouping::new(&grouping.as_bytes()), target_key)
+            .unwrap();
 
         for (key, content) in key_content_pairs.iter() {
             if key == target_key {
-                let (status_code, actual_output) = client.get_by_key(&grouping, &key).unwrap();
+                let (status_code, actual_output) = client
+                    .get_by_key(&Grouping::new(&grouping.as_bytes()), &key)
+                    .unwrap();
                 assert_eq!(status_code.as_u16(), 200);
                 assert!(actual_output.is_empty());
             } else {
-                let (status_code, actual_output) = client.get_by_key(&grouping, &key).unwrap();
+                let (status_code, actual_output) = client
+                    .get_by_key(&Grouping::new(&grouping.as_bytes()), &key)
+                    .unwrap();
                 let expected_output = content.to_string();
                 assert_eq!(status_code.as_u16(), 200);
                 assert_eq!(actual_output, expected_output);
@@ -203,19 +247,25 @@ mod http_e2e_tests {
         let target_height = ChainHeight::new(target_pair_index);
 
         for (key, content) in key_content_pairs.iter() {
-            client.set_unit(&grouping, &key, &content).unwrap();
+            client
+                .set_unit(&Grouping::new(&grouping.as_bytes()), &key, &content)
+                .unwrap();
         }
 
         client.revert_all(&target_height).unwrap();
 
         for (index, (key, content)) in key_content_pairs.iter().enumerate() {
             if index <= target_height.as_u64() as usize {
-                let (status_code, actual_output) = client.get_by_key(&grouping, &key).unwrap();
+                let (status_code, actual_output) = client
+                    .get_by_key(&Grouping::new(&grouping.as_bytes()), &key)
+                    .unwrap();
                 let expected_output = content.to_string();
                 assert_eq!(status_code.as_u16(), 200);
                 assert_eq!(actual_output, expected_output);
             } else {
-                let (status_code, actual_output) = client.get_by_key(&grouping, &key).unwrap();
+                let (status_code, actual_output) = client
+                    .get_by_key(&Grouping::new(&grouping.as_bytes()), &key)
+                    .unwrap();
                 assert_eq!(status_code.as_u16(), 200);
                 assert!(actual_output.is_empty());
             }
@@ -235,13 +285,17 @@ mod http_e2e_tests {
         let key_content_pairs = get_key_content_pairs();
 
         for (key, content) in key_content_pairs.iter() {
-            client.set_unit(&grouping, &key, &content).unwrap();
+            client
+                .set_unit(&Grouping::new(&grouping.as_bytes()), &key, &content)
+                .unwrap();
         }
 
         client.remove_all().unwrap();
 
         for (key, _content) in key_content_pairs.iter() {
-            let (status_code, actual_output) = client.get_by_key(&grouping, &key).unwrap();
+            let (status_code, actual_output) = client
+                .get_by_key(&Grouping::new(&grouping.as_bytes()), &key)
+                .unwrap();
             assert_eq!(status_code.as_u16(), 200);
             assert!(actual_output.is_empty());
         }
@@ -265,14 +319,21 @@ mod http_e2e_tests {
 
         for (key, content) in key_content_pairs.iter() {
             client
-                .transactional_set_unit(&grouping, &key, &content, &transaction_id)
+                .transactional_set_unit(
+                    &Grouping::new(&grouping.as_bytes()),
+                    &key,
+                    &content,
+                    &transaction_id,
+                )
                 .unwrap();
         }
 
         client.commit_transaction(&transaction_id).unwrap();
 
         for (key, content) in key_content_pairs.iter() {
-            let (status_code, actual_output) = client.get_by_key(&grouping, &key).unwrap();
+            let (status_code, actual_output) = client
+                .get_by_key(&Grouping::new(&grouping.as_bytes()), &key)
+                .unwrap();
             let expected_output = content.to_string();
             assert_eq!(status_code.as_u16(), 200);
             assert_eq!(actual_output, expected_output);
@@ -297,14 +358,21 @@ mod http_e2e_tests {
 
         for (key, content) in key_content_pairs.iter() {
             client
-                .transactional_set_unit(&grouping, &key, &content, &transaction_id)
+                .transactional_set_unit(
+                    &Grouping::new(&grouping.as_bytes()),
+                    &key,
+                    &content,
+                    &transaction_id,
+                )
                 .unwrap();
         }
 
         client.abort_transaction(&transaction_id).unwrap();
 
         for (key, _content) in key_content_pairs.iter() {
-            let (status_code, actual_output) = client.get_by_key(&grouping, &key).unwrap();
+            let (status_code, actual_output) = client
+                .get_by_key(&Grouping::new(&grouping.as_bytes()), &key)
+                .unwrap();
             assert_eq!(status_code.as_u16(), 200);
             assert!(actual_output.is_empty());
         }
@@ -329,12 +397,21 @@ mod http_e2e_tests {
         let transaction_id = TransactionId::new(transaction_id_str.parse::<u64>().unwrap());
 
         client
-            .transactional_set_unit(&grouping, &unit_key, &content, &transaction_id)
+            .transactional_set_unit(
+                &Grouping::new(&grouping.as_bytes()),
+                &unit_key,
+                &content,
+                &transaction_id,
+            )
             .unwrap();
 
         {
             let (status_code, actual_output) = client
-                .transactional_get(&grouping, &unit_key, &transaction_id)
+                .transactional_get(
+                    &Grouping::new(&grouping.as_bytes()),
+                    &unit_key,
+                    &transaction_id,
+                )
                 .unwrap();
             assert_eq!(status_code.as_u16(), 200);
             let expected_output = content.to_string();
@@ -342,7 +419,9 @@ mod http_e2e_tests {
         }
 
         {
-            let (status_code, output) = client.get_by_key(&grouping, &unit_key).unwrap();
+            let (status_code, output) = client
+                .get_by_key(&Grouping::new(&grouping.as_bytes()), &unit_key)
+                .unwrap();
             assert_eq!(status_code.as_u16(), 200);
             assert!(output.is_empty());
         }
@@ -350,7 +429,9 @@ mod http_e2e_tests {
         client.commit_transaction(&transaction_id).unwrap();
 
         {
-            let (status_code, actual_output) = client.get_by_key(&grouping, &unit_key).unwrap();
+            let (status_code, actual_output) = client
+                .get_by_key(&Grouping::new(&grouping.as_bytes()), &unit_key)
+                .unwrap();
             let expected_output = content.to_string();
             assert_eq!(status_code.as_u16(), 200);
             assert_eq!(actual_output, expected_output);
@@ -372,7 +453,9 @@ mod http_e2e_tests {
         let (target_key, _target_content) = &key_content_pairs[target_pair_index];
 
         for (key, content) in key_content_pairs.iter() {
-            client.set_unit(&grouping, &key, &content).unwrap();
+            client
+                .set_unit(&Grouping::new(&grouping.as_bytes()), &key, &content)
+                .unwrap();
         }
 
         let (status_code, transaction_id_str) = client.create_transaction().unwrap();
@@ -381,11 +464,17 @@ mod http_e2e_tests {
         let transaction_id = TransactionId::new(transaction_id_str.parse::<u64>().unwrap());
 
         client
-            .transactional_remove_one(&transaction_id, &grouping, &target_key)
+            .transactional_remove_one(
+                &transaction_id,
+                &Grouping::new(&grouping.as_bytes()),
+                &target_key,
+            )
             .unwrap();
 
         for (key, content) in key_content_pairs.iter() {
-            let (status_code, actual_output) = client.get_by_key(&grouping, &key).unwrap();
+            let (status_code, actual_output) = client
+                .get_by_key(&Grouping::new(&grouping.as_bytes()), &key)
+                .unwrap();
             let expected_output = content.to_string();
             assert_eq!(status_code.as_u16(), 200);
             assert_eq!(actual_output, expected_output);
@@ -395,11 +484,15 @@ mod http_e2e_tests {
 
         for (key, content) in key_content_pairs.iter() {
             if key == target_key {
-                let (status_code, actual_output) = client.get_by_key(&grouping, &key).unwrap();
+                let (status_code, actual_output) = client
+                    .get_by_key(&Grouping::new(&grouping.as_bytes()), &key)
+                    .unwrap();
                 assert_eq!(status_code.as_u16(), 200);
                 assert!(actual_output.is_empty());
             } else {
-                let (status_code, actual_output) = client.get_by_key(&grouping, &key).unwrap();
+                let (status_code, actual_output) = client
+                    .get_by_key(&Grouping::new(&grouping.as_bytes()), &key)
+                    .unwrap();
                 let expected_output = content.to_string();
                 assert_eq!(status_code.as_u16(), 200);
                 assert_eq!(actual_output, expected_output);
@@ -431,7 +524,9 @@ mod http_e2e_tests {
         ];
 
         for content in contents.iter() {
-            client.set_unit(&grouping, &key, &content).unwrap();
+            client
+                .set_unit(&Grouping::new(&grouping.as_bytes()), &key, &content)
+                .unwrap();
         }
 
         let (status_code, transaction_id_str) = client.create_transaction().unwrap();
@@ -440,17 +535,26 @@ mod http_e2e_tests {
         let transaction_id = TransactionId::new(transaction_id_str.parse::<u64>().unwrap());
 
         client
-            .transactional_revert_one(&grouping, &key, &target_height, &transaction_id)
+            .transactional_revert_one(
+                &Grouping::new(&grouping.as_bytes()),
+                &key,
+                &target_height,
+                &transaction_id,
+            )
             .unwrap();
 
-        let (status_code, actual_output) = &client.get_by_key(&grouping, &key).unwrap();
+        let (status_code, actual_output) = &client
+            .get_by_key(&Grouping::new(&grouping.as_bytes()), &key)
+            .unwrap();
         let expected_output = &contents.last().unwrap().to_string();
         assert_eq!(status_code.as_u16(), 200);
         assert_eq!(actual_output, expected_output);
 
         client.commit_transaction(&transaction_id).unwrap();
 
-        let (status_code, actual_output) = &client.get_by_key(&grouping, &key).unwrap();
+        let (status_code, actual_output) = &client
+            .get_by_key(&Grouping::new(&grouping.as_bytes()), &key)
+            .unwrap();
         let expected_output = &contents[target_pair_index as usize].to_string();
         assert_eq!(status_code.as_u16(), 200);
         assert_eq!(actual_output, expected_output);
@@ -469,7 +573,9 @@ mod http_e2e_tests {
         let key_content_pairs = get_key_content_pairs();
 
         for (key, content) in key_content_pairs.iter() {
-            client.set_unit(&grouping, &key, &content).unwrap();
+            client
+                .set_unit(&Grouping::new(&grouping.as_bytes()), &key, &content)
+                .unwrap();
         }
 
         let (status_code, transaction_id_str) = client.create_transaction().unwrap();
@@ -481,7 +587,7 @@ mod http_e2e_tests {
 
         for (key, _content) in key_content_pairs.iter() {
             let (status_code, actual_output) = client
-                .transactional_get(&grouping, &key, &transaction_id)
+                .transactional_get(&Grouping::new(&grouping.as_bytes()), &key, &transaction_id)
                 .unwrap();
             assert_eq!(status_code.as_u16(), 200);
             assert!(actual_output.is_empty())
@@ -503,7 +609,9 @@ mod http_e2e_tests {
         let target_height = ChainHeight::new(target_pair_index);
 
         for (key, content) in key_content_pairs.iter() {
-            client.set_unit(&grouping, &key, &content).unwrap();
+            client
+                .set_unit(&Grouping::new(&grouping.as_bytes()), &key, &content)
+                .unwrap();
         }
 
         let (status_code, transaction_id_str) = client.create_transaction().unwrap();
@@ -516,14 +624,14 @@ mod http_e2e_tests {
         for (index, (key, content)) in key_content_pairs.iter().enumerate() {
             if index <= target_height.as_u64() as usize {
                 let (status_code, actual_output) = client
-                    .transactional_get(&grouping, &key, &transaction_id)
+                    .transactional_get(&Grouping::new(&grouping.as_bytes()), &key, &transaction_id)
                     .unwrap();
                 let expected_output = content.to_string();
                 assert_eq!(status_code.as_u16(), 200);
                 assert_eq!(actual_output, expected_output);
             } else {
                 let (status_code, actual_output) = client
-                    .transactional_get(&grouping, &key, &transaction_id)
+                    .transactional_get(&Grouping::new(&grouping.as_bytes()), &key, &transaction_id)
                     .unwrap();
                 assert_eq!(status_code.as_u16(), 200);
                 assert!(actual_output.is_empty());
@@ -546,7 +654,9 @@ mod http_e2e_tests {
         let target_height = ChainHeight::new(target_pair_index);
 
         for (key, content) in key_content_pairs.iter() {
-            client.set_unit(&grouping, &key, &content).unwrap();
+            client
+                .set_unit(&Grouping::new(&grouping.as_bytes()), &key, &content)
+                .unwrap();
         }
 
         let (status_code, transaction_id_str) = client.create_transaction().unwrap();
@@ -634,10 +744,20 @@ mod http_e2e_tests {
             let kv_1 = kv_pairs.0;
             let kv_2 = kv_pairs.1;
             client
-                .transactional_set_unit(&grouping, &kv_1.0, &kv_1.1, &transaction_id_1)
+                .transactional_set_unit(
+                    &Grouping::new(&grouping.as_bytes()),
+                    &kv_1.0,
+                    &kv_1.1,
+                    &transaction_id_1,
+                )
                 .unwrap();
             client
-                .transactional_set_unit(&grouping, &kv_2.0, &kv_2.1, &transaction_id_2)
+                .transactional_set_unit(
+                    &Grouping::new(&grouping.as_bytes()),
+                    &kv_2.0,
+                    &kv_2.1,
+                    &transaction_id_2,
+                )
                 .unwrap();
         }
 
@@ -645,7 +765,9 @@ mod http_e2e_tests {
         client.commit_transaction(&transaction_id_2).unwrap();
 
         for (index, key) in shared_keys.iter().enumerate() {
-            let (status_code, actual_value) = client.get_by_key(&grouping, key).unwrap();
+            let (status_code, actual_value) = client
+                .get_by_key(&Grouping::new(&grouping.as_bytes()), key)
+                .unwrap();
             let expected_value = key_value_pairs_2[index].1.clone();
             assert_eq!(status_code.as_u16(), 200);
             assert_eq!(actual_value, expected_value.to_string());
@@ -665,7 +787,9 @@ mod http_e2e_tests {
         let key = UnitKey::from("a");
         let value = UnitContent::String(String::from("1"));
 
-        client.set_unit(&grouping, &key, &value).unwrap();
+        client
+            .set_unit(&Grouping::new(&grouping.as_bytes()), &key, &value)
+            .unwrap();
 
         let (status_code, transaction_id_str) = client.create_transaction().unwrap();
         assert_eq!(status_code.as_u16(), 200);
@@ -673,7 +797,7 @@ mod http_e2e_tests {
 
         {
             let (status_code, actual_value) = client
-                .transactional_get(&grouping, &key, &transaction_id)
+                .transactional_get(&Grouping::new(&grouping.as_bytes()), &key, &transaction_id)
                 .unwrap();
             let expected_value = value.to_string();
             assert_eq!(status_code.as_u16(), 200);
@@ -695,14 +819,18 @@ mod http_e2e_tests {
         let origin_value = UnitContent::String(String::from("1"));
         let value_in_transaction = UnitContent::String(String::from("2"));
 
-        client.set_unit(&grouping, &key, &origin_value).unwrap();
+        client
+            .set_unit(&Grouping::new(&grouping.as_bytes()), &key, &origin_value)
+            .unwrap();
 
         let (status_code, transaction_id_str) = client.create_transaction().unwrap();
         assert_eq!(status_code.as_u16(), 200);
         let transaction_id = TransactionId::new(transaction_id_str.parse::<u64>().unwrap());
 
         {
-            let (status_code, actual_value) = client.get_by_key(&grouping, &key).unwrap();
+            let (status_code, actual_value) = client
+                .get_by_key(&Grouping::new(&grouping.as_bytes()), &key)
+                .unwrap();
             let expected_value = &origin_value.to_string();
             assert_eq!(status_code.as_u16(), 200);
             assert_eq!(&actual_value, expected_value);
@@ -710,10 +838,17 @@ mod http_e2e_tests {
 
         {
             client
-                .transactional_set_unit(&grouping, &key, &value_in_transaction, &transaction_id)
+                .transactional_set_unit(
+                    &Grouping::new(&grouping.as_bytes()),
+                    &key,
+                    &value_in_transaction,
+                    &transaction_id,
+                )
                 .unwrap();
 
-            let (status_code, actual_value) = client.get_by_key(&grouping, &key).unwrap();
+            let (status_code, actual_value) = client
+                .get_by_key(&Grouping::new(&grouping.as_bytes()), &key)
+                .unwrap();
             let expected_value = &origin_value.to_string();
             assert_eq!(status_code.as_u16(), 200);
             assert_eq!(&actual_value, expected_value);
@@ -723,7 +858,7 @@ mod http_e2e_tests {
 
         {
             let (status_code, actual_value) = client
-                .transactional_get(&grouping, &key, &transaction_id)
+                .transactional_get(&Grouping::new(&grouping.as_bytes()), &key, &transaction_id)
                 .unwrap();
             let expected_value = &value_in_transaction.to_string();
             assert_eq!(status_code.as_u16(), 200);

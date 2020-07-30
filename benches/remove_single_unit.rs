@@ -4,6 +4,7 @@ use immuxsys::constants as Constants;
 use immuxsys::storage::executor::unit_content::UnitContent;
 use immuxsys_client::client::ImmuxDBClient;
 use immuxsys_dev_utils::data_models::census90::CensusEntry;
+use immuxsys::storage::executor::grouping::Grouping;
 use immuxsys_dev_utils::dev_utils::{
     csv_to_json_table, e2e_verify_correctness, launch_db, measure_iteration, notified_sleep,
     read_usize_from_arguments, UnitList,
@@ -24,10 +25,10 @@ fn main() {
     thread::spawn(move || launch_db("bench_remove_single_unit", port));
     notified_sleep(5);
 
-    let grouping = String::from("census90");
+    let grouping = Grouping::new("census90".as_bytes());
     let table = csv_to_json_table::<CensusEntry>(
         "dev_utils/src/data_models/data-raw/census90.txt",
-        &grouping,
+        &grouping.to_string(),
         b',',
         row_limit,
     )
@@ -42,7 +43,7 @@ fn main() {
 
     println!(
         "Removing single unit in table '{}', total records {}",
-        grouping,
+        &grouping.to_string(),
         table.len()
     );
     measure_iteration(

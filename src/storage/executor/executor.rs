@@ -2,9 +2,10 @@ use std::convert::TryFrom;
 use std::path::PathBuf;
 
 use crate::storage::chain_height::ChainHeight;
+use crate::storage::executor::command::{Command, CommandError};
 use crate::storage::executor::errors::ExecutorResult;
-use crate::storage::executor::instruction::Instruction;
-use crate::storage::executor::unit_content::{UnitContent, UnitContentError};
+use crate::storage::executor::grouping::Grouping;
+use crate::storage::executor::unit_content::UnitContent;
 use crate::storage::executor::unit_key::UnitKey;
 use crate::storage::kv::LogKeyValueStore;
 use crate::storage::kvkey::KVKey;
@@ -24,11 +25,12 @@ impl Executor {
 
     pub fn set(
         &mut self,
+        grouping: &Grouping,
         key: &UnitKey,
         value: &UnitContent,
         transaction_id: Option<TransactionId>,
     ) -> ExecutorResult<()> {
-        let kv_key = KVKey::from(key);
+        let kv_key = KVKey::from_grouping_and_unit_key(&grouping, &key);
         let kv_value = KVValue::from(value);
         self.store_engine.set(&kv_key, &kv_value, transaction_id)?;
         return Ok(());
@@ -36,10 +38,11 @@ impl Executor {
 
     pub fn get(
         &mut self,
+        grouping: &Grouping,
         key: &UnitKey,
         transaction_id: Option<TransactionId>,
     ) -> ExecutorResult<Option<UnitContent>> {
-        let kv_key = KVKey::from(key);
+        let kv_key = KVKey::from_grouping_and_unit_key(&grouping, &key);
         match self.store_engine.get(&kv_key, transaction_id)? {
             None => Ok(None),
             Some(kv_value) => {
@@ -51,11 +54,12 @@ impl Executor {
 
     pub fn revert_one(
         &mut self,
+        grouping: &Grouping,
         key: &UnitKey,
         height: &ChainHeight,
         transaction_id: Option<TransactionId>,
     ) -> ExecutorResult<()> {
-        let kv_key = KVKey::from(key);
+        let kv_key = KVKey::from_grouping_and_unit_key(&grouping, &key);
         self.store_engine
             .revert_one(&kv_key, height, transaction_id)?;
         return Ok(());
@@ -68,10 +72,11 @@ impl Executor {
 
     pub fn remove_one(
         &mut self,
+        grouping: &Grouping,
         key: &UnitKey,
         transaction_id: Option<TransactionId>,
     ) -> ExecutorResult<()> {
-        let kv_key = KVKey::from(key);
+        let kv_key = KVKey::from_grouping_and_unit_key(&grouping, &key);
         self.store_engine.remove_one(&kv_key, transaction_id)?;
         return Ok(());
     }
@@ -81,13 +86,13 @@ impl Executor {
         return Ok(());
     }
 
-    pub fn inspect_all(&mut self) -> ExecutorResult<Vec<(Instruction, ChainHeight)>> {
-        let result: Result<Vec<_>, UnitContentError> = self
+    pub fn inspect_all(&mut self) -> ExecutorResult<Vec<(Command, ChainHeight)>> {
+        let result: Result<Vec<_>, CommandError> = self
             .store_engine
             .inspect_all()?
             .iter()
             .map(|(command, height)| {
-                let instruction = Instruction::try_from(command)?;
+                let instruction = Command::try_from(command)?;
                 Ok((instruction, height.to_owned()))
             })
             .collect();
@@ -97,15 +102,16 @@ impl Executor {
 
     pub fn inspect_one(
         &mut self,
+        grouping: &Grouping,
         target_key: &UnitKey,
-    ) -> ExecutorResult<Vec<(Instruction, ChainHeight)>> {
-        let kv_key = KVKey::from(target_key);
-        let result: Result<Vec<_>, UnitContentError> = self
+    ) -> ExecutorResult<Vec<(Command, ChainHeight)>> {
+        let kv_key = KVKey::from_grouping_and_unit_key(&grouping, &target_key);
+        let result: Result<Vec<_>, CommandError> = self
             .store_engine
             .inspect_one(&kv_key)?
             .iter()
             .map(|(command, height)| {
-                let instruction = Instruction::try_from(command)?;
+                let instruction = Command::try_from(command)?;
                 Ok((instruction, height.to_owned()))
             })
             .collect();

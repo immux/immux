@@ -10,6 +10,7 @@ use immuxsys_dev_utils::dev_utils::{
     csv_to_json_table, e2e_verify_correctness, launch_db, measure_iteration, notified_sleep,
     read_usize_from_arguments, UnitList,
 };
+use immuxsys::storage::executor::grouping::Grouping;
 
 fn main() {
     let port = 22190;
@@ -30,9 +31,9 @@ fn main() {
         "account", "card", "client", "disp", "district", "loan", "order", "trans",
     ];
 
-    let dataset: Vec<(String, UnitList)> = paths
+    let dataset: Vec<(Grouping, UnitList)> = paths
         .iter()
-        .map(|table_name| -> (String, Result<UnitList, Box<dyn Error>>) {
+        .map(|table_name| -> (Grouping, Result<UnitList, Box<dyn Error>>) {
             let csv_path = format!("dev_utils/src/data_models/data-raw/{}.asc", table_name);
             let data = match table_name.as_ref() {
                 "account" => csv_to_json_table::<Account>(&csv_path, table_name, b';', row_limit),
@@ -45,13 +46,13 @@ fn main() {
                 "trans" => csv_to_json_table::<Trans>(&csv_path, table_name, b';', row_limit),
                 _ => panic!("Unexpected table {}", table_name),
             };
-            return (table_name.to_string(), data);
+            return (Grouping::new(table_name.as_bytes()), data);
         })
-        .map(|result| -> (String, UnitList) {
+        .map(|result| -> (Grouping, UnitList) {
             match result.1 {
                 Err(error) => {
                     eprintln!("CSV error: {}", error);
-                    return (String::from("error"), vec![]);
+                    return (Grouping::new("error".as_bytes()), vec![]);
                 }
                 Ok(table) => return (result.0, table),
             }
@@ -64,7 +65,7 @@ fn main() {
     for (table_name, table) in dataset.iter() {
         println!(
             "Loading table '{}', total records {}",
-            table_name,
+            &table_name.to_string(),
             table.len()
         );
         measure_iteration(
@@ -83,7 +84,7 @@ fn main() {
     for (table_name, table) in dataset.iter() {
         println!(
             "Reading table '{}', total records {}",
-            table_name,
+            &table_name.to_string(),
             table.len()
         );
         measure_iteration(

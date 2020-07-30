@@ -28,6 +28,8 @@ pub const SUBCOMMAND_ABORT_TRANSACTION_DESCRIPTION: &str = "Abort transaction";
 
 pub const GENERAL_ARGUMENT_HELP_INFORMATION: &str = "A string key";
 
+pub const ARGUMENT_NAME_FOR_GROUPING: &str = "GROUPING";
+pub const MISSING_GROUPING_ARGUMENT_MESSAGE: &str = "GROUPING argument missing";
 pub const ARGUMENT_NAME_FOR_KEY: &str = "KEY";
 pub const MISSING_KEY_ARGUMENT_MESSAGE: &str = "KEY argument missing";
 pub const ARGUMENT_NAME_FOR_VALUE: &str = "VALUE";

@@ -2,13 +2,13 @@ use std::io::Error;
 use std::num::ParseIntError;
 
 use crate::storage::chain_height::ChainHeightError;
-use crate::storage::command::CommandError;
+use crate::storage::instruction::InstructionError;
 use crate::storage::transaction_manager::TransactionManagerError;
 
 #[derive(Debug)]
 pub enum KVError {
     IOError(Error),
-    CommandError(CommandError),
+    CommandError(InstructionError),
     RevertOutOfRange,
     ParseIntError(ParseIntError),
     ChainHeightError(ChainHeightError),
@@ -22,8 +22,8 @@ impl From<Error> for KVError {
     }
 }
 
-impl From<CommandError> for KVError {
-    fn from(err: CommandError) -> KVError {
+impl From<InstructionError> for KVError {
+    fn from(err: InstructionError) -> KVError {
         KVError::CommandError(err)
     }
 }

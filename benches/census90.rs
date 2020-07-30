@@ -9,6 +9,7 @@ use immuxsys_dev_utils::dev_utils::{
     read_usize_from_arguments,
 };
 use immuxsys_dev_utils::least_squares::solve;
+use immuxsys::storage::executor::grouping::Grouping;
 
 fn main() {
     let port = 20021;
@@ -25,10 +26,10 @@ fn main() {
     thread::spawn(move || launch_db("bench_census90", port));
     notified_sleep(5);
 
-    let grouping = String::from("census90");
+    let grouping = Grouping::new("census90".as_bytes());
     let table = csv_to_json_table::<CensusEntry>(
         "dev_utils/src/data_models/data-raw/census90.txt",
-        &grouping,
+        &grouping.to_string(),
         b',',
         row_limit,
     )

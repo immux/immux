@@ -6,6 +6,7 @@ use immuxsys_dev_utils::data_models::census90::CensusEntry;
 use immuxsys_dev_utils::dev_utils::{
     csv_to_json_table, launch_db, measure_iteration, notified_sleep, read_usize_from_arguments,
 };
+use immuxsys::storage::executor::grouping::Grouping;
 
 fn main() {
     let port = 4450;
@@ -21,10 +22,10 @@ fn main() {
     thread::spawn(move || launch_db("bench_inspect_one", port));
     notified_sleep(5);
 
-    let grouping = String::from("census90");
+    let grouping = Grouping::new("census90".as_bytes());
     let table = csv_to_json_table::<CensusEntry>(
         "dev_utils/src/data_models/data-raw/census90.txt",
-        &grouping,
+        &grouping.to_string(),
         b',',
         row_limit,
     )

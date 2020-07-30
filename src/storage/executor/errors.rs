@@ -2,6 +2,7 @@ use std::fmt::Formatter;
 use std::num::ParseIntError;
 
 use crate::storage::errors::KVError;
+use crate::storage::executor::command::CommandError;
 use crate::storage::executor::unit_content::UnitContentError;
 
 #[derive(Debug)]
@@ -9,6 +10,7 @@ pub enum ExecutorError {
     KVError(KVError),
     UnitContentError(UnitContentError),
     ParseIntError(ParseIntError),
+    InstructionError(CommandError),
 }
 
 impl From<KVError> for ExecutorError {
@@ -26,6 +28,12 @@ impl From<UnitContentError> for ExecutorError {
 impl From<ParseIntError> for ExecutorError {
     fn from(err: ParseIntError) -> ExecutorError {
         ExecutorError::ParseIntError(err)
+    }
+}
+
+impl From<CommandError> for ExecutorError {
+    fn from(err: CommandError) -> ExecutorError {
+        ExecutorError::InstructionError(err)
     }
 }
 
