@@ -1,6 +1,7 @@
 use std::thread;
 
 use immuxsys::constants as Constants;
+use immuxsys::storage::executor::grouping_label::GroupingLabel;
 use immuxsys_client::client::ImmuxDBClient;
 use immuxsys_dev_utils::data_models::census90::CensusEntry;
 use immuxsys_dev_utils::dev_utils::{
@@ -48,10 +49,10 @@ fn main() {
         let bench_spec = bench_spec.clone();
         let project_name = format!("{}_{}", bench_name, index);
         let child = thread::spawn(move || {
-            let grouping = String::from("census90");
+            let grouping = GroupingLabel::from("census90");
             let (table, read_bytes) = csv_to_json_table_with_size::<CensusEntry>(
                 "dev_utils/src/data_models/data-raw/census90.txt",
-                &grouping,
+                &grouping.to_string(),
                 b',',
                 bench_spec.bytes_limit,
             )

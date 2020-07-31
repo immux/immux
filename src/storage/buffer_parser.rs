@@ -1,4 +1,4 @@
-use crate::storage::command::Command;
+use crate::storage::instruction::Instruction;
 
 pub struct CommandBufferParser<'a> {
     buffer: &'a [u8],
@@ -12,10 +12,10 @@ impl<'a> CommandBufferParser<'a> {
 }
 
 impl<'a> Iterator for CommandBufferParser<'a> {
-    type Item = (Command, usize);
+    type Item = (Instruction, usize);
 
     fn next(&mut self) -> Option<Self::Item> {
-        match Command::parse(&self.buffer[self.index..]) {
+        match Instruction::parse(&self.buffer[self.index..]) {
             Ok((command, command_length)) => {
                 self.index += command_length;
                 return Some((command, command_length));
@@ -29,33 +29,33 @@ impl<'a> Iterator for CommandBufferParser<'a> {
 mod tests {
     use crate::storage::buffer_parser::CommandBufferParser;
     use crate::storage::chain_height::ChainHeight;
-    use crate::storage::command::Command;
+    use crate::storage::instruction::Instruction;
     use crate::storage::kvkey::KVKey;
     use crate::storage::kvvalue::KVValue;
 
-    fn get_commands() -> Vec<Command> {
-        let commands: Vec<Command> = vec![
-            Command::Set {
+    fn get_commands() -> Vec<Instruction> {
+        let commands: Vec<Instruction> = vec![
+            Instruction::Set {
                 key: KVKey::new(&[0x00, 0x01]),
                 value: KVValue::new(&[0xff, 0xf3]),
             },
-            Command::RevertOne {
+            Instruction::RevertOne {
                 key: KVKey::new(&[0x11, 0x22]),
                 height: ChainHeight::new(3),
             },
-            Command::RevertAll {
+            Instruction::RevertAll {
                 height: ChainHeight::new(6),
             },
-            Command::RemoveOne {
+            Instruction::RemoveOne {
                 key: KVKey::new(&[0x88]),
             },
-            Command::RemoveAll,
+            Instruction::RemoveAll,
         ];
 
         return commands;
     }
 
-    fn serialize_commands(commands: &Vec<Command>) -> Vec<u8> {
+    fn serialize_commands(commands: &Vec<Instruction>) -> Vec<u8> {
         let mut buffer: Vec<u8> = Vec::new();
         &commands.to_vec().iter().fold(&mut buffer, |acc, command| {
             let command_bytes: Vec<u8> = command.serialize();

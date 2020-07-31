@@ -3,6 +3,7 @@ use std::thread;
 
 use immuxsys::constants as Constants;
 use immuxsys::storage::chain_height::ChainHeight;
+use immuxsys::storage::executor::grouping_label::GroupingLabel;
 use immuxsys_client::client::ImmuxDBClient;
 use immuxsys_dev_utils::data_models::census90::CensusEntry;
 use immuxsys_dev_utils::dev_utils::{
@@ -24,10 +25,10 @@ fn main() {
     thread::spawn(move || launch_db("bench_revert_all", port));
     notified_sleep(5);
 
-    let grouping = String::from("census90");
+    let grouping = GroupingLabel::from("census90");
     let table = csv_to_json_table::<CensusEntry>(
         "dev_utils/src/data_models/data-raw/census90.txt",
-        &grouping,
+        &grouping.to_string(),
         b',',
         row_limit,
     )

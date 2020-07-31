@@ -4,8 +4,9 @@ use std::collections::HashMap;
 use crate::constants as Constants;
 use crate::server::errors::{ServerError, ServerResult};
 use crate::storage::chain_height::ChainHeight;
+use crate::storage::executor::command::Command;
 use crate::storage::executor::executor::Executor;
-use crate::storage::executor::instruction::Instruction;
+use crate::storage::executor::grouping_label::GroupingLabel;
 use crate::storage::executor::outcome::Outcome;
 use crate::storage::executor::unit_content::UnitContent;
 use crate::storage::executor::unit_key::UnitKey;
@@ -97,80 +98,92 @@ fn handle_request(request: &mut Request, executor: &mut Executor) -> ServerResul
     let instruction = parse_http_request(request)?;
 
     match instruction {
-        Instruction::Select {
+        Command::Select {
+            grouping,
             key,
             transaction_id,
         } => {
-            let result = executor.get(&key, transaction_id)?;
+            let result = executor.get(&grouping, &key, transaction_id)?;
             return Ok(Outcome::Select(result));
         }
-        Instruction::Insert { key, content } => {
-            executor.set(&key, &content, None)?;
+        Command::Insert {
+            grouping,
+            key,
+            content,
+        } => {
+            executor.set(&grouping, &key, &content, None)?;
             return Ok(Outcome::InsertSuccess);
         }
-        Instruction::RemoveOne { key } => {
-            executor.remove_one(&key, None)?;
+        Command::RemoveOne { grouping, key } => {
+            executor.remove_one(&grouping, &key, None)?;
             return Ok(Outcome::RemoveOneSuccess);
         }
-        Instruction::RemoveAll => {
+        Command::RemoveAll => {
             executor.remove_all()?;
             return Ok(Outcome::RemoveAllSuccess);
         }
-        Instruction::RevertOne { key, height } => {
-            executor.revert_one(&key, &height, None)?;
+        Command::RevertOne {
+            grouping,
+            key,
+            height,
+        } => {
+            executor.revert_one(&grouping, &key, &height, None)?;
             return Ok(Outcome::RevertOneSuccess);
         }
-        Instruction::RevertAll { height } => {
+        Command::RevertAll { height } => {
             executor.revert_all(&height)?;
             return Ok(Outcome::RevertAllSuccess);
         }
-        Instruction::InspectOne { key } => {
-            let result = executor.inspect_one(&key)?;
+        Command::InspectOne { grouping, key } => {
+            let result = executor.inspect_one(&grouping, &key)?;
             return Ok(Outcome::InspectOne(result));
         }
-        Instruction::InspectAll => {
+        Command::InspectAll => {
             let result = executor.inspect_all()?;
             return Ok(Outcome::InspectAll(result));
         }
-        Instruction::CreateTransaction => {
+        Command::CreateTransaction => {
             let transaction_id = executor.start_transaction()?;
             return Ok(Outcome::CreateTransaction(transaction_id));
         }
-        Instruction::TransactionCommit { transaction_id } => {
+        Command::TransactionCommit { transaction_id } => {
             executor.commit_transaction(transaction_id)?;
             return Ok(Outcome::TransactionCommitSuccess);
         }
-        Instruction::TransactionAbort { transaction_id } => {
+        Command::TransactionAbort { transaction_id } => {
             executor.abort_transaction(transaction_id)?;
             return Ok(Outcome::TransactionAbortSuccess);
         }
-        Instruction::TransactionalInsert {
+        Command::TransactionalInsert {
+            grouping,
             key,
             content,
             transaction_id,
         } => {
-            executor.set(&key, &content, Some(transaction_id))?;
+            executor.set(&grouping, &key, &content, Some(transaction_id))?;
             return Ok(Outcome::TransactionalInsertSuccess);
         }
-        Instruction::TransactionalRemoveOne {
+        Command::TransactionalRemoveOne {
+            grouping,
             key,
             transaction_id,
         } => {
-            executor.remove_one(&key, Some(transaction_id))?;
+            executor.remove_one(&grouping, &key, Some(transaction_id))?;
             return Ok(Outcome::TransactionalRemoveOneSuccess);
         }
-        Instruction::TransactionalRevertOne {
+        Command::TransactionalRevertOne {
+            grouping,
             key,
             height,
             transaction_id,
         } => {
-            executor.revert_one(&key, &height, Some(transaction_id))?;
+            executor.revert_one(&grouping, &key, &height, Some(transaction_id))?;
             return Ok(Outcome::TransactionalRevertOneSuccess);
         }
     }
 }
 
-fn parse_http_request(request: &mut Request) -> ServerResult<Instruction> {
+fn parse_http_request(request: &mut Request) -> ServerResult<Command> {
     let mut incoming_body = String::new();
     match request.as_reader().read_to_string(&mut incoming_body) {
         Ok(_) => (),
@@ -186,7 +199,7 @@ fn parse_http_request(request: &mut Request) -> ServerResult<Instruction> {
             if segments.len() >= 5 {
                 let url_transactions_key_word = segments[1];
                 let transaction_id_str = segments[2];
-                let _grouping_str = segments[3];
+                let grouping_str = segments[3];
                 let unit_key_str = segments[4];
 
                 if url_transactions_key_word != Constants::URL_TRANSACTIONS_KEY_WORD
@@ -197,15 +210,17 @@ fn parse_http_request(request: &mut Request) -> ServerResult<Instruction> {
 
                 let transaction_id = transaction_id_str.parse::<u64>()?;
                 let transaction_id = TransactionId::new(transaction_id);
+                let grouping = GroupingLabel::new(grouping_str.as_bytes());
                 let unit_key = UnitKey::from(unit_key_str);
 
-                let instruction = Instruction::Select {
+                let instruction = Command::Select {
+                    grouping,
                     key: unit_key,
                     transaction_id: Some(transaction_id),
                 };
                 return Ok(instruction);
             } else if segments.len() >= 4 {
-                let _grouping_str = segments[1];
+                let grouping_str = segments[1];
                 let unit_key_str = segments[2];
                 let url_journal_key_word = segments[3];
 
@@ -215,22 +230,28 @@ fn parse_http_request(request: &mut Request) -> ServerResult<Instruction> {
                     return Err(ServerError::UrlParsingError);
                 }
 
+                let grouping = GroupingLabel::new(grouping_str.as_bytes());
                 let unit_key = UnitKey::from(unit_key_str);
-                let instruction = Instruction::InspectOne { key: unit_key };
+                let instruction = Command::InspectOne {
+                    grouping,
+                    key: unit_key,
+                };
                 return Ok(instruction);
             } else if segments.len() >= 3 {
-                let _grouping_str = segments[1];
+                let grouping_str = segments[1];
                 let unit_key_str = segments[2];
+                let grouping = GroupingLabel::new(grouping_str.as_bytes());
                 let unit_key = UnitKey::from(unit_key_str);
 
-                let instruction = Instruction::Select {
+                let instruction = Command::Select {
+                    grouping,
                     key: unit_key,
                     transaction_id: None,
                 };
                 return Ok(instruction);
             } else if segments.len() >= 2 {
                 if segments[1] == Constants::URL_JOURNAL_KEY_WORD {
-                    let instruction = Instruction::InspectAll;
+                    let instruction = Command::InspectAll;
                     return Ok(instruction);
                 } else {
                     return Err(ServerError::UnimplementedForGetGrouping);
@@ -243,7 +264,7 @@ fn parse_http_request(request: &mut Request) -> ServerResult<Instruction> {
             if segments.len() >= 5 {
                 let url_transactions_key_word = segments[1];
                 let transaction_id_str = segments[2];
-                let _grouping_str = segments[3];
+                let grouping_str = segments[3];
                 let unit_key_str = segments[4];
 
                 if url_transactions_key_word != Constants::URL_TRANSACTIONS_KEY_WORD
@@ -252,13 +273,15 @@ fn parse_http_request(request: &mut Request) -> ServerResult<Instruction> {
                     return Err(ServerError::UrlParsingError);
                 }
 
+                let grouping = GroupingLabel::new(grouping_str.as_bytes());
                 let unit_key = UnitKey::from(unit_key_str);
                 let transaction_id = transaction_id_str.parse::<u64>()?;
 
                 if let Ok(height) = url_info.extract_numeric_query(Constants::HEIGHT) {
                     let height = ChainHeight::new(height);
                     let transaction_id = TransactionId::new(transaction_id);
-                    let instruction = Instruction::TransactionalRevertOne {
+                    let instruction = Command::TransactionalRevertOne {
+                        grouping,
                         key: unit_key,
                         height,
                         transaction_id,
@@ -267,7 +290,8 @@ fn parse_http_request(request: &mut Request) -> ServerResult<Instruction> {
                 } else {
                     let content = UnitContent::String(incoming_body);
                     let transaction_id = TransactionId::new(transaction_id);
-                    let instruction = Instruction::TransactionalInsert {
+                    let instruction = Command::TransactionalInsert {
+                        grouping,
                         key: unit_key,
                         content,
                         transaction_id,
@@ -275,25 +299,28 @@ fn parse_http_request(request: &mut Request) -> ServerResult<Instruction> {
                     return Ok(instruction);
                 }
             } else if segments.len() >= 3 {
-                let _grouping_str = segments[1];
+                let grouping_str = segments[1];
                 let unit_key_str = segments[2];
 
                 if unit_key_str.is_empty() {
                     return Err(ServerError::UrlParsingError);
                 }
 
+                let grouping = GroupingLabel::new(grouping_str.as_bytes());
                 let unit_key = UnitKey::from(unit_key_str);
 
                 if let Ok(height) = url_info.extract_numeric_query(Constants::HEIGHT) {
                     let height = ChainHeight::new(height);
-                    let instruction = Instruction::RevertOne {
+                    let instruction = Command::RevertOne {
+                        grouping,
                         key: unit_key,
                         height,
                     };
                     return Ok(instruction);
                 } else {
                     let content = UnitContent::String(incoming_body);
-                    let instruction = Instruction::Insert {
+                    let instruction = Command::Insert {
+                        grouping,
                         key: unit_key,
                         content,
                     };
@@ -301,7 +328,7 @@ fn parse_http_request(request: &mut Request) -> ServerResult<Instruction> {
                 }
             } else if let Ok(height) = url_info.extract_numeric_query(Constants::HEIGHT) {
                 let height = ChainHeight::new(height);
-                let instruction = Instruction::RevertAll { height };
+                let instruction = Command::RevertAll { height };
                 return Ok(instruction);
             } else {
                 return Err(ServerError::UrlParsingError);
@@ -328,7 +355,7 @@ fn parse_http_request(request: &mut Request) -> ServerResult<Instruction> {
                 let transaction_id = transaction_id_str.parse::<u64>()?;
                 let transaction_id = TransactionId::new(transaction_id);
 
-                let instruction = Instruction::TransactionCommit { transaction_id };
+                let instruction = Command::TransactionCommit { transaction_id };
                 return Ok(instruction);
             } else if let Some(_) =
                 url_info.extract_string_query(Constants::ABORT_TRANSACTION_KEY_WORD)
@@ -340,10 +367,10 @@ fn parse_http_request(request: &mut Request) -> ServerResult<Instruction> {
                 let transaction_id = transaction_id_str.parse::<u64>()?;
                 let transaction_id = TransactionId::new(transaction_id);
 
-                let instruction = Instruction::TransactionAbort { transaction_id };
+                let instruction = Command::TransactionAbort { transaction_id };
                 return Ok(instruction);
             } else {
-                let instruction = Instruction::CreateTransaction;
+                let instruction = Command::CreateTransaction;
                 return Ok(instruction);
             }
         }
@@ -351,7 +378,7 @@ fn parse_http_request(request: &mut Request) -> ServerResult<Instruction> {
             if segments.len() >= 5 {
                 let url_transactions_key_word = segments[1];
                 let transaction_id_str = segments[2];
-                let _grouping_str = segments[3];
+                let grouping_str = segments[3];
                 let unit_key_str = segments[4];
 
                 if unit_key_str.is_empty()
@@ -363,23 +390,28 @@ fn parse_http_request(request: &mut Request) -> ServerResult<Instruction> {
 
                 let transaction_id = transaction_id_str.parse::<u64>()?;
                 let transaction_id = TransactionId::new(transaction_id);
+                let grouping = GroupingLabel::new(grouping_str.as_bytes());
                 let unit_key = UnitKey::from(unit_key_str);
 
-                let instruction = Instruction::TransactionalRemoveOne {
+                let instruction = Command::TransactionalRemoveOne {
+                    grouping,
                     key: unit_key,
                     transaction_id,
                 };
                 return Ok(instruction);
             } else if segments.len() >= 3 {
-                let _grouping_str = segments[1];
+                let grouping_str = segments[1];
                 let unit_key_str = segments[2];
-
+                let grouping = GroupingLabel::new(grouping_str.as_bytes());
                 let unit_key = UnitKey::from(unit_key_str);
 
-                let instruction = Instruction::RemoveOne { key: unit_key };
+                let instruction = Command::RemoveOne {
+                    grouping,
+                    key: unit_key,
+                };
                 return Ok(instruction);
             } else {
-                let instruction = Instruction::RemoveAll;
+                let instruction = Command::RemoveAll;
                 return Ok(instruction);
             }
         }

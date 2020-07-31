@@ -2,6 +2,7 @@ use std::error::Error;
 use std::thread;
 
 use immuxsys::constants as Constants;
+use immuxsys::storage::executor::grouping_label::GroupingLabel;
 use immuxsys_client::client::ImmuxDBClient;
 use immuxsys_dev_utils::data_models::berka99::{
     Account, Card, Client, Disp, District, Loan, Order, Trans,
@@ -30,28 +31,34 @@ fn main() {
         "account", "card", "client", "disp", "district", "loan", "order", "trans",
     ];
 
-    let dataset: Vec<(String, UnitList)> = paths
+    let dataset: Vec<(GroupingLabel, UnitList)> = paths
         .iter()
-        .map(|table_name| -> (String, Result<UnitList, Box<dyn Error>>) {
-            let csv_path = format!("dev_utils/src/data_models/data-raw/{}.asc", table_name);
-            let data = match table_name.as_ref() {
-                "account" => csv_to_json_table::<Account>(&csv_path, table_name, b';', row_limit),
-                "card" => csv_to_json_table::<Card>(&csv_path, table_name, b';', row_limit),
-                "client" => csv_to_json_table::<Client>(&csv_path, table_name, b';', row_limit),
-                "disp" => csv_to_json_table::<Disp>(&csv_path, table_name, b';', row_limit),
-                "district" => csv_to_json_table::<District>(&csv_path, table_name, b';', row_limit),
-                "loan" => csv_to_json_table::<Loan>(&csv_path, table_name, b';', row_limit),
-                "order" => csv_to_json_table::<Order>(&csv_path, table_name, b';', row_limit),
-                "trans" => csv_to_json_table::<Trans>(&csv_path, table_name, b';', row_limit),
-                _ => panic!("Unexpected table {}", table_name),
-            };
-            return (table_name.to_string(), data);
-        })
-        .map(|result| -> (String, UnitList) {
+        .map(
+            |table_name| -> (GroupingLabel, Result<UnitList, Box<dyn Error>>) {
+                let csv_path = format!("dev_utils/src/data_models/data-raw/{}.asc", table_name);
+                let data = match table_name.as_ref() {
+                    "account" => {
+                        csv_to_json_table::<Account>(&csv_path, table_name, b';', row_limit)
+                    }
+                    "card" => csv_to_json_table::<Card>(&csv_path, table_name, b';', row_limit),
+                    "client" => csv_to_json_table::<Client>(&csv_path, table_name, b';', row_limit),
+                    "disp" => csv_to_json_table::<Disp>(&csv_path, table_name, b';', row_limit),
+                    "district" => {
+                        csv_to_json_table::<District>(&csv_path, table_name, b';', row_limit)
+                    }
+                    "loan" => csv_to_json_table::<Loan>(&csv_path, table_name, b';', row_limit),
+                    "order" => csv_to_json_table::<Order>(&csv_path, table_name, b';', row_limit),
+                    "trans" => csv_to_json_table::<Trans>(&csv_path, table_name, b';', row_limit),
+                    _ => panic!("Unexpected table {}", table_name),
+                };
+                return (GroupingLabel::from(*table_name), data);
+            },
+        )
+        .map(|result| -> (GroupingLabel, UnitList) {
             match result.1 {
                 Err(error) => {
                     eprintln!("CSV error: {}", error);
-                    return (String::from("error"), vec![]);
+                    return (GroupingLabel::from("error"), vec![]);
                 }
                 Ok(table) => return (result.0, table),
             }
@@ -64,7 +71,7 @@ fn main() {
     for (table_name, table) in dataset.iter() {
         println!(
             "Loading table '{}', total records {}",
-            table_name,
+            &table_name,
             table.len()
         );
         measure_iteration(
@@ -83,7 +90,7 @@ fn main() {
     for (table_name, table) in dataset.iter() {
         println!(
             "Reading table '{}', total records {}",
-            table_name,
+            &table_name,
             table.len()
         );
         measure_iteration(
