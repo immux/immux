@@ -2,7 +2,7 @@ use crate::errors::{ClientResult, ImmuxDBClientError};
 
 use immuxsys::constants as Constants;
 use immuxsys::storage::chain_height::ChainHeight;
-use immuxsys::storage::executor::grouping::Grouping;
+use immuxsys::storage::executor::grouping_label::GroupingLabel;
 use immuxsys::storage::executor::unit_content::UnitContent;
 use immuxsys::storage::executor::unit_key::UnitKey;
 use immuxsys::storage::transaction_manager::TransactionId;
@@ -24,7 +24,7 @@ impl ImmuxDBClient {
 }
 
 impl ImmuxDBClient {
-    pub fn get_by_key(&self, grouping: &Grouping, unit_key: &UnitKey) -> ClientResult {
+    pub fn get_by_key(&self, grouping: &GroupingLabel, unit_key: &UnitKey) -> ClientResult {
         let url = format!(
             "http://{}/{}/{}",
             &self.host,
@@ -42,7 +42,7 @@ impl ImmuxDBClient {
 
     pub fn transactional_get(
         &self,
-        grouping: &Grouping,
+        grouping: &GroupingLabel,
         unit_key: &UnitKey,
         transaction_id: &TransactionId,
     ) -> ClientResult {
@@ -64,7 +64,7 @@ impl ImmuxDBClient {
         }
     }
 
-    pub fn inspect_one(&self, grouping: &Grouping, unit_key: &UnitKey) -> ClientResult {
+    pub fn inspect_one(&self, grouping: &GroupingLabel, unit_key: &UnitKey) -> ClientResult {
         let url = format!(
             "http://{}/{}/{}/{}",
             &self.host,
@@ -94,13 +94,13 @@ impl ImmuxDBClient {
         }
     }
 
-    pub fn get_by_grouping(&self, _grouping: &Grouping) -> ClientResult {
+    pub fn get_by_grouping(&self, _grouping: &GroupingLabel) -> ClientResult {
         return Err(ImmuxDBClientError::Unimplemented);
     }
 
     pub fn set_unit(
         &self,
-        grouping: &Grouping,
+        grouping: &GroupingLabel,
         unit_key: &UnitKey,
         unit_content: &UnitContent,
     ) -> ClientResult {
@@ -124,7 +124,7 @@ impl ImmuxDBClient {
 
     pub fn transactional_set_unit(
         &self,
-        grouping: &Grouping,
+        grouping: &GroupingLabel,
         unit_key: &UnitKey,
         unit_content: &UnitContent,
         transaction_id: &TransactionId,
@@ -151,7 +151,7 @@ impl ImmuxDBClient {
 
     pub fn revert_one(
         &self,
-        grouping: &Grouping,
+        grouping: &GroupingLabel,
         unit_key: &UnitKey,
         height: &ChainHeight,
     ) -> ClientResult {
@@ -176,7 +176,7 @@ impl ImmuxDBClient {
 
     pub fn transactional_revert_one(
         &self,
-        grouping: &Grouping,
+        grouping: &GroupingLabel,
         unit_key: &UnitKey,
         height: &ChainHeight,
         transaction_id: &TransactionId,
@@ -220,7 +220,7 @@ impl ImmuxDBClient {
         }
     }
 
-    pub fn remove_one(&self, grouping: &Grouping, unit_key: &UnitKey) -> ClientResult {
+    pub fn remove_one(&self, grouping: &GroupingLabel, unit_key: &UnitKey) -> ClientResult {
         let mut response = self
             .client
             .delete(&format!(
@@ -241,7 +241,7 @@ impl ImmuxDBClient {
     pub fn transactional_remove_one(
         &self,
         transaction_id: &TransactionId,
-        grouping: &Grouping,
+        grouping: &GroupingLabel,
         unit_key: &UnitKey,
     ) -> ClientResult {
         let mut response = self

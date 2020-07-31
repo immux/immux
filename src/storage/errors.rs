@@ -8,7 +8,7 @@ use crate::storage::transaction_manager::TransactionManagerError;
 #[derive(Debug)]
 pub enum KVError {
     IOError(Error),
-    CommandError(InstructionError),
+    InstructionError(InstructionError),
     RevertOutOfRange,
     ParseIntError(ParseIntError),
     ChainHeightError(ChainHeightError),
@@ -24,7 +24,7 @@ impl From<Error> for KVError {
 
 impl From<InstructionError> for KVError {
     fn from(err: InstructionError) -> KVError {
-        KVError::CommandError(err)
+        KVError::InstructionError(err)
     }
 }
 

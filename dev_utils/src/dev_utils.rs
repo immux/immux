@@ -9,7 +9,7 @@ use std::{io, thread};
 
 use immuxsys::server::server::run_server;
 use immuxsys::storage::executor::executor::Executor;
-use immuxsys::storage::executor::grouping::Grouping;
+use immuxsys::storage::executor::grouping_label::GroupingLabel;
 use immuxsys::storage::executor::unit_content::UnitContent;
 use immuxsys::storage::executor::unit_key::UnitKey;
 use immuxsys_client::client::ImmuxDBClient;
@@ -191,7 +191,7 @@ where
 }
 
 pub fn e2e_verify_correctness(
-    grouping: &Grouping,
+    grouping: &GroupingLabel,
     table: &[(UnitKey, UnitContent)],
     client: &ImmuxDBClient,
 ) -> bool {

@@ -5,8 +5,8 @@ use immuxsys::storage::chain_height::ChainHeight;
 
 use clap::{App, Arg, SubCommand};
 use immuxsys::storage::executor::{
-    errors::ExecutorResult, executor::Executor, grouping::Grouping, unit_content::UnitContent,
-    unit_key::UnitKey,
+    errors::ExecutorResult, executor::Executor, grouping_label::GroupingLabel,
+    unit_content::UnitContent, unit_key::UnitKey,
 };
 use immuxsys::storage::transaction_manager::TransactionId;
 
@@ -133,13 +133,13 @@ fn main() -> ExecutorResult<()> {
 
     match arg_matches.subcommand() {
         (Constants::SUBCOMMAND_SET, Some(arg_matches)) => {
-            let grouping = arg_matches
+            let grouping_arg = arg_matches
                 .value_of(Constants::ARGUMENT_NAME_FOR_GROUPING)
                 .expect(Constants::MISSING_GROUPING_ARGUMENT_MESSAGE);
-            let key = arg_matches
+            let key_arg = arg_matches
                 .value_of(Constants::ARGUMENT_NAME_FOR_KEY)
                 .expect(Constants::MISSING_KEY_ARGUMENT_MESSAGE);
-            let value = arg_matches
+            let value_arg = arg_matches
                 .value_of(Constants::ARGUMENT_NAME_FOR_VALUE)
                 .expect(Constants::MISSING_VALUE_ARGUMENT_MESSAGE);
 
@@ -152,25 +152,25 @@ fn main() -> ExecutorResult<()> {
             {
                 let transaction_id = transaction_id_str.parse::<u64>()?;
                 executor.set(
-                    &Grouping::new(grouping.as_bytes()),
-                    &UnitKey::new(&key.as_bytes()),
-                    &UnitContent::String(value.to_string()),
+                    &GroupingLabel::from(grouping_arg),
+                    &UnitKey::from(key_arg),
+                    &UnitContent::String(value_arg.to_string()),
                     Some(TransactionId::new(transaction_id)),
                 )
             } else {
                 executor.set(
-                    &Grouping::new(grouping.as_bytes()),
-                    &UnitKey::new(&key.as_bytes()),
-                    &UnitContent::String(value.to_string()),
+                    &GroupingLabel::from(grouping_arg),
+                    &UnitKey::from(key_arg),
+                    &UnitContent::String(value_arg.to_string()),
                     None,
                 )
             }
         }
         (Constants::SUBCOMMAND_GET, Some(arg_matches)) => {
-            let grouping = arg_matches
+            let grouping_arg = arg_matches
                 .value_of(Constants::ARGUMENT_NAME_FOR_GROUPING)
                 .expect(Constants::MISSING_GROUPING_ARGUMENT_MESSAGE);
-            let key = arg_matches
+            let key_arg = arg_matches
                 .value_of(Constants::ARGUMENT_NAME_FOR_KEY)
                 .expect(Constants::MISSING_KEY_ARGUMENT_MESSAGE);
 
@@ -182,8 +182,8 @@ fn main() -> ExecutorResult<()> {
             {
                 let transaction_id = transaction_id_str.parse::<u64>()?;
                 match executor.get(
-                    &Grouping::new(grouping.as_bytes()),
-                    &UnitKey::new(&key.as_bytes()),
+                    &GroupingLabel::from(grouping_arg),
+                    &UnitKey::from(key_arg),
                     Some(TransactionId::new(transaction_id)),
                 )? {
                     Some(result) => {
@@ -195,8 +195,8 @@ fn main() -> ExecutorResult<()> {
                 }
             } else {
                 match executor.get(
-                    &Grouping::new(grouping.as_bytes()),
-                    &UnitKey::new(&key.as_bytes()),
+                    &GroupingLabel::from(grouping_arg),
+                    &UnitKey::from(key_arg),
                     None,
                 )? {
                     Some(result) => {
@@ -211,56 +211,56 @@ fn main() -> ExecutorResult<()> {
             return Ok(());
         }
         (Constants::SUBCOMMAND_REVERT_ONE, Some(arg_matches)) => {
-            let grouping = arg_matches
+            let grouping_arg = arg_matches
                 .value_of(Constants::ARGUMENT_NAME_FOR_GROUPING)
                 .expect(Constants::MISSING_GROUPING_ARGUMENT_MESSAGE);
-            let key = arg_matches
+            let key_arg = arg_matches
                 .value_of(Constants::ARGUMENT_NAME_FOR_KEY)
                 .expect(Constants::MISSING_KEY_ARGUMENT_MESSAGE);
-            let height_str = arg_matches
+            let height_arg = arg_matches
                 .value_of(Constants::ARGUMENT_NAME_FOR_HEIGHT)
                 .expect(Constants::MISSING_HEIGHT_ARGUMENT_MESSAGE);
 
             let path = PathBuf::from(Constants::TEMP_LOG_FILE_PATH);
 
             let mut executor = Executor::open(&path)?;
-            let height = height_str.parse::<u64>()?;
+            let height = height_arg.parse::<u64>()?;
 
             if let Some(transaction_id_str) =
                 arg_matches.value_of(Constants::ARGUMENT_NAME_FOR_TRANSACTION_ID)
             {
                 let transaction_id = transaction_id_str.parse::<u64>()?;
                 executor.revert_one(
-                    &Grouping::new(grouping.as_bytes()),
-                    &UnitKey::new(&key.as_bytes()),
+                    &GroupingLabel::from(grouping_arg),
+                    &UnitKey::from(key_arg),
                     &ChainHeight::new(height),
                     Some(TransactionId::new(transaction_id)),
                 )
             } else {
                 executor.revert_one(
-                    &Grouping::new(grouping.as_bytes()),
-                    &UnitKey::new(&key.as_bytes()),
+                    &GroupingLabel::from(grouping_arg),
+                    &UnitKey::from(key_arg),
                     &ChainHeight::new(height),
                     None,
                 )
             }
         }
         (Constants::SUBCOMMAND_REVERT_ALL, Some(arg_matches)) => {
-            let height_str = arg_matches
+            let height_arg = arg_matches
                 .value_of(Constants::ARGUMENT_NAME_FOR_HEIGHT)
                 .expect(Constants::MISSING_HEIGHT_ARGUMENT_MESSAGE);
 
             let path = PathBuf::from(Constants::TEMP_LOG_FILE_PATH);
 
             let mut executor = Executor::open(&path)?;
-            let height = height_str.parse::<u64>()?;
+            let height = height_arg.parse::<u64>()?;
             executor.revert_all(&ChainHeight::new(height))
         }
         (Constants::SUBCOMMAND_REMOVE_ONE, Some(arg_matches)) => {
-            let grouping = arg_matches
+            let grouping_arg = arg_matches
                 .value_of(Constants::ARGUMENT_NAME_FOR_GROUPING)
                 .expect(Constants::MISSING_GROUPING_ARGUMENT_MESSAGE);
-            let key = arg_matches
+            let key_arg = arg_matches
                 .value_of(Constants::ARGUMENT_NAME_FOR_KEY)
                 .expect(Constants::MISSING_KEY_ARGUMENT_MESSAGE);
 
@@ -273,14 +273,14 @@ fn main() -> ExecutorResult<()> {
             {
                 let transaction_id = transaction_id_str.parse::<u64>()?;
                 executor.remove_one(
-                    &Grouping::new(grouping.as_bytes()),
-                    &UnitKey::new(&key.as_bytes()),
+                    &GroupingLabel::from(grouping_arg),
+                    &UnitKey::from(key_arg),
                     Some(TransactionId::new(transaction_id)),
                 )
             } else {
                 executor.remove_one(
-                    &Grouping::new(grouping.as_bytes()),
-                    &UnitKey::new(&key.as_bytes()),
+                    &GroupingLabel::from(grouping_arg),
+                    &UnitKey::from(key_arg),
                     None,
                 )
             }
@@ -292,17 +292,17 @@ fn main() -> ExecutorResult<()> {
             executor.remove_all()
         }
         (Constants::SUBCOMMAND_INSPECT_ONE, Some(arg_matches)) => {
-            let grouping = arg_matches
+            let grouping_arg = arg_matches
                 .value_of(Constants::ARGUMENT_NAME_FOR_GROUPING)
                 .expect(Constants::MISSING_GROUPING_ARGUMENT_MESSAGE);
-            let key = arg_matches
+            let key_arg = arg_matches
                 .value_of(Constants::ARGUMENT_NAME_FOR_KEY)
                 .expect(Constants::MISSING_KEY_ARGUMENT_MESSAGE);
-            let unit_key = UnitKey::new(&key.as_bytes());
+            let unit_key = UnitKey::from(key_arg);
             let path = PathBuf::from(Constants::TEMP_LOG_FILE_PATH);
             let mut executor = Executor::open(&path)?;
 
-            let res = executor.inspect_one(&Grouping::new(grouping.as_bytes()), &unit_key)?;
+            let res = executor.inspect_one(&GroupingLabel::from(grouping_arg), &unit_key)?;
             for command in res {
                 println!("{:?}", command);
             }

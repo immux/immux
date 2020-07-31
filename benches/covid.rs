@@ -2,7 +2,7 @@ use std::error::Error;
 use std::thread;
 
 use immuxsys::constants as Constants;
-use immuxsys::storage::executor::grouping::Grouping;
+use immuxsys::storage::executor::grouping_label::GroupingLabel;
 use immuxsys_client::client::ImmuxDBClient;
 use immuxsys_dev_utils::data_models::covid::Covid;
 use immuxsys_dev_utils::dev_utils::{
@@ -27,23 +27,23 @@ fn main() {
 
     let paths = vec!["covid"];
 
-    let dataset: Vec<(Grouping, UnitList)> = paths
+    let dataset: Vec<(GroupingLabel, UnitList)> = paths
         .iter()
         .map(
-            |table_name| -> (Grouping, Result<UnitList, Box<dyn Error>>) {
+            |table_name| -> (GroupingLabel, Result<UnitList, Box<dyn Error>>) {
                 let csv_path = format!("dev_utils/src/data_models/data-raw/{}.csv", table_name);
                 let data = match table_name.as_ref() {
                     "covid" => csv_to_json_table::<Covid>(&csv_path, table_name, b',', row_limit),
                     _ => panic!("Unexpected table {}", table_name),
                 };
-                return (Grouping::new(table_name.as_bytes()), data);
+                return (GroupingLabel::from(*table_name), data);
             },
         )
-        .map(|result| -> (Grouping, UnitList) {
+        .map(|result| -> (GroupingLabel, UnitList) {
             match result.1 {
                 Err(error) => {
                     eprintln!("CSV error: {}", error);
-                    return (Grouping::new("error".as_bytes()), vec![]);
+                    return (GroupingLabel::from("error"), vec![]);
                 }
                 Ok(table) => return (result.0, table),
             }
@@ -56,7 +56,7 @@ fn main() {
     for (table_name, table) in dataset.iter() {
         println!(
             "Loading table '{}', total records {}",
-            &table_name.to_string(),
+            &table_name,
             table.len()
         );
         measure_iteration(

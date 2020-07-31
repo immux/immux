@@ -6,7 +6,7 @@ use crate::server::errors::{ServerError, ServerResult};
 use crate::storage::chain_height::ChainHeight;
 use crate::storage::executor::command::Command;
 use crate::storage::executor::executor::Executor;
-use crate::storage::executor::grouping::Grouping;
+use crate::storage::executor::grouping_label::GroupingLabel;
 use crate::storage::executor::outcome::Outcome;
 use crate::storage::executor::unit_content::UnitContent;
 use crate::storage::executor::unit_key::UnitKey;
@@ -210,7 +210,7 @@ fn parse_http_request(request: &mut Request) -> ServerResult<Command> {
 
                 let transaction_id = transaction_id_str.parse::<u64>()?;
                 let transaction_id = TransactionId::new(transaction_id);
-                let grouping = Grouping::new(grouping_str.as_bytes());
+                let grouping = GroupingLabel::new(grouping_str.as_bytes());
                 let unit_key = UnitKey::from(unit_key_str);
 
                 let instruction = Command::Select {
@@ -230,7 +230,7 @@ fn parse_http_request(request: &mut Request) -> ServerResult<Command> {
                     return Err(ServerError::UrlParsingError);
                 }
 
-                let grouping = Grouping::new(grouping_str.as_bytes());
+                let grouping = GroupingLabel::new(grouping_str.as_bytes());
                 let unit_key = UnitKey::from(unit_key_str);
                 let instruction = Command::InspectOne {
                     grouping,
@@ -240,7 +240,7 @@ fn parse_http_request(request: &mut Request) -> ServerResult<Command> {
             } else if segments.len() >= 3 {
                 let grouping_str = segments[1];
                 let unit_key_str = segments[2];
-                let grouping = Grouping::new(grouping_str.as_bytes());
+                let grouping = GroupingLabel::new(grouping_str.as_bytes());
                 let unit_key = UnitKey::from(unit_key_str);
 
                 let instruction = Command::Select {
@@ -273,7 +273,7 @@ fn parse_http_request(request: &mut Request) -> ServerResult<Command> {
                     return Err(ServerError::UrlParsingError);
                 }
 
-                let grouping = Grouping::new(grouping_str.as_bytes());
+                let grouping = GroupingLabel::new(grouping_str.as_bytes());
                 let unit_key = UnitKey::from(unit_key_str);
                 let transaction_id = transaction_id_str.parse::<u64>()?;
 
@@ -306,7 +306,7 @@ fn parse_http_request(request: &mut Request) -> ServerResult<Command> {
                     return Err(ServerError::UrlParsingError);
                 }
 
-                let grouping = Grouping::new(grouping_str.as_bytes());
+                let grouping = GroupingLabel::new(grouping_str.as_bytes());
                 let unit_key = UnitKey::from(unit_key_str);
 
                 if let Ok(height) = url_info.extract_numeric_query(Constants::HEIGHT) {
@@ -390,7 +390,7 @@ fn parse_http_request(request: &mut Request) -> ServerResult<Command> {
 
                 let transaction_id = transaction_id_str.parse::<u64>()?;
                 let transaction_id = TransactionId::new(transaction_id);
-                let grouping = Grouping::new(grouping_str.as_bytes());
+                let grouping = GroupingLabel::new(grouping_str.as_bytes());
                 let unit_key = UnitKey::from(unit_key_str);
 
                 let instruction = Command::TransactionalRemoveOne {
@@ -402,7 +402,7 @@ fn parse_http_request(request: &mut Request) -> ServerResult<Command> {
             } else if segments.len() >= 3 {
                 let grouping_str = segments[1];
                 let unit_key_str = segments[2];
-                let grouping = Grouping::new(grouping_str.as_bytes());
+                let grouping = GroupingLabel::new(grouping_str.as_bytes());
                 let unit_key = UnitKey::from(unit_key_str);
 
                 let instruction = Command::RemoveOne {

@@ -1,4 +1,4 @@
-use crate::storage::executor::grouping::Grouping;
+use crate::storage::executor::grouping_label::GroupingLabel;
 use crate::storage::executor::unit_key::UnitKey;
 use crate::utils::varint::varint_encode;
 
@@ -22,7 +22,7 @@ impl KVKey {
         return serialized;
     }
 
-    pub fn from_grouping_and_unit_key(grouping: &Grouping, unit_key: &UnitKey) -> Self {
+    pub fn from_grouping_and_unit_key(grouping: &GroupingLabel, unit_key: &UnitKey) -> Self {
         let mut kvkey_bytes = vec![];
         let grouping_bytes = grouping.marshal();
         let unit_key_bytes = unit_key.as_bytes();

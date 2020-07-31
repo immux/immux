@@ -2,7 +2,7 @@ use std::error::Error;
 use std::thread;
 
 use immuxsys::constants as Constants;
-use immuxsys::storage::executor::grouping::Grouping;
+use immuxsys::storage::executor::grouping_label::GroupingLabel;
 use immuxsys::storage::executor::unit_content::UnitContent;
 use immuxsys::storage::executor::unit_key::UnitKey;
 use immuxsys_client::client::ImmuxDBClient;
@@ -28,11 +28,11 @@ fn main() {
     notified_sleep(5);
 
     let paths = vec!["anzsic06"];
-    let dataset: Vec<(Grouping, Vec<(UnitKey, UnitContent)>)> = paths
+    let dataset: Vec<(GroupingLabel, Vec<(UnitKey, UnitContent)>)> = paths
         .iter()
         .map(
             |table_name| -> (
-                Grouping,
+                GroupingLabel,
                 Result<Vec<(UnitKey, UnitContent)>, Box<dyn Error>>,
             ) {
                 let csv_path = format!("dev_utils/src/data_models/data-raw/{}.csv", table_name);
@@ -43,14 +43,14 @@ fn main() {
                     }
                     _ => panic!("Unexpected table {}", table_name),
                 };
-                return (Grouping::new(table_name.as_bytes()), data);
+                return (GroupingLabel::from(*table_name), data);
             },
         )
-        .map(|result| -> (Grouping, Vec<(UnitKey, UnitContent)>) {
+        .map(|result| -> (GroupingLabel, Vec<(UnitKey, UnitContent)>) {
             match result.1 {
                 Err(error) => {
                     eprintln!("CSV error: {}", error);
-                    return (Grouping::new("error".as_bytes()), vec![]);
+                    return (GroupingLabel::from("error"), vec![]);
                 }
                 Ok(table) => return (result.0, table),
             }
@@ -63,7 +63,7 @@ fn main() {
     for (table_name, table) in dataset.iter() {
         println!(
             "Loading table '{}', total records {}",
-            &table_name.to_string(),
+            &table_name,
             table.len()
         );
         measure_iteration(
@@ -82,7 +82,7 @@ fn main() {
     for (table_name, table) in dataset.iter() {
         println!(
             "Reading table '{}', total records {}",
-            &table_name.to_string(),
+            &table_name,
             table.len()
         );
         measure_iteration(

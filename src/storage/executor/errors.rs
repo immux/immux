@@ -10,7 +10,7 @@ pub enum ExecutorError {
     KVError(KVError),
     UnitContentError(UnitContentError),
     ParseIntError(ParseIntError),
-    InstructionError(CommandError),
+    CommandError(CommandError),
 }
 
 impl From<KVError> for ExecutorError {
@@ -33,7 +33,7 @@ impl From<ParseIntError> for ExecutorError {
 
 impl From<CommandError> for ExecutorError {
     fn from(err: CommandError) -> ExecutorError {
-        ExecutorError::InstructionError(err)
+        ExecutorError::CommandError(err)
     }
 }
 

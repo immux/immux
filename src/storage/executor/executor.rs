@@ -4,7 +4,7 @@ use std::path::PathBuf;
 use crate::storage::chain_height::ChainHeight;
 use crate::storage::executor::command::{Command, CommandError};
 use crate::storage::executor::errors::ExecutorResult;
-use crate::storage::executor::grouping::Grouping;
+use crate::storage::executor::grouping_label::GroupingLabel;
 use crate::storage::executor::unit_content::UnitContent;
 use crate::storage::executor::unit_key::UnitKey;
 use crate::storage::kv::LogKeyValueStore;
@@ -25,7 +25,7 @@ impl Executor {
 
     pub fn set(
         &mut self,
-        grouping: &Grouping,
+        grouping: &GroupingLabel,
         key: &UnitKey,
         value: &UnitContent,
         transaction_id: Option<TransactionId>,
@@ -38,7 +38,7 @@ impl Executor {
 
     pub fn get(
         &mut self,
-        grouping: &Grouping,
+        grouping: &GroupingLabel,
         key: &UnitKey,
         transaction_id: Option<TransactionId>,
     ) -> ExecutorResult<Option<UnitContent>> {
@@ -54,7 +54,7 @@ impl Executor {
 
     pub fn revert_one(
         &mut self,
-        grouping: &Grouping,
+        grouping: &GroupingLabel,
         key: &UnitKey,
         height: &ChainHeight,
         transaction_id: Option<TransactionId>,
@@ -72,7 +72,7 @@ impl Executor {
 
     pub fn remove_one(
         &mut self,
-        grouping: &Grouping,
+        grouping: &GroupingLabel,
         key: &UnitKey,
         transaction_id: Option<TransactionId>,
     ) -> ExecutorResult<()> {
@@ -102,7 +102,7 @@ impl Executor {
 
     pub fn inspect_one(
         &mut self,
-        grouping: &Grouping,
+        grouping: &GroupingLabel,
         target_key: &UnitKey,
     ) -> ExecutorResult<Vec<(Command, ChainHeight)>> {
         let kv_key = KVKey::from_grouping_and_unit_key(&grouping, &target_key);

@@ -1,5 +1,5 @@
 use crate::storage::chain_height::ChainHeight;
-use crate::storage::executor::grouping::{Grouping, GroupingError};
+use crate::storage::executor::grouping_label::{GroupingLabel, GroupingLabelError};
 use crate::storage::executor::unit_content::{UnitContent, UnitContentError};
 use crate::storage::executor::unit_key::UnitKey;
 use crate::storage::instruction::Instruction;
@@ -8,12 +8,12 @@ use std::convert::TryFrom;
 
 #[derive(Debug)]
 pub enum CommandError {
-    GroupingErr(GroupingError),
+    GroupingErr(GroupingLabelError),
     UnitContentErr(UnitContentError),
 }
 
-impl From<GroupingError> for CommandError {
-    fn from(error: GroupingError) -> CommandError {
+impl From<GroupingLabelError> for CommandError {
+    fn from(error: GroupingLabelError) -> CommandError {
         CommandError::GroupingErr(error)
     }
 }
@@ -27,22 +27,22 @@ impl From<UnitContentError> for CommandError {
 #[derive(Debug)]
 pub enum Command {
     Select {
-        grouping: Grouping,
+        grouping: GroupingLabel,
         key: UnitKey,
         transaction_id: Option<TransactionId>,
     },
     InspectOne {
-        grouping: Grouping,
+        grouping: GroupingLabel,
         key: UnitKey,
     },
     InspectAll,
     Insert {
-        grouping: Grouping,
+        grouping: GroupingLabel,
         key: UnitKey,
         content: UnitContent,
     },
     RevertOne {
-        grouping: Grouping,
+        grouping: GroupingLabel,
         key: UnitKey,
         height: ChainHeight,
     },
@@ -50,25 +50,25 @@ pub enum Command {
         height: ChainHeight,
     },
     RemoveOne {
-        grouping: Grouping,
+        grouping: GroupingLabel,
         key: UnitKey,
     },
     RemoveAll,
     CreateTransaction,
     TransactionalInsert {
-        grouping: Grouping,
+        grouping: GroupingLabel,
         key: UnitKey,
         content: UnitContent,
         transaction_id: TransactionId,
     },
     TransactionalRevertOne {
-        grouping: Grouping,
+        grouping: GroupingLabel,
         key: UnitKey,
         height: ChainHeight,
         transaction_id: TransactionId,
     },
     TransactionalRemoveOne {
-        grouping: Grouping,
+        grouping: GroupingLabel,
         key: UnitKey,
         transaction_id: TransactionId,
     },
@@ -86,7 +86,7 @@ impl TryFrom<&Instruction> for Command {
     fn try_from(instruction: &Instruction) -> Result<Self, Self::Error> {
         match instruction {
             Instruction::Set { key, value } => {
-                let (grouping, offset) = Grouping::parse(&key.as_bytes())?;
+                let (grouping, offset) = GroupingLabel::parse(&key.as_bytes())?;
                 let unit_key = UnitKey::from(&key.as_bytes()[offset..]);
                 let (content, _) = UnitContent::parse(value.as_bytes())?;
                 let command = Command::Insert {
@@ -97,7 +97,7 @@ impl TryFrom<&Instruction> for Command {
                 return Ok(command);
             }
             Instruction::RevertOne { key, height } => {
-                let (grouping, offset) = Grouping::parse(&key.as_bytes())?;
+                let (grouping, offset) = GroupingLabel::parse(&key.as_bytes())?;
                 let unit_key = UnitKey::from(&key.as_bytes()[offset..]);
                 let command = Command::RevertOne {
                     grouping,
@@ -113,7 +113,7 @@ impl TryFrom<&Instruction> for Command {
                 return Ok(command);
             }
             Instruction::RemoveOne { key } => {
-                let (grouping, offset) = Grouping::parse(&key.as_bytes())?;
+                let (grouping, offset) = GroupingLabel::parse(&key.as_bytes())?;
                 let unit_key = UnitKey::from(&key.as_bytes()[offset..]);
                 let command = Command::RemoveOne {
                     grouping,
@@ -134,7 +134,7 @@ impl TryFrom<&Instruction> for Command {
                 value,
                 transaction_id,
             } => {
-                let (grouping, offset) = Grouping::parse(&key.as_bytes())?;
+                let (grouping, offset) = GroupingLabel::parse(&key.as_bytes())?;
                 let unit_key = UnitKey::from(&key.as_bytes()[offset..]);
                 let (content, _) = UnitContent::parse(value.as_bytes())?;
                 let command = Command::TransactionalInsert {
@@ -150,7 +150,7 @@ impl TryFrom<&Instruction> for Command {
                 height,
                 transaction_id,
             } => {
-                let (grouping, offset) = Grouping::parse(&key.as_bytes())?;
+                let (grouping, offset) = GroupingLabel::parse(&key.as_bytes())?;
                 let unit_key = UnitKey::from(&key.as_bytes()[offset..]);
                 let command = Command::TransactionalRevertOne {
                     grouping,
@@ -164,7 +164,7 @@ impl TryFrom<&Instruction> for Command {
                 key,
                 transaction_id,
             } => {
-                let (grouping, offset) = Grouping::parse(&key.as_bytes())?;
+                let (grouping, offset) = GroupingLabel::parse(&key.as_bytes())?;
                 let unit_key = UnitKey::from(&key.as_bytes()[offset..]);
                 let command = Command::TransactionalRemoveOne {
                     grouping,
