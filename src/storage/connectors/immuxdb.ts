@@ -13,21 +13,21 @@ interface UpdateRecordJS {
 
 export interface ImmuxDBHttp {
     host: string;
-    simpleGet(collection: string, key: number): Promise<string>;
-    select(collection: string, condition: string): Promise<string>;
-    inspect(collection: string, key: number): Promise<UpdateRecordJS[]>;
-    set(collection: string, key: number, value: string): Promise<string>;
-    revertOne(collection: string, key: number, height: number): Promise<string>;
+    simpleGet(grouping: string, key: string): Promise<string>;
+    select(grouping: string, condition: string): Promise<string>;
+    inspect(grouping: string, key: string): Promise<UpdateRecordJS[]>;
+    set(grouping: string, key: string, value: string): Promise<string>;
+    revertOne(grouping: string, key: string, height: number): Promise<string>;
     revertAll(height: number): Promise<string>;
-    deleteOne(collection: string, key: number): Promise<string>;
+    deleteOne(grouping: string, key: string): Promise<string>;
     deleteAll(): Promise<string>;
     createTransactions(): Promise<string>;
     commitTransactions(tid: number): Promise<string>;
     abortTransactions(tid: number): Promise<string>;
-    simpleTransactionsGet(tid: number, collection: string, key: number): Promise<string>;
-    transactionsSet(tid: number, collection: string, key: number, value: string): Promise<string>;
-    transactionsRevertOne(tid: number, collection: string, key: number, height: number): Promise<string>;
-    transactionsDeleteOne(tid: number, collection: string, key: number): Promise<string>;
+    simpleTransactionsGet(tid: number, grouping: string, key: string): Promise<string>;
+    transactionsSet(tid: number, grouping: string, key: string, value: string): Promise<string>;
+    transactionsRevertOne(tid: number, grouping: string, key: string, height: number): Promise<string>;
+    transactionsDeleteOne(tid: number, grouping: string, key: string): Promise<string>;
 }
 
 export function makeImmuxDBHttp(
@@ -36,22 +36,22 @@ export function makeImmuxDBHttp(
 ): ImmuxDBHttp {
     return {
         host,
-        async simpleGet(collection: string, key: number) {
+        async simpleGet(grouping: string, key: string) {
             const response = await fetch(
-                `http://${this.host}/${collection}/${key}`
+                `http://${this.host}/${grouping}/${key}`
             );
             return await response.text();
         },
         // todo
-        async select(collection: string, condition: string) {
+        async select(grouping: string, condition: string) {
             const response = await fetch(
-                `http://${this.host}/${collection}/?select=${condition}`
+                `http://${this.host}/${grouping}/?select=${condition}`
             );
             return await response.text();
         },
-        async inspect(collection: string, key: number) {
+        async inspect(grouping: string, key: string) {
             const response = await fetch(
-                `http://${this.host}/${collection}/${key}/.journal`
+                `http://${this.host}/${grouping}/${key}/.journal`
             );
             const text = await response.text();
             return text.split('\r\n')
@@ -61,9 +61,9 @@ export function makeImmuxDBHttp(
                            value: segments[1]
                        }))
         },
-        async set(collection: string, key: number, value: string) {
+        async set(grouping: string, key: string, value: string) {
             const response = await fetch(
-                `http://${this.host}/${collection}/${key}`,
+                `http://${this.host}/${grouping}/${key}`,
                 {
                     method: "PUT",
                     body: value
@@ -71,9 +71,9 @@ export function makeImmuxDBHttp(
             );
             return await response.text();
         },
-        async revertOne(collection: string, key: number, height: number) {
+        async revertOne(grouping: string, key: string, height: number) {
             const response = await fetch(
-                `http://${this.host}/${collection}/${key}?height=${height}`,
+                `http://${this.host}/${grouping}/${key}?height=${height}`,
                 {
                     method: "PUT"
                 }
@@ -89,9 +89,9 @@ export function makeImmuxDBHttp(
             );
             return await response.text();
         },
-        async deleteOne(collection: string, key: number) {
+        async deleteOne(grouping: string, key: string) {
             const response = await fetch(
-                `http://${this.host}/${collection}/${key}`,
+                `http://${this.host}/${grouping}/${key}`,
                 {
                     method: "DELETE"
                 }
@@ -134,15 +134,15 @@ export function makeImmuxDBHttp(
             );
             return await response.text();
         },
-        async simpleTransactionsGet(tid: number, collection: string, key: number) {
+        async simpleTransactionsGet(tid: number, grouping: string, key: string) {
             const response = await fetch(
-                `http://${this.host}/.transactions/${tid}/${collection}/${key}`
+                `http://${this.host}/.transactions/${tid}/${grouping}/${key}`
             );
             return await response.text();
         },
-        async transactionsSet(tid: number, collection: string, key: number, value: string) {
+        async transactionsSet(tid: number, grouping: string, key: string, value: string) {
             const response = await fetch(
-                `http://${this.host}/.transactions/${tid}/${collection}/${key}`,
+                `http://${this.host}/.transactions/${tid}/${grouping}/${key}`,
                 {
                     method: "PUT",
                     body: value
@@ -150,18 +150,18 @@ export function makeImmuxDBHttp(
             );
             return await response.text();
         },
-        async transactionsRevertOne(tid: number, collection: string, key: number, height: number) {
+        async transactionsRevertOne(tid: number, grouping: string, key: string, height: number) {
             const response = await fetch(
-                `http://${this.host}/.transactions/${tid}/${collection}/${key}?height=${height}`,
+                `http://${this.host}/.transactions/${tid}/${grouping}/${key}?height=${height}`,
                 {
                     method: "PUT"
                 }
             );
             return await response.text();
         },
-        async transactionsDeleteOne(tid: number, collection: string, key: number) {
+        async transactionsDeleteOne(tid: number, grouping: string, key: string) {
             const response = await fetch(
-                `http://${this.host}/.transactions/${tid}/${collection}/${key}`,
+                `http://${this.host}/.transactions/${tid}/${grouping}/${key}`,
                 {
                     method: "DELETE"
                 }
@@ -188,7 +188,7 @@ export function createImmuxDbViaHttpsRestrictedAccess(
             get: (_, collectionName) => {
                 const collectionObject: ImmuxDbCollection = {
                     upsert: async (doc: ImmuxDbDocument) => {
-                        doc.id = doc.id || Number.parseInt(Math.random().toString().slice(2));
+                        doc.id = doc.id || parseInt(Math.random().toString().slice(2)).toString();
                         await db.set(
                             collectionName.toString(),
                             doc.id,
@@ -230,7 +230,7 @@ export function createImmuxDbViaHttpsRestrictedAccess(
                             return null;
                         }
                     },
-                    deleteOne: async (id: number) => {
+                    deleteOne: async (id: string) => {
                         await db.deleteOne(
                             collectionName.toString(),
                             id
@@ -239,7 +239,7 @@ export function createImmuxDbViaHttpsRestrictedAccess(
                     deleteAll: async () => {
                         await db.deleteAll();
                     },
-                    revertOne: async (id: number, height: number) => {
+                    revertOne: async (id: string, height: number) => {
                         await db.revertOne(
                             collectionName.toString(),
                             id,
@@ -260,7 +260,7 @@ export function createImmuxDbViaHttpsRestrictedAccess(
                     abortTransactions: async (tid: number) => {
                         await db.abortTransactions(tid);
                     },
-                    simpleTransactionsGet: async (tid: number, id: number) => {
+                    simpleTransactionsGet: async (tid: number, id: string) => {
                         await db.simpleTransactionsGet(
                             tid,
                             collectionName.toString(),
@@ -268,7 +268,7 @@ export function createImmuxDbViaHttpsRestrictedAccess(
                         );
                     },
                     transactionsUpsert: async (doc: ImmuxDbTransactions) => {
-                        doc.id = doc.id || Number.parseInt(Math.random().toString().slice(2));
+                        doc.id = doc.id || parseInt(Math.random().toString().slice(2)).toString();
                         await db.transactionsSet(
                             doc.tid,
                             collectionName.toString(),
@@ -276,7 +276,7 @@ export function createImmuxDbViaHttpsRestrictedAccess(
                             JSON.stringify(doc)
                         );
                     },
-                    transactionsRevertOne: async (tid: number, id: number, height: number) => {
+                    transactionsRevertOne: async (tid: number, id: string, height: number) => {
                         await db.transactionsRevertOne(
                             tid,
                             collectionName.toString(),
@@ -284,7 +284,7 @@ export function createImmuxDbViaHttpsRestrictedAccess(
                             height,
                         );
                     },
-                    transactionsDeleteOne: async (tid: number, id: number) => {
+                    transactionsDeleteOne: async (tid: number, id: string) => {
                         await db.transactionsDeleteOne(
                             tid,
                             collectionName.toString(),
