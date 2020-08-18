@@ -199,12 +199,67 @@ impl UnitContent {
 impl ToString for UnitContent {
     fn to_string(&self) -> String {
         match self {
-            UnitContent::Nil => String::from("nil"),
-            UnitContent::String(string) => string.clone(),
+            UnitContent::Nil => format!("{}", "Nil"),
+            UnitContent::String(string) => format!("{}{}{}", "\"", string.clone(), "\""),
             UnitContent::Float64(f) => format!("{}", f),
             UnitContent::Bool(b) => (if *b { "true" } else { "false" }).to_string(),
-            UnitContent::Map(map) => format!("{:?}", map),
-            UnitContent::Array(array) => format!("{:?}", array),
+            UnitContent::Map(map) => {
+                let kv_pairs: Vec<String> = map
+                    .iter()
+                    .map(|(key, content)| format!("{}:{}", key, content.to_string()))
+                    .collect();
+                format!("{}{}{}", "{", kv_pairs.join(","), "}")
+            }
+            UnitContent::Array(array) => {
+                let kv_pairs: Vec<String> =
+                    array.iter().map(|content| content.to_string()).collect();
+                format!("{}{}{}", "[", kv_pairs.join(","), "]")
+            }
+        }
+    }
+}
+
+impl From<&str> for UnitContent {
+    fn from(incoming_str: &str) -> UnitContent {
+        if incoming_str.starts_with("{") && incoming_str.ends_with("}") {
+            let body_length = incoming_str.len();
+            let sub_body = &incoming_str[1..body_length - 1];
+            let kv_paris_str: Vec<&str> = sub_body.split(",").collect();
+
+            let mut map = HashMap::new();
+
+            for kv_pair_str in kv_paris_str.iter() {
+                let kv_pair_str = kv_pair_str.trim();
+                let segments: Vec<&str> = kv_pair_str.split(":").collect();
+                let key = segments[0].trim();
+                let content = UnitContent::from(segments[1].trim());
+                map.insert(key.to_string(), content);
+            }
+            UnitContent::Map(map)
+        } else if let Ok(num_f64) = incoming_str.parse::<f64>() {
+            UnitContent::Float64(num_f64)
+        } else if incoming_str == "true" {
+            UnitContent::Bool(true)
+        } else if incoming_str == "false" {
+            UnitContent::Bool(false)
+        } else if incoming_str == "Nil" {
+            UnitContent::Nil
+        } else if incoming_str.starts_with("[") && incoming_str.ends_with("]") {
+            let body_length = incoming_str.len();
+            let sub_body = &incoming_str[1..body_length - 1];
+            let contents_str: Vec<&str> = sub_body.split(",").collect();
+
+            let mut array = vec![];
+
+            for content_str in contents_str.into_iter() {
+                let content = UnitContent::from(content_str);
+                array.push(content);
+            }
+            UnitContent::Array(array)
+        } else {
+            let str_length = &incoming_str.len();
+            let sub_string = &incoming_str[1..str_length - 1];
+            UnitContent::String(String::from(sub_string))
         }
     }
 }
@@ -244,6 +299,15 @@ mod unit_content_tests {
         }
 
         return result;
+    }
+
+    #[test]
+    fn to_string_from_string_reversible() {
+        let content = UnitContent::String(String::from("123"));
+        let content_str = &content.to_string();
+        let content_from_str = UnitContent::from(content_str.as_str());
+
+        println!("{:?} {:?}", content, content_from_str);
     }
 
     #[test]

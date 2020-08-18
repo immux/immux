@@ -1,10 +1,12 @@
+use std::convert::TryFrom;
+
 use crate::storage::chain_height::ChainHeight;
+use crate::storage::executor::filter::Filter;
 use crate::storage::executor::grouping_label::{GroupingLabel, GroupingLabelError};
 use crate::storage::executor::unit_content::{UnitContent, UnitContentError};
 use crate::storage::executor::unit_key::UnitKey;
 use crate::storage::instruction::Instruction;
 use crate::storage::transaction_manager::TransactionId;
-use std::convert::TryFrom;
 
 #[derive(Debug)]
 pub enum CommandError {
@@ -25,11 +27,17 @@ impl From<UnitContentError> for CommandError {
 }
 
 #[derive(Debug)]
+pub enum SelectCondition {
+    Key(UnitKey, Option<TransactionId>),
+    UnconditionalMatch,
+    Filter(Filter),
+}
+
+#[derive(Debug)]
 pub enum Command {
     Select {
         grouping: GroupingLabel,
-        key: UnitKey,
-        transaction_id: Option<TransactionId>,
+        condition: SelectCondition,
     },
     InspectOne {
         grouping: GroupingLabel,
@@ -194,14 +202,25 @@ impl ToString for Command {
         match self {
             Command::Select {
                 grouping,
-                key,
-                transaction_id,
-            } => format!(
-                "Command Select, grouping: {:?}, key: {:?}, transaction_id: {:?}",
-                grouping.to_string(),
-                key.to_string(),
-                transaction_id
-            ),
+                condition,
+            } => {
+                match condition {
+                    SelectCondition::Key(key, transaction_id) => {
+                        return format!(
+                            "Command Select, grouping: {:?}, key: {:?}, transaction_id: {:?}",
+                            grouping.to_string(),
+                            key.to_string(),
+                            transaction_id,
+                        );
+                    }
+                    SelectCondition::UnconditionalMatch => {
+                        return format!("Command Select, UnconditionalMatch on grouping {:?}", grouping.to_string());
+                    },
+                    SelectCondition::Filter(filters) => {
+                        return format!("{}", filters);
+                    },
+                }
+            },
             Command::InspectOne { grouping, key } => {
                 format!("Command InspectOne, grouping: {:?}, key: {:?}", grouping.to_string(), key.to_string())
             }

@@ -2,12 +2,14 @@ use crate::errors::{ClientResult, ImmuxDBClientError};
 
 use immuxsys::constants as Constants;
 use immuxsys::storage::chain_height::ChainHeight;
+use immuxsys::storage::executor::filter::Filter;
 use immuxsys::storage::executor::grouping_label::GroupingLabel;
 use immuxsys::storage::executor::unit_content::UnitContent;
 use immuxsys::storage::executor::unit_key::UnitKey;
 use immuxsys::storage::transaction_manager::TransactionId;
 
 use reqwest::Client;
+use reqwest::Url;
 
 pub struct ImmuxDBClient {
     host: String,
@@ -32,6 +34,20 @@ impl ImmuxDBClient {
             unit_key.to_string()
         );
         let mut response = self.client.get(&url).send()?;
+        let status_code = response.status();
+
+        match response.text() {
+            Ok(text) => Ok((status_code, text)),
+            Err(error) => Err(ImmuxDBClientError::Reqwest(error.into())),
+        }
+    }
+
+    pub fn get_by_filter(&self, grouping: &GroupingLabel, filter: &Filter) -> ClientResult {
+        let url_str = format!("http://{}/{}", &self.host, grouping.to_string());
+
+        let url = Url::parse_with_params(&url_str, &[("filter", format!("{}", filter))]).unwrap();
+
+        let mut response = self.client.get(url).send()?;
         let status_code = response.status();
 
         match response.text() {

@@ -6,6 +6,14 @@ mod kv_tests {
     use std::path::PathBuf;
 
     use immuxsys::storage::chain_height::ChainHeight;
+    use immuxsys::storage::executor::command::SelectCondition;
+    use immuxsys::storage::executor::executor::Executor;
+    use immuxsys::storage::executor::filter::{
+        Filter, FilterOperands, FilterOperator, FilterUnit, LogicalOperator,
+    };
+    use immuxsys::storage::executor::grouping_label::GroupingLabel;
+    use immuxsys::storage::executor::unit_content::UnitContent;
+    use immuxsys::storage::executor::unit_key::UnitKey;
     use immuxsys::storage::kv::{get_log_file_dir, LogKeyValueStore};
     use immuxsys::storage::kvkey::KVKey;
     use immuxsys::storage::kvvalue::KVValue;
@@ -22,6 +30,59 @@ mod kv_tests {
         let store_engine = LogKeyValueStore::open(&path).unwrap();
 
         return store_engine;
+    }
+
+    fn get_filter() -> Filter {
+        let mut filter_units = Vec::new();
+        let mut logical_operators = Vec::new();
+
+        let filter_units_vec = vec![
+            FilterUnit {
+                operator: FilterOperator::GreaterEqual,
+                operands: FilterOperands {
+                    map_key: String::from("age"),
+                    unit_content: UnitContent::Float64(12.0),
+                },
+            },
+            FilterUnit {
+                operator: FilterOperator::LessEqual,
+                operands: FilterOperands {
+                    map_key: String::from("height"),
+                    unit_content: UnitContent::Float64(170.0),
+                },
+            },
+            FilterUnit {
+                operator: FilterOperator::Equal,
+                operands: FilterOperands {
+                    map_key: String::from("name"),
+                    unit_content: UnitContent::String(String::from("Bob")),
+                },
+            },
+            FilterUnit {
+                operator: FilterOperator::Equal,
+                operands: FilterOperands {
+                    map_key: String::from("boy"),
+                    unit_content: UnitContent::Bool(true),
+                },
+            },
+        ];
+
+        let logical_operators_vec = vec![
+            LogicalOperator::And,
+            LogicalOperator::Or,
+            LogicalOperator::Or,
+            LogicalOperator::And,
+        ];
+
+        filter_units.extend(filter_units_vec);
+        logical_operators.extend(logical_operators_vec);
+
+        let filter = Filter {
+            filter_units,
+            logical_operators,
+        };
+
+        return filter;
     }
 
     #[test]
@@ -141,6 +202,94 @@ mod kv_tests {
             let out_put = store_engine.get(&kv_pair.0, None).unwrap();
             assert_eq!(out_put, None);
         }
+    }
+
+    #[test]
+    fn test_content_satisfied_filter_unit() {
+        let satisfied_contents = vec![
+            {
+                let mut map = HashMap::new();
+                map.insert(String::from("age"), UnitContent::Float64(14.0));
+                map.insert(String::from("height"), UnitContent::Float64(168.0));
+                map.insert(
+                    String::from("name"),
+                    UnitContent::String(String::from("Bob")),
+                );
+                map.insert(String::from("boy"), UnitContent::Bool(true));
+                UnitContent::Map(map)
+            },
+            {
+                let mut map = HashMap::new();
+                map.insert(String::from("age"), UnitContent::Float64(12.0));
+                map.insert(String::from("height"), UnitContent::Float64(170.0));
+                map.insert(
+                    String::from("name"),
+                    UnitContent::String(String::from("Jerry")),
+                );
+                map.insert(String::from("boy"), UnitContent::Bool(false));
+                UnitContent::Map(map)
+            },
+        ];
+
+        let unsatisfied_contents = vec![
+            {
+                let mut map = HashMap::new();
+                map.insert(String::from("age"), UnitContent::Float64(20.0));
+                map.insert(String::from("height"), UnitContent::Float64(181.0));
+                map.insert(
+                    String::from("name"),
+                    UnitContent::String(String::from("Tom")),
+                );
+                map.insert(String::from("boy"), UnitContent::Bool(false));
+                UnitContent::Map(map)
+            },
+            {
+                let mut map = HashMap::new();
+                map.insert(String::from("age"), UnitContent::Float64(2.0));
+                map.insert(String::from("height"), UnitContent::Float64(157.0));
+                map.insert(
+                    String::from("name"),
+                    UnitContent::String(String::from("Andy")),
+                );
+                map.insert(String::from("boy"), UnitContent::Bool(true));
+                UnitContent::Map(map)
+            },
+        ];
+
+        let filter = get_filter();
+        let condition = SelectCondition::Filter(filter);
+
+        let mut contents = vec![];
+        contents.extend_from_slice(&satisfied_contents);
+        contents.extend_from_slice(&unsatisfied_contents);
+
+        let path = PathBuf::from("/tmp/test_content_satisfied_filter_unit");
+        let grouping = GroupingLabel::new("any_grouping".as_bytes());
+        let mut executor = Executor::open(&path).unwrap();
+
+        for (index, content) in contents.iter().enumerate() {
+            let unit_key = UnitKey::from(format!("{}", index).as_str());
+            executor.set(&grouping, &unit_key, &content, None).unwrap();
+        }
+
+        let output = executor.get(&grouping, &condition).unwrap();
+
+        for content in output.iter() {
+            assert!(&satisfied_contents.contains(content));
+        }
+
+        for content in satisfied_contents.iter() {
+            assert!(&output.contains(content));
+        }
+
+        assert_eq!(output.len(), satisfied_contents.len());
+    }
+
+    #[test]
+    fn test_filter_to_string() {
+        let expected_output = String::from("age>=12&&height<=170||name=\"Bob\"||boy=true");
+        let actual_output = get_filter().to_string();
+        assert_eq!(expected_output, actual_output);
     }
 
     #[test]

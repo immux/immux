@@ -113,7 +113,7 @@ impl LogKeyValueStore {
                     match command {
                         Instruction::Set { key: _, value } => Ok(Some(value)),
                         Instruction::RevertOne { key, height } => {
-                            self.get_revert_value(&key, &height)
+                            get_revert_value(&mut self.reader, &key, &height)
                         }
                         Instruction::RemoveOne { key: _ } => Ok(None),
                         Instruction::TransactionalSet {
@@ -125,7 +125,7 @@ impl LogKeyValueStore {
                             key,
                             height,
                             transaction_id: _,
-                        } => self.get_revert_value(&key, &height),
+                        } => get_revert_value(&mut self.reader, &key, &height),
                         Instruction::TransactionalRemoveOne {
                             key: _,
                             transaction_id: _,
@@ -141,6 +141,37 @@ impl LogKeyValueStore {
                 }
             }
         }
+    }
+
+    pub fn get_all_current(&mut self) -> KVResult<Vec<(KVKey, KVValue)>> {
+        let mut result = vec![];
+
+        for (_key, log_pointer) in &self.key_pointer_map {
+            match log_pointer.get(&None) {
+                None => {}
+                Some(log_pointer) => {
+                    self.reader.seek(SeekFrom::Start(log_pointer.pos))?;
+                    let mut log_pointer_reader = self.reader.by_ref().take(log_pointer.len as u64);
+                    let mut buffer = vec![0; log_pointer.len];
+                    log_pointer_reader.read(&mut buffer)?;
+                    let (command, _) = Instruction::parse(buffer.as_slice())?;
+
+                    match command {
+                        Instruction::Set { key, value } => {
+                            result.push((key, value));
+                        }
+                        Instruction::RevertOne { key, height } => {
+                            if let Some(value) = get_revert_value(&mut self.reader, &key, &height)?
+                            {
+                                result.push((key, value));
+                            }
+                        }
+                        _ => {}
+                    }
+                }
+            }
+        }
+        return Ok(result);
     }
 
     pub fn revert_one(
@@ -377,19 +408,22 @@ impl LogKeyValueStore {
 
         return Ok(());
     }
+}
 
-    fn get_revert_value(&mut self, key: &KVKey, height: &ChainHeight) -> KVResult<Option<KVValue>> {
-        let mut command_buffer: Vec<u8> = Vec::new();
-        self.reader.seek(SeekFrom::Start(0))?;
-        self.reader.read_to_end(&mut command_buffer)?;
-        let command_buffer_parser = CommandBufferParser::new(&command_buffer, 0);
+fn get_revert_value(
+    reader: &mut BufReader<File>,
+    key: &KVKey,
+    height: &ChainHeight,
+) -> KVResult<Option<KVValue>> {
+    let mut command_buffer: Vec<u8> = Vec::new();
+    reader.seek(SeekFrom::Start(0))?;
+    reader.read_to_end(&mut command_buffer)?;
+    let command_buffer_parser = CommandBufferParser::new(&command_buffer, 0);
 
-        let commands: Vec<Instruction> =
-            command_buffer_parser.map(|(command, _)| command).collect();
-        let value = recursive_find(&key, &commands, &height)?;
+    let commands: Vec<Instruction> = command_buffer_parser.map(|(command, _)| command).collect();
+    let value = recursive_find(&key, &commands, &height)?;
 
-        return Ok(value);
-    }
+    return Ok(value);
 }
 
 fn recursive_find(

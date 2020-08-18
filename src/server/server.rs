@@ -4,7 +4,7 @@ use std::collections::HashMap;
 use crate::constants as Constants;
 use crate::server::errors::{ServerError, ServerResult};
 use crate::storage::chain_height::ChainHeight;
-use crate::storage::executor::command::Command;
+use crate::storage::executor::command::{Command, SelectCondition};
 use crate::storage::executor::executor::Executor;
 use crate::storage::executor::grouping_label::GroupingLabel;
 use crate::storage::executor::outcome::Outcome;
@@ -12,6 +12,7 @@ use crate::storage::executor::unit_content::UnitContent;
 use crate::storage::executor::unit_key::UnitKey;
 use crate::storage::transaction_manager::TransactionId;
 
+use crate::storage::executor::filter::parse_filter_string;
 use tiny_http::{Method, Request, Response, Server};
 use url::Url;
 
@@ -48,10 +49,11 @@ pub fn run_server(mut executor: Executor, port: u16) -> ServerResult<()> {
                         Err(error) => (500, format!("Server error {:?}", error)),
                         Ok(outcome) => match outcome {
                             Outcome::Select(outcome) => {
-                                let body = match outcome {
-                                    None => String::from(""),
-                                    Some(content) => content.to_string(),
-                                };
+                                let outcome_string_vec: Vec<String> = outcome
+                                    .iter()
+                                    .map(|unit_content| unit_content.to_string())
+                                    .collect();
+                                let body = outcome_string_vec.join("\r\n");
                                 (200, body)
                             }
                             Outcome::InspectOne(outcome) => {
@@ -82,7 +84,12 @@ pub fn run_server(mut executor: Executor, port: u16) -> ServerResult<()> {
                         },
                     };
 
-                let response = Response::from_string(body).with_status_code(status);
+                let response = if body.is_empty() {
+                    Response::from_string(UnitContent::Nil.to_string()).with_status_code(status)
+                } else {
+                    Response::from_string(body).with_status_code(status)
+                };
+
                 match request.respond(response) {
                     Ok(_) => {}
                     Err(error) => return Err(ServerError::HttpResponseError(error)),
@@ -100,11 +107,10 @@ fn handle_request(request: &mut Request, executor: &mut Executor) -> ServerResul
     match instruction {
         Command::Select {
             grouping,
-            key,
-            transaction_id,
+            condition,
         } => {
-            let result = executor.get(&grouping, &key, transaction_id)?;
-            return Ok(Outcome::Select(result));
+            let content_vec = executor.get(&grouping, &condition)?;
+            return Ok(Outcome::Select(content_vec));
         }
         Command::Insert {
             grouping,
@@ -191,7 +197,6 @@ fn parse_http_request(request: &mut Request) -> ServerResult<Command> {
     }
 
     let url_info = parse_path(&request.url())?;
-
     let segments: Vec<&str> = url_info.main_path.split("/").collect();
 
     match request.method() {
@@ -213,11 +218,12 @@ fn parse_http_request(request: &mut Request) -> ServerResult<Command> {
                 let grouping = GroupingLabel::new(grouping_str.as_bytes());
                 let unit_key = UnitKey::from(unit_key_str);
 
+                let condition = SelectCondition::Key(unit_key, Some(transaction_id));
                 let instruction = Command::Select {
                     grouping,
-                    key: unit_key,
-                    transaction_id: Some(transaction_id),
+                    condition,
                 };
+
                 return Ok(instruction);
             } else if segments.len() >= 4 {
                 let grouping_str = segments[1];
@@ -243,18 +249,35 @@ fn parse_http_request(request: &mut Request) -> ServerResult<Command> {
                 let grouping = GroupingLabel::new(grouping_str.as_bytes());
                 let unit_key = UnitKey::from(unit_key_str);
 
+                let condition = SelectCondition::Key(unit_key, None);
                 let instruction = Command::Select {
                     grouping,
-                    key: unit_key,
-                    transaction_id: None,
+                    condition,
                 };
+
                 return Ok(instruction);
             } else if segments.len() >= 2 {
                 if segments[1] == Constants::URL_JOURNAL_KEY_WORD {
                     let instruction = Command::InspectAll;
                     return Ok(instruction);
                 } else {
-                    return Err(ServerError::UnimplementedForGetGrouping);
+                    if let Some(filter_string) =
+                        url_info.extract_string_query(Constants::FILTER_KEY_WORD)
+                    {
+                        let grouping_str = segments[1];
+                        let grouping = GroupingLabel::new(grouping_str.as_bytes());
+                        let filter = parse_filter_string(filter_string)?;
+                        let condition = SelectCondition::Filter(filter);
+
+                        let instruction = Command::Select {
+                            grouping,
+                            condition,
+                        };
+
+                        return Ok(instruction);
+                    } else {
+                        return Err(ServerError::UnimplementedForGetGrouping);
+                    }
                 }
             } else {
                 return Err(ServerError::UrlParsingError);
@@ -288,7 +311,7 @@ fn parse_http_request(request: &mut Request) -> ServerResult<Command> {
                     };
                     return Ok(instruction);
                 } else {
-                    let content = UnitContent::String(incoming_body);
+                    let content = UnitContent::from(incoming_body.as_str());
                     let transaction_id = TransactionId::new(transaction_id);
                     let instruction = Command::TransactionalInsert {
                         grouping,
@@ -318,7 +341,7 @@ fn parse_http_request(request: &mut Request) -> ServerResult<Command> {
                     };
                     return Ok(instruction);
                 } else {
-                    let content = UnitContent::String(incoming_body);
+                    let content = UnitContent::from(incoming_body.as_str());
                     let instruction = Command::Insert {
                         grouping,
                         key: unit_key,
