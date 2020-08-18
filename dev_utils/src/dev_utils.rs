@@ -200,8 +200,6 @@ pub fn e2e_verify_correctness(
         let expected_output = content;
         let actual_output = UnitContent::from(actual_output.as_str());
         if code != 200 || expected_output != &actual_output {
-            println!("expected {:?} actual {:?}", expected_output, &actual_output);
-
             return false;
         }
     }
