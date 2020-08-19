@@ -199,6 +199,7 @@ pub fn e2e_verify_correctness(
         let (code, actual_output) = client.get_by_key(&grouping, &unit_key).unwrap();
         let expected_output = content;
         let actual_output = UnitContent::from(actual_output.as_str());
+
         if code != 200 || expected_output != &actual_output {
             return false;
         }
