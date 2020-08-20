@@ -14,9 +14,6 @@ pub enum ServerError {
     ParseIntError(ParseIntError),
     HttpResponseError(Error),
     FilterError(FilterError),
-
-    //    unimplemented error
-    UnimplementedForGetGrouping,
 }
 
 impl From<ExecutorError> for ServerError {

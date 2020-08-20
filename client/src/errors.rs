@@ -5,7 +5,6 @@ use std::fmt::Formatter;
 pub enum ImmuxDBClientError {
     Everything,
     Reqwest(reqwest::Error),
-    Unimplemented,
 }
 
 impl std::fmt::Display for ImmuxDBClientError {
