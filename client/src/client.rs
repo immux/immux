@@ -2,10 +2,14 @@ use crate::errors::{ClientResult, ImmuxDBClientError};
 
 use immuxsys::constants as Constants;
 use immuxsys::storage::chain_height::ChainHeight;
+use immuxsys::storage::executor::filter::Filter;
+use immuxsys::storage::executor::grouping_label::GroupingLabel;
 use immuxsys::storage::executor::unit_content::UnitContent;
 use immuxsys::storage::executor::unit_key::UnitKey;
 use immuxsys::storage::transaction_manager::TransactionId;
+
 use reqwest::Client;
+use reqwest::Url;
 
 pub struct ImmuxDBClient {
     host: String,
@@ -22,11 +26,11 @@ impl ImmuxDBClient {
 }
 
 impl ImmuxDBClient {
-    pub fn get_by_key(&self, grouping: &str, unit_key: &UnitKey) -> ClientResult {
+    pub fn get_by_key(&self, grouping: &GroupingLabel, unit_key: &UnitKey) -> ClientResult {
         let url = format!(
             "http://{}/{}/{}",
             &self.host,
-            grouping,
+            grouping.to_string(),
             unit_key.to_string()
         );
         let mut response = self.client.get(&url).send()?;
@@ -38,9 +42,23 @@ impl ImmuxDBClient {
         }
     }
 
+    pub fn get_by_filter(&self, grouping: &GroupingLabel, filter: &Filter) -> ClientResult {
+        let url_str = format!("http://{}/{}", &self.host, grouping.to_string());
+
+        let url = Url::parse_with_params(&url_str, &[("filter", format!("{}", filter))]).unwrap();
+
+        let mut response = self.client.get(url).send()?;
+        let status_code = response.status();
+
+        match response.text() {
+            Ok(text) => Ok((status_code, text)),
+            Err(error) => Err(ImmuxDBClientError::Reqwest(error.into())),
+        }
+    }
+
     pub fn transactional_get(
         &self,
-        grouping: &str,
+        grouping: &GroupingLabel,
         unit_key: &UnitKey,
         transaction_id: &TransactionId,
     ) -> ClientResult {
@@ -49,7 +67,7 @@ impl ImmuxDBClient {
             &self.host,
             Constants::URL_TRANSACTIONS_KEY_WORD,
             transaction_id.as_u64(),
-            grouping,
+            grouping.to_string(),
             unit_key.to_string(),
         );
 
@@ -62,11 +80,11 @@ impl ImmuxDBClient {
         }
     }
 
-    pub fn inspect_one(&self, grouping: &str, unit_key: &UnitKey) -> ClientResult {
+    pub fn inspect_one(&self, grouping: &GroupingLabel, unit_key: &UnitKey) -> ClientResult {
         let url = format!(
             "http://{}/{}/{}/{}",
             &self.host,
-            grouping,
+            grouping.to_string(),
             unit_key.to_string(),
             Constants::URL_JOURNAL_KEY_WORD,
         );
@@ -92,13 +110,13 @@ impl ImmuxDBClient {
         }
     }
 
-    pub fn get_by_grouping(&self, _grouping: &str) -> ClientResult {
+    pub fn get_by_grouping(&self, _grouping: &GroupingLabel) -> ClientResult {
         return Err(ImmuxDBClientError::Unimplemented);
     }
 
     pub fn set_unit(
         &self,
-        grouping: &str,
+        grouping: &GroupingLabel,
         unit_key: &UnitKey,
         unit_content: &UnitContent,
     ) -> ClientResult {
@@ -107,7 +125,7 @@ impl ImmuxDBClient {
             .put(&format!(
                 "http://{}/{}/{}",
                 &self.host,
-                grouping,
+                grouping.to_string(),
                 unit_key.to_string(),
             ))
             .body(unit_content.to_string())
@@ -122,7 +140,7 @@ impl ImmuxDBClient {
 
     pub fn transactional_set_unit(
         &self,
-        grouping: &str,
+        grouping: &GroupingLabel,
         unit_key: &UnitKey,
         unit_content: &UnitContent,
         transaction_id: &TransactionId,
@@ -134,7 +152,7 @@ impl ImmuxDBClient {
                 &self.host,
                 Constants::URL_TRANSACTIONS_KEY_WORD,
                 transaction_id.as_u64(),
-                grouping,
+                grouping.to_string(),
                 unit_key.to_string(),
             ))
             .body(unit_content.to_string())
@@ -149,7 +167,7 @@ impl ImmuxDBClient {
 
     pub fn revert_one(
         &self,
-        grouping: &str,
+        grouping: &GroupingLabel,
         unit_key: &UnitKey,
         height: &ChainHeight,
     ) -> ClientResult {
@@ -158,7 +176,7 @@ impl ImmuxDBClient {
             .put(&format!(
                 "http://{}/{}/{}?{}={}",
                 &self.host,
-                grouping,
+                grouping.to_string(),
                 unit_key.to_string(),
                 Constants::HEIGHT,
                 height.as_u64(),
@@ -174,7 +192,7 @@ impl ImmuxDBClient {
 
     pub fn transactional_revert_one(
         &self,
-        grouping: &str,
+        grouping: &GroupingLabel,
         unit_key: &UnitKey,
         height: &ChainHeight,
         transaction_id: &TransactionId,
@@ -186,7 +204,7 @@ impl ImmuxDBClient {
                 &self.host,
                 Constants::URL_TRANSACTIONS_KEY_WORD,
                 transaction_id.as_u64(),
-                grouping,
+                grouping.to_string(),
                 unit_key.to_string(),
                 Constants::HEIGHT,
                 height.as_u64(),
@@ -218,13 +236,13 @@ impl ImmuxDBClient {
         }
     }
 
-    pub fn remove_one(&self, grouping: &str, unit_key: &UnitKey) -> ClientResult {
+    pub fn remove_one(&self, grouping: &GroupingLabel, unit_key: &UnitKey) -> ClientResult {
         let mut response = self
             .client
             .delete(&format!(
                 "http://{}/{}/{}",
                 &self.host,
-                grouping,
+                grouping.to_string(),
                 unit_key.to_string(),
             ))
             .send()?;
@@ -239,7 +257,7 @@ impl ImmuxDBClient {
     pub fn transactional_remove_one(
         &self,
         transaction_id: &TransactionId,
-        grouping: &str,
+        grouping: &GroupingLabel,
         unit_key: &UnitKey,
     ) -> ClientResult {
         let mut response = self
@@ -249,7 +267,7 @@ impl ImmuxDBClient {
                 &self.host,
                 Constants::URL_TRANSACTIONS_KEY_WORD,
                 transaction_id.as_u64(),
-                grouping,
+                grouping.to_string(),
                 unit_key.to_string(),
             ))
             .send()?;

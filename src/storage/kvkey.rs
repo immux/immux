@@ -1,5 +1,17 @@
+use crate::storage::executor::grouping_label::GroupingLabel;
 use crate::storage::executor::unit_key::UnitKey;
-use crate::utils::varint::varint_encode;
+use crate::utils::varint::{varint_decode, varint_encode, VarIntError};
+
+#[derive(Debug)]
+pub enum KVKeyError {
+    VarIntError(VarIntError),
+}
+
+impl From<VarIntError> for KVKeyError {
+    fn from(err: VarIntError) -> KVKeyError {
+        KVKeyError::VarIntError(err)
+    }
+}
 
 #[derive(Debug, Eq, PartialEq, Hash, Clone)]
 pub struct KVKey(Vec<u8>);
@@ -8,15 +20,36 @@ impl KVKey {
     pub fn new(data: &[u8]) -> Self {
         Self(data.to_owned())
     }
+
     pub fn as_bytes(&self) -> &[u8] {
         &self.0
     }
+
     pub fn serialize(&self) -> Vec<u8> {
         let mut serialized = Vec::new();
         let bytes = self.as_bytes();
         serialized.extend_from_slice(&varint_encode(bytes.len() as u64));
         serialized.extend_from_slice(bytes);
         return serialized;
+    }
+
+    pub fn from_grouping_and_unit_key(grouping: &GroupingLabel, unit_key: &UnitKey) -> Self {
+        let mut kvkey_bytes = vec![];
+        let grouping_bytes = grouping.marshal();
+        let unit_key_bytes = unit_key.as_bytes();
+
+        kvkey_bytes.extend_from_slice(&grouping_bytes);
+        kvkey_bytes.extend_from_slice(&unit_key_bytes);
+
+        KVKey::new(&kvkey_bytes)
+    }
+
+    pub fn parse(data: &[u8]) -> Result<(GroupingLabel, UnitKey), KVKeyError> {
+        let (data_length, offset) = varint_decode(&data)?;
+        let grouping = GroupingLabel::new(&data[offset..offset + data_length as usize]);
+        let remaining_bytes = &data[offset + data_length as usize..];
+        let unit_key = UnitKey::from(remaining_bytes);
+        return Ok((grouping, unit_key));
     }
 }
 
@@ -41,12 +74,6 @@ impl From<&str> for KVKey {
 impl From<KVKey> for Vec<u8> {
     fn from(key: KVKey) -> Vec<u8> {
         key.0
-    }
-}
-
-impl From<&UnitKey> for KVKey {
-    fn from(unit_key: &UnitKey) -> KVKey {
-        KVKey::new(unit_key.as_bytes())
     }
 }
 

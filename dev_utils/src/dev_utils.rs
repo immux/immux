@@ -9,6 +9,7 @@ use std::{io, thread};
 
 use immuxsys::server::server::run_server;
 use immuxsys::storage::executor::executor::Executor;
+use immuxsys::storage::executor::grouping_label::GroupingLabel;
 use immuxsys::storage::executor::unit_content::UnitContent;
 use immuxsys::storage::executor::unit_key::UnitKey;
 use immuxsys_client::client::ImmuxDBClient;
@@ -79,7 +80,7 @@ pub fn csv_to_json_table_with_size<J: DeserializeOwned + Serialize>(
                 let mut unit_key_str = table_name.to_string();
                 unit_key_str.push_str(&index.to_string());
                 let unit_key = UnitKey::from(unit_key_str.as_str());
-                let content = UnitContent::String(string);
+                let content = UnitContent::from(string.as_str());
 
                 read_bytes += unit_key.as_bytes().len();
                 read_bytes += content.marshal().len();
@@ -123,7 +124,7 @@ pub fn csv_to_json_table<J: DeserializeOwned + Serialize>(
             let mut unit_key_str = table_name.to_string();
             unit_key_str.push_str(&index.to_string());
             let unit_key = UnitKey::from(unit_key_str.as_str());
-            let content = UnitContent::String(string);
+            let content = UnitContent::from(string.as_str());
             Ok((unit_key, content))
         })
         .enumerate()
@@ -190,15 +191,16 @@ where
 }
 
 pub fn e2e_verify_correctness(
-    grouping: &str,
+    grouping: &GroupingLabel,
     table: &[(UnitKey, UnitContent)],
     client: &ImmuxDBClient,
 ) -> bool {
     for (unit_key, content) in table {
         let (code, actual_output) = client.get_by_key(&grouping, &unit_key).unwrap();
-        let expected_output = content.to_string();
+        let expected_output = content;
+        let actual_output = UnitContent::from(actual_output.as_str());
 
-        if code != 200 || expected_output != actual_output {
+        if code != 200 || expected_output != &actual_output {
             return false;
         }
     }

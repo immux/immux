@@ -199,12 +199,71 @@ impl UnitContent {
 impl ToString for UnitContent {
     fn to_string(&self) -> String {
         match self {
-            UnitContent::Nil => String::from("nil"),
-            UnitContent::String(string) => string.clone(),
+            UnitContent::Nil => "Nil".to_string(),
+            UnitContent::String(string) => format!("{}{}{}", "\"", string.clone(), "\""),
             UnitContent::Float64(f) => format!("{}", f),
             UnitContent::Bool(b) => (if *b { "true" } else { "false" }).to_string(),
-            UnitContent::Map(map) => format!("{:?}", map),
-            UnitContent::Array(array) => format!("{:?}", array),
+            UnitContent::Map(map) => {
+                let kv_pairs: Vec<String> = map
+                    .iter()
+                    .map(|(key, content)| format!("{}:{}", key, content.to_string()))
+                    .collect();
+                format!("{}{}{}", "{", kv_pairs.join(","), "}")
+            }
+            UnitContent::Array(array) => {
+                let kv_pairs: Vec<String> =
+                    array.iter().map(|content| content.to_string()).collect();
+                format!("{}{}{}", "[", kv_pairs.join(","), "]")
+            }
+        }
+    }
+}
+
+impl From<&str> for UnitContent {
+    fn from(incoming_str: &str) -> UnitContent {
+        if incoming_str.starts_with("{") && incoming_str.ends_with("}") {
+            let body_length = incoming_str.len();
+            let sub_body = &incoming_str[1..body_length - 1];
+            let kv_paris_str: Vec<&str> = sub_body.split(",").collect();
+
+            let mut map = HashMap::new();
+
+            for kv_pair_str in kv_paris_str.iter() {
+                let kv_pair_str = kv_pair_str.trim();
+                let segments: Vec<&str> = kv_pair_str.split(":").collect();
+                let key = segments[0].trim();
+                let content = UnitContent::from(segments[1].trim());
+                map.insert(key.to_string(), content);
+            }
+            UnitContent::Map(map)
+        } else if let Ok(num_f64) = incoming_str.parse::<f64>() {
+            UnitContent::Float64(num_f64)
+        } else if incoming_str == "true" {
+            UnitContent::Bool(true)
+        } else if incoming_str == "false" {
+            UnitContent::Bool(false)
+        } else if incoming_str == "Nil" {
+            UnitContent::Nil
+        } else if incoming_str.starts_with("[") && incoming_str.ends_with("]") {
+            let body_length = incoming_str.len();
+            let sub_body = &incoming_str[1..body_length - 1];
+            let contents_str: Vec<&str> = sub_body.split(",").collect();
+
+            let mut array = vec![];
+
+            for content_str in contents_str.into_iter() {
+                let content = UnitContent::from(content_str);
+                array.push(content);
+            }
+            UnitContent::Array(array)
+        } else {
+            if incoming_str.trim().starts_with("\"") && incoming_str.ends_with("\"") {
+                let str_length = &incoming_str.len();
+                let sub_string = &incoming_str[1..str_length - 1];
+                UnitContent::String(String::from(sub_string))
+            } else {
+                UnitContent::String(String::from(incoming_str))
+            }
         }
     }
 }
@@ -244,6 +303,47 @@ mod unit_content_tests {
         }
 
         return result;
+    }
+
+    #[test]
+    fn unit_content_from_string() {
+        let mut map = HashMap::new();
+        map.insert(
+            String::from("name"),
+            UnitContent::String(String::from("Tom")),
+        );
+        map.insert(String::from("age"), UnitContent::Float64(40.0));
+
+        let content_pairs = [
+            (
+                "\"this is a string\"",
+                UnitContent::String(String::from("this is a string")),
+            ),
+            ("true", UnitContent::Bool(true)),
+            ("false", UnitContent::Bool(false)),
+            ("Nil", UnitContent::Nil),
+            ("\"true\"", UnitContent::String(String::from("true"))),
+            ("\"false\"", UnitContent::String(String::from("false"))),
+            ("\"Nil\"", UnitContent::String(String::from("Nil"))),
+            ("{name:\"Tom\", age:40}", UnitContent::Map(map)),
+            (
+                "[1,2,3,\"Andy\",5]",
+                UnitContent::Array(vec![
+                    UnitContent::Float64(1.0),
+                    UnitContent::Float64(2.0),
+                    UnitContent::Float64(3.0),
+                    UnitContent::String(String::from("Andy")),
+                    UnitContent::Float64(5.0),
+                ]),
+            ),
+            ("\"\"", UnitContent::String(String::from(""))),
+            ("", UnitContent::String(String::from(""))),
+        ];
+
+        for (content_str, expected_output) in content_pairs.iter() {
+            let actual_output = UnitContent::from(*content_str);
+            assert_eq!(&actual_output, expected_output);
+        }
     }
 
     #[test]
