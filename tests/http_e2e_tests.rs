@@ -1043,14 +1043,14 @@ mod http_e2e_tests {
 
         let filter_units_vec = vec![
             FilterUnit {
-                operator: FilterOperator::GreaterEqual,
+                operator: FilterOperator::GreaterOrEqual,
                 operands: FilterOperands {
                     map_key: String::from("price"),
                     unit_content: UnitContent::Float64(1200.0),
                 },
             },
             FilterUnit {
-                operator: FilterOperator::LessEqual,
+                operator: FilterOperator::LessOrEqual,
                 operands: FilterOperands {
                     map_key: String::from("size"),
                     unit_content: UnitContent::Float64(13.0),

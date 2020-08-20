@@ -24,20 +24,20 @@ pub type FilterResult<T> = Result<T, FilterError>;
 pub enum FilterOperator {
     Equal,
     Greater,
-    GreaterEqual,
+    GreaterOrEqual,
     Less,
-    LessEqual,
+    LessOrEqual,
     NotEqual,
 }
 
 impl fmt::Display for FilterOperator {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let string = match self {
-            FilterOperator::Equal => "=",
+            FilterOperator::Equal => "==",
             FilterOperator::Greater => ">",
-            FilterOperator::GreaterEqual => ">=",
+            FilterOperator::GreaterOrEqual => ">=",
             FilterOperator::Less => "<",
-            FilterOperator::LessEqual => "<=",
+            FilterOperator::LessOrEqual => "<=",
             FilterOperator::NotEqual => "!=",
         };
         write!(f, "{}", string)
@@ -151,7 +151,7 @@ pub fn parse_filter_string(filter_string: String) -> FilterResult<Filter> {
         return Err(FilterError::ParseFilterError);
     }
 
-    let filter_unit_operator_re = Regex::new(r">=|<=|!=|>|=|<")?;
+    let filter_unit_operator_re = Regex::new(r">=|<=|!=|==|>|<")?;
 
     let filter_units: FilterResult<Vec<FilterUnit>> = filter_units_str_vec
         .iter()
@@ -177,8 +177,8 @@ pub fn parse_filter_string(filter_string: String) -> FilterResult<Filter> {
             };
 
             let operator = match operators[0].as_str() {
-                Constants::FILTER_GREATER_EQUAL => FilterOperator::GreaterEqual,
-                Constants::FILTER_LESS_EQUAL => FilterOperator::LessEqual,
+                Constants::FILTER_GREATER_OR_EQUAL => FilterOperator::GreaterOrEqual,
+                Constants::FILTER_LESS_OR_EQUAL => FilterOperator::LessOrEqual,
                 Constants::FILTER_NOT_EQUAL => FilterOperator::NotEqual,
                 Constants::FILTER_GREATER => FilterOperator::Greater,
                 Constants::FILTER_LESS => FilterOperator::Less,
@@ -317,7 +317,7 @@ pub fn content_satisfied_filter_unit(content: &UnitContent, filter_unit: &Filter
             },
             _ => return false,
         },
-        FilterOperator::LessEqual => match content {
+        FilterOperator::LessOrEqual => match content {
             UnitContent::Map(map) => match map.get(filter_map_key) {
                 Some(content) => match content {
                     UnitContent::Float64(number) => match filter_content {
@@ -375,7 +375,7 @@ pub fn content_satisfied_filter_unit(content: &UnitContent, filter_unit: &Filter
             },
             _ => return false,
         },
-        FilterOperator::GreaterEqual => match content {
+        FilterOperator::GreaterOrEqual => match content {
             UnitContent::Map(map) => match map.get(filter_map_key) {
                 Some(content) => match content {
                     UnitContent::Float64(number) => match filter_content {

@@ -63,9 +63,9 @@ pub const URL_TRANSACTIONS_KEY_WORD: &str = ".transactions";
 pub const URL_JOURNAL_KEY_WORD: &str = ".journal";
 
 pub const FILTER_KEY_WORD: &str = "filter";
-pub const FILTER_GREATER_EQUAL: &str = ">=";
-pub const FILTER_LESS_EQUAL: &str = "<=";
+pub const FILTER_GREATER_OR_EQUAL: &str = ">=";
+pub const FILTER_LESS_OR_EQUAL: &str = "<=";
 pub const FILTER_NOT_EQUAL: &str = "!=";
 pub const FILTER_LESS: &str = "<";
 pub const FILTER_GREATER: &str = ">";
-pub const FILTER_EQUAL: &str = "=";
+pub const FILTER_EQUAL: &str = "==";

@@ -38,14 +38,14 @@ mod kv_tests {
 
         let filter_units_vec = vec![
             FilterUnit {
-                operator: FilterOperator::GreaterEqual,
+                operator: FilterOperator::GreaterOrEqual,
                 operands: FilterOperands {
                     map_key: String::from("age"),
                     unit_content: UnitContent::Float64(12.0),
                 },
             },
             FilterUnit {
-                operator: FilterOperator::LessEqual,
+                operator: FilterOperator::LessOrEqual,
                 operands: FilterOperands {
                     map_key: String::from("height"),
                     unit_content: UnitContent::Float64(170.0),
@@ -287,7 +287,7 @@ mod kv_tests {
 
     #[test]
     fn test_filter_to_string() {
-        let expected_output = String::from("age>=12&&height<=170||name=\"Bob\"||boy=true");
+        let expected_output = String::from("age>=12&&height<=170||name==\"Bob\"||boy==true");
         let actual_output = get_filter().to_string();
         assert_eq!(expected_output, actual_output);
     }
