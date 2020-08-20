@@ -4,6 +4,8 @@ use immuxsys::constants as Constants;
 use immuxsys::storage::chain_height::ChainHeight;
 
 use clap::{App, Arg, SubCommand};
+use immuxsys::storage::executor::command::SelectCondition;
+use immuxsys::storage::executor::filter::parse_filter_string;
 use immuxsys::storage::executor::{
     errors::ExecutorResult, executor::Executor, grouping_label::GroupingLabel,
     unit_content::UnitContent, unit_key::UnitKey,
@@ -18,6 +20,11 @@ fn main() -> ExecutorResult<()> {
         .subcommand(
             SubCommand::with_name(Constants::SUBCOMMAND_SET)
                 .about(Constants::SUBCOMMAND_SET_DESCRIPTION)
+                .arg(
+                    Arg::with_name(Constants::ARGUMENT_NAME_FOR_GROUPING)
+                        .help(Constants::GENERAL_ARGUMENT_HELP_INFORMATION)
+                        .required(true),
+                )
                 .arg(
                     Arg::with_name(Constants::ARGUMENT_NAME_FOR_KEY)
                         .help(Constants::GENERAL_ARGUMENT_HELP_INFORMATION)
@@ -38,6 +45,11 @@ fn main() -> ExecutorResult<()> {
             SubCommand::with_name(Constants::SUBCOMMAND_GET)
                 .about(Constants::SUBCOMMAND_GET_DESCRIPTION)
                 .arg(
+                    Arg::with_name(Constants::ARGUMENT_NAME_FOR_GROUPING)
+                        .help(Constants::GENERAL_ARGUMENT_HELP_INFORMATION)
+                        .required(true),
+                )
+                .arg(
                     Arg::with_name(Constants::ARGUMENT_NAME_FOR_KEY)
                         .help(Constants::GENERAL_ARGUMENT_HELP_INFORMATION)
                         .required(true),
@@ -49,8 +61,27 @@ fn main() -> ExecutorResult<()> {
                 ),
         )
         .subcommand(
+            SubCommand::with_name(Constants::SUBCOMMAND_FILTER)
+                .about(Constants::SUBCOMMAND_FILTER_DESCRIPTION)
+                .arg(
+                    Arg::with_name(Constants::ARGUMENT_NAME_FOR_GROUPING)
+                        .help(Constants::GENERAL_ARGUMENT_HELP_INFORMATION)
+                        .required(true),
+                )
+                .arg(
+                    Arg::with_name(Constants::ARGUMENT_NAME_FOR_FILTER)
+                        .help(Constants::GENERAL_ARGUMENT_HELP_INFORMATION)
+                        .required(true),
+                ),
+        )
+        .subcommand(
             SubCommand::with_name(Constants::SUBCOMMAND_REVERT_ONE)
                 .about(Constants::SUBCOMMAND_REVERT_ONE_DESCRIPTION)
+                .arg(
+                    Arg::with_name(Constants::ARGUMENT_NAME_FOR_GROUPING)
+                        .help(Constants::GENERAL_ARGUMENT_HELP_INFORMATION)
+                        .required(true),
+                )
                 .arg(
                     Arg::with_name(Constants::ARGUMENT_NAME_FOR_KEY)
                         .help(Constants::GENERAL_ARGUMENT_HELP_INFORMATION)
@@ -80,6 +111,11 @@ fn main() -> ExecutorResult<()> {
             SubCommand::with_name(Constants::SUBCOMMAND_REMOVE_ONE)
                 .about(Constants::SUBCOMMAND_REMOVE_ONE_DESCRIPTION)
                 .arg(
+                    Arg::with_name(Constants::ARGUMENT_NAME_FOR_GROUPING)
+                        .help(Constants::GENERAL_ARGUMENT_HELP_INFORMATION)
+                        .required(true),
+                )
+                .arg(
                     Arg::with_name(Constants::ARGUMENT_NAME_FOR_KEY)
                         .help(Constants::GENERAL_ARGUMENT_HELP_INFORMATION)
                         .required(true),
@@ -97,6 +133,11 @@ fn main() -> ExecutorResult<()> {
         .subcommand(
             SubCommand::with_name(Constants::SUBCOMMAND_INSPECT_ONE)
                 .about(Constants::SUBCOMMAND_INSPECT_ONE_DESCRIPTION)
+                .arg(
+                    Arg::with_name(Constants::ARGUMENT_NAME_FOR_GROUPING)
+                        .help(Constants::GENERAL_ARGUMENT_HELP_INFORMATION)
+                        .required(true),
+                )
                 .arg(
                     Arg::with_name(Constants::ARGUMENT_NAME_FOR_KEY)
                         .help(Constants::GENERAL_ARGUMENT_HELP_INFORMATION)
@@ -136,9 +177,11 @@ fn main() -> ExecutorResult<()> {
             let grouping_arg = arg_matches
                 .value_of(Constants::ARGUMENT_NAME_FOR_GROUPING)
                 .expect(Constants::MISSING_GROUPING_ARGUMENT_MESSAGE);
+
             let key_arg = arg_matches
                 .value_of(Constants::ARGUMENT_NAME_FOR_KEY)
                 .expect(Constants::MISSING_KEY_ARGUMENT_MESSAGE);
+
             let value_arg = arg_matches
                 .value_of(Constants::ARGUMENT_NAME_FOR_VALUE)
                 .expect(Constants::MISSING_VALUE_ARGUMENT_MESSAGE);
@@ -154,14 +197,14 @@ fn main() -> ExecutorResult<()> {
                 executor.set(
                     &GroupingLabel::from(grouping_arg),
                     &UnitKey::from(key_arg),
-                    &UnitContent::String(value_arg.to_string()),
+                    &UnitContent::from(value_arg),
                     Some(TransactionId::new(transaction_id)),
                 )
             } else {
                 executor.set(
                     &GroupingLabel::from(grouping_arg),
                     &UnitKey::from(key_arg),
-                    &UnitContent::String(value_arg.to_string()),
+                    &UnitContent::from(value_arg),
                     None,
                 )
             }
@@ -170,45 +213,70 @@ fn main() -> ExecutorResult<()> {
             let grouping_arg = arg_matches
                 .value_of(Constants::ARGUMENT_NAME_FOR_GROUPING)
                 .expect(Constants::MISSING_GROUPING_ARGUMENT_MESSAGE);
-            let key_arg = arg_matches
-                .value_of(Constants::ARGUMENT_NAME_FOR_KEY)
-                .expect(Constants::MISSING_KEY_ARGUMENT_MESSAGE);
 
             let path = PathBuf::from(Constants::TEMP_LOG_FILE_PATH);
             let mut executor = Executor::open(&path)?;
 
-            if let Some(transaction_id_str) =
-                arg_matches.value_of(Constants::ARGUMENT_NAME_FOR_TRANSACTION_ID)
-            {
-                let transaction_id = transaction_id_str.parse::<u64>()?;
-                match executor.get(
-                    &GroupingLabel::from(grouping_arg),
-                    &UnitKey::from(key_arg),
-                    Some(TransactionId::new(transaction_id)),
-                )? {
-                    Some(result) => {
-                        println!("{:?}", result);
+            let result =
+                if let Some(key_arg) = arg_matches.value_of(Constants::ARGUMENT_NAME_FOR_KEY) {
+                    if let Some(transaction_id_str) =
+                        arg_matches.value_of(Constants::ARGUMENT_NAME_FOR_TRANSACTION_ID)
+                    {
+                        let transaction_id = transaction_id_str.parse::<u64>()?;
+                        let condition = SelectCondition::Key(
+                            UnitKey::from(key_arg),
+                            Some(TransactionId::new(transaction_id)),
+                        );
+                        executor.get(&GroupingLabel::from(grouping_arg), &condition)?
+                    } else {
+                        let condition = SelectCondition::Key(UnitKey::from(key_arg), None);
+                        executor.get(&GroupingLabel::from(grouping_arg), &condition)?
                     }
-                    None => {
-                        println!("{:?}", Constants::MISSING_KEY_MESSAGE);
-                    }
-                }
+                } else {
+                    vec![]
+                };
+
+            if result.is_empty() {
+                println!("Nil");
             } else {
-                match executor.get(
-                    &GroupingLabel::from(grouping_arg),
-                    &UnitKey::from(key_arg),
-                    None,
-                )? {
-                    Some(result) => {
-                        println!("{:?}", result);
-                    }
-                    None => {
-                        println!("{:?}", Constants::MISSING_KEY_MESSAGE);
-                    }
-                }
+                let output_vec: Vec<String> = result
+                    .into_iter()
+                    .map(|content| content.to_string())
+                    .collect();
+                let output = output_vec.join("\r\n");
+                println!("{:?}", output);
             }
 
             return Ok(());
+        }
+        (Constants::SUBCOMMAND_FILTER, Some(arg_matches)) => {
+            let grouping_arg = arg_matches
+                .value_of(Constants::ARGUMENT_NAME_FOR_GROUPING)
+                .expect(Constants::MISSING_GROUPING_ARGUMENT_MESSAGE);
+            let filter_str = arg_matches
+                .value_of(Constants::ARGUMENT_NAME_FOR_FILTER)
+                .expect(Constants::MISSING_FILTER_ARGUMENT_MESSAGE);
+            {
+                let path = PathBuf::from(Constants::TEMP_LOG_FILE_PATH);
+                let mut executor = Executor::open(&path)?;
+                let filter = parse_filter_string(filter_str.to_string())?;
+
+                let condition = SelectCondition::Filter(filter);
+                let result = executor.get(&GroupingLabel::from(grouping_arg), &condition)?;
+
+                if result.is_empty() {
+                    println!("Nil");
+                } else {
+                    let output_vec: Vec<String> = result
+                        .into_iter()
+                        .map(|content| content.to_string())
+                        .collect();
+                    let output = output_vec.join("\r\n");
+                    println!("{:?}", output);
+                }
+
+                return Ok(());
+            }
         }
         (Constants::SUBCOMMAND_REVERT_ONE, Some(arg_matches)) => {
             let grouping_arg = arg_matches

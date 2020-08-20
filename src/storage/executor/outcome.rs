@@ -5,7 +5,7 @@ use crate::storage::transaction_manager::TransactionId;
 
 #[derive(Debug)]
 pub enum Outcome {
-    Select(Option<UnitContent>),
+    Select(Vec<UnitContent>),
     InspectOne(Vec<(Command, ChainHeight)>),
     InspectAll(Vec<(Command, ChainHeight)>),
     InsertSuccess,

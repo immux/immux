@@ -63,7 +63,7 @@ fn main() {
         let expected_table: UnitList = table
             .iter()
             .map(|(unit_key, _content)| {
-                return (unit_key.to_owned(), UnitContent::String("".to_string()));
+                return (unit_key.to_owned(), UnitContent::Nil);
             })
             .collect();
         assert!(e2e_verify_correctness(&grouping, &expected_table, &client));

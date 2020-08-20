@@ -1,6 +1,17 @@
 use crate::storage::executor::grouping_label::GroupingLabel;
 use crate::storage::executor::unit_key::UnitKey;
-use crate::utils::varint::varint_encode;
+use crate::utils::varint::{varint_decode, varint_encode, VarIntError};
+
+#[derive(Debug)]
+pub enum KVKeyError {
+    VarIntError(VarIntError),
+}
+
+impl From<VarIntError> for KVKeyError {
+    fn from(err: VarIntError) -> KVKeyError {
+        KVKeyError::VarIntError(err)
+    }
+}
 
 #[derive(Debug, Eq, PartialEq, Hash, Clone)]
 pub struct KVKey(Vec<u8>);
@@ -31,6 +42,14 @@ impl KVKey {
         kvkey_bytes.extend_from_slice(&unit_key_bytes);
 
         KVKey::new(&kvkey_bytes)
+    }
+
+    pub fn parse(data: &[u8]) -> Result<(GroupingLabel, UnitKey), KVKeyError> {
+        let (data_length, offset) = varint_decode(&data)?;
+        let grouping = GroupingLabel::new(&data[offset..offset + data_length as usize]);
+        let remaining_bytes = &data[offset + data_length as usize..];
+        let unit_key = UnitKey::from(remaining_bytes);
+        return Ok((grouping, unit_key));
     }
 }
 

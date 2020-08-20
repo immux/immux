@@ -2,6 +2,7 @@ use std::io::Error;
 use std::num::ParseIntError;
 
 use crate::storage::executor::errors::ExecutorError;
+use crate::storage::executor::filter::FilterError;
 
 #[derive(Debug)]
 pub enum ServerError {
@@ -12,6 +13,7 @@ pub enum ServerError {
     BodyParsingError,
     ParseIntError(ParseIntError),
     HttpResponseError(Error),
+    FilterError(FilterError),
 
     //    unimplemented error
     UnimplementedForGetGrouping,
@@ -26,6 +28,12 @@ impl From<ExecutorError> for ServerError {
 impl From<ParseIntError> for ServerError {
     fn from(err: ParseIntError) -> ServerError {
         ServerError::ParseIntError(err)
+    }
+}
+
+impl From<FilterError> for ServerError {
+    fn from(err: FilterError) -> ServerError {
+        ServerError::FilterError(err)
     }
 }
 

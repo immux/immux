@@ -87,7 +87,7 @@ fn main() {
                 for (unit_key, _content) in table.iter() {
                     let (code, actual_output) = client.get_by_key(&grouping, unit_key).unwrap();
                     assert_eq!(code, 200);
-                    assert!(actual_output.is_empty());
+                    assert_eq!(actual_output, "Nil");
                 }
                 println!("Verifying correctness finished");
             }

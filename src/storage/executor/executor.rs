@@ -2,8 +2,9 @@ use std::convert::TryFrom;
 use std::path::PathBuf;
 
 use crate::storage::chain_height::ChainHeight;
-use crate::storage::executor::command::{Command, CommandError};
+use crate::storage::executor::command::{Command, CommandError, SelectCondition};
 use crate::storage::executor::errors::ExecutorResult;
+use crate::storage::executor::filter::content_satisfied_filter;
 use crate::storage::executor::grouping_label::GroupingLabel;
 use crate::storage::executor::unit_content::UnitContent;
 use crate::storage::executor::unit_key::UnitKey;
@@ -38,16 +39,60 @@ impl Executor {
 
     pub fn get(
         &mut self,
-        grouping: &GroupingLabel,
-        key: &UnitKey,
-        transaction_id: Option<TransactionId>,
-    ) -> ExecutorResult<Option<UnitContent>> {
-        let kv_key = KVKey::from_grouping_and_unit_key(&grouping, &key);
-        match self.store_engine.get(&kv_key, transaction_id)? {
-            None => Ok(None),
-            Some(kv_value) => {
-                let (content, _) = UnitContent::parse(kv_value.as_bytes())?;
-                return Ok(Some(content));
+        target_grouping: &GroupingLabel,
+        condition: &SelectCondition,
+    ) -> ExecutorResult<Vec<UnitContent>> {
+        match condition {
+            SelectCondition::UnconditionalMatch => {
+                let kvs = self.store_engine.get_all_current()?;
+                let result: Vec<UnitContent> = kvs
+                    .iter()
+                    .filter_map(|(key, value)| {
+                        if let Ok((grouping, _)) = KVKey::parse(&key.as_bytes()) {
+                            if &grouping == target_grouping {
+                                match UnitContent::parse(value.as_bytes()) {
+                                    Err(_error) => return None,
+                                    Ok((content, _)) => return Some(content),
+                                }
+                            }
+                        }
+                        return None;
+                    })
+                    .collect();
+                return Ok(result);
+            }
+            SelectCondition::Filter(filter) => {
+                let kvs = self.store_engine.get_all_current()?;
+                let result: Vec<UnitContent> = kvs
+                    .iter()
+                    .filter_map(|(key, value)| {
+                        if let Ok((grouping, _unit_key)) = KVKey::parse(&key.as_bytes()) {
+                            if &grouping == target_grouping {
+                                match UnitContent::parse(value.as_bytes()) {
+                                    Err(_error) => return None,
+                                    Ok((content, _)) => {
+                                        if content_satisfied_filter(&content, &filter) {
+                                            return Some(content);
+                                        }
+                                        return None;
+                                    }
+                                }
+                            }
+                        }
+                        return None;
+                    })
+                    .collect();
+                return Ok(result);
+            }
+            SelectCondition::Key(key, transaction_id) => {
+                let kv_key = KVKey::from_grouping_and_unit_key(&target_grouping, &key);
+                match self.store_engine.get(&kv_key, *transaction_id)? {
+                    None => Ok(vec![]),
+                    Some(kv_value) => {
+                        let (content, _) = UnitContent::parse(kv_value.as_bytes())?;
+                        return Ok(vec![content]);
+                    }
+                }
             }
         }
     }
