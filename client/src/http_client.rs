@@ -1,4 +1,4 @@
-use crate::errors::{ClientResult, ImmuxDBClientError};
+use crate::errors::{HttpClientResult, ImmuxDBHttpClientError};
 
 use immuxsys::constants as Constants;
 use immuxsys::storage::chain_height::ChainHeight;
@@ -11,22 +11,20 @@ use immuxsys::storage::transaction_manager::TransactionId;
 use reqwest::Client;
 use reqwest::Url;
 
-pub struct ImmuxDBClient {
+pub struct ImmuxDBHttpClient {
     host: String,
     client: Client,
 }
 
-impl ImmuxDBClient {
-    pub fn new(host: &str) -> Result<ImmuxDBClient, ImmuxDBClientError> {
-        return Ok(ImmuxDBClient {
+impl ImmuxDBHttpClient {
+    pub fn new(host: &str) -> Result<ImmuxDBHttpClient, ImmuxDBHttpClientError> {
+        return Ok(ImmuxDBHttpClient {
             host: host.to_string(),
             client: reqwest::Client::new(),
         });
     }
-}
 
-impl ImmuxDBClient {
-    pub fn get_by_key(&self, grouping: &GroupingLabel, unit_key: &UnitKey) -> ClientResult {
+    pub fn get_by_key(&self, grouping: &GroupingLabel, unit_key: &UnitKey) -> HttpClientResult {
         let url = format!(
             "http://{}/{}/{}",
             &self.host,
@@ -38,11 +36,11 @@ impl ImmuxDBClient {
 
         match response.text() {
             Ok(text) => Ok((status_code, text)),
-            Err(error) => Err(ImmuxDBClientError::Reqwest(error.into())),
+            Err(error) => Err(ImmuxDBHttpClientError::Reqwest(error.into())),
         }
     }
 
-    pub fn get_by_filter(&self, grouping: &GroupingLabel, filter: &Filter) -> ClientResult {
+    pub fn get_by_filter(&self, grouping: &GroupingLabel, filter: &Filter) -> HttpClientResult {
         let url_str = format!("http://{}/{}", &self.host, grouping.to_string());
 
         let url = Url::parse_with_params(&url_str, &[("filter", format!("{}", filter))]).unwrap();
@@ -52,7 +50,7 @@ impl ImmuxDBClient {
 
         match response.text() {
             Ok(text) => Ok((status_code, text)),
-            Err(error) => Err(ImmuxDBClientError::Reqwest(error.into())),
+            Err(error) => Err(ImmuxDBHttpClientError::Reqwest(error.into())),
         }
     }
 
@@ -61,7 +59,7 @@ impl ImmuxDBClient {
         grouping: &GroupingLabel,
         unit_key: &UnitKey,
         transaction_id: &TransactionId,
-    ) -> ClientResult {
+    ) -> HttpClientResult {
         let url = format!(
             "http://{}/{}/{}/{}/{}",
             &self.host,
@@ -76,11 +74,11 @@ impl ImmuxDBClient {
 
         match response.text() {
             Ok(text) => Ok((status_code, text)),
-            Err(error) => Err(ImmuxDBClientError::Reqwest(error.into())),
+            Err(error) => Err(ImmuxDBHttpClientError::Reqwest(error.into())),
         }
     }
 
-    pub fn inspect_one(&self, grouping: &GroupingLabel, unit_key: &UnitKey) -> ClientResult {
+    pub fn inspect_one(&self, grouping: &GroupingLabel, unit_key: &UnitKey) -> HttpClientResult {
         let url = format!(
             "http://{}/{}/{}/{}",
             &self.host,
@@ -94,11 +92,11 @@ impl ImmuxDBClient {
 
         match response.text() {
             Ok(text) => Ok((status_code, text)),
-            Err(error) => Err(ImmuxDBClientError::Reqwest(error.into())),
+            Err(error) => Err(ImmuxDBHttpClientError::Reqwest(error.into())),
         }
     }
 
-    pub fn inspect_all(&self) -> ClientResult {
+    pub fn inspect_all(&self) -> HttpClientResult {
         let url = format!("http://{}/{}", &self.host, Constants::URL_JOURNAL_KEY_WORD,);
 
         let mut response = self.client.get(&url).send()?;
@@ -106,12 +104,12 @@ impl ImmuxDBClient {
 
         match response.text() {
             Ok(text) => Ok((status_code, text)),
-            Err(error) => Err(ImmuxDBClientError::Reqwest(error.into())),
+            Err(error) => Err(ImmuxDBHttpClientError::Reqwest(error.into())),
         }
     }
 
-    pub fn get_by_grouping(&self, _grouping: &GroupingLabel) -> ClientResult {
-        return Err(ImmuxDBClientError::Unimplemented);
+    pub fn get_by_grouping(&self, _grouping: &GroupingLabel) -> HttpClientResult {
+        return Err(ImmuxDBHttpClientError::Unimplemented);
     }
 
     pub fn set_unit(
@@ -119,7 +117,7 @@ impl ImmuxDBClient {
         grouping: &GroupingLabel,
         unit_key: &UnitKey,
         unit_content: &UnitContent,
-    ) -> ClientResult {
+    ) -> HttpClientResult {
         let mut response = self
             .client
             .put(&format!(
@@ -134,7 +132,7 @@ impl ImmuxDBClient {
 
         match response.text() {
             Ok(text) => Ok((status_code, text)),
-            Err(error) => Err(ImmuxDBClientError::Reqwest(error.into())),
+            Err(error) => Err(ImmuxDBHttpClientError::Reqwest(error.into())),
         }
     }
 
@@ -144,7 +142,7 @@ impl ImmuxDBClient {
         unit_key: &UnitKey,
         unit_content: &UnitContent,
         transaction_id: &TransactionId,
-    ) -> ClientResult {
+    ) -> HttpClientResult {
         let mut response = self
             .client
             .put(&format!(
@@ -161,7 +159,7 @@ impl ImmuxDBClient {
 
         match response.text() {
             Ok(text) => Ok((status_code, text)),
-            Err(error) => Err(ImmuxDBClientError::Reqwest(error.into())),
+            Err(error) => Err(ImmuxDBHttpClientError::Reqwest(error.into())),
         }
     }
 
@@ -170,7 +168,7 @@ impl ImmuxDBClient {
         grouping: &GroupingLabel,
         unit_key: &UnitKey,
         height: &ChainHeight,
-    ) -> ClientResult {
+    ) -> HttpClientResult {
         let mut response = self
             .client
             .put(&format!(
@@ -186,7 +184,7 @@ impl ImmuxDBClient {
 
         match response.text() {
             Ok(text) => Ok((status_code, text)),
-            Err(error) => Err(ImmuxDBClientError::Reqwest(error.into())),
+            Err(error) => Err(ImmuxDBHttpClientError::Reqwest(error.into())),
         }
     }
 
@@ -196,7 +194,7 @@ impl ImmuxDBClient {
         unit_key: &UnitKey,
         height: &ChainHeight,
         transaction_id: &TransactionId,
-    ) -> ClientResult {
+    ) -> HttpClientResult {
         let mut response = self
             .client
             .put(&format!(
@@ -214,11 +212,11 @@ impl ImmuxDBClient {
 
         match response.text() {
             Ok(text) => Ok((status_code, text)),
-            Err(error) => Err(ImmuxDBClientError::Reqwest(error.into())),
+            Err(error) => Err(ImmuxDBHttpClientError::Reqwest(error.into())),
         }
     }
 
-    pub fn revert_all(&self, height: &ChainHeight) -> ClientResult {
+    pub fn revert_all(&self, height: &ChainHeight) -> HttpClientResult {
         let mut response = self
             .client
             .put(&format!(
@@ -232,11 +230,11 @@ impl ImmuxDBClient {
 
         match response.text() {
             Ok(text) => Ok((status_code, text)),
-            Err(error) => Err(ImmuxDBClientError::Reqwest(error.into())),
+            Err(error) => Err(ImmuxDBHttpClientError::Reqwest(error.into())),
         }
     }
 
-    pub fn remove_one(&self, grouping: &GroupingLabel, unit_key: &UnitKey) -> ClientResult {
+    pub fn remove_one(&self, grouping: &GroupingLabel, unit_key: &UnitKey) -> HttpClientResult {
         let mut response = self
             .client
             .delete(&format!(
@@ -250,7 +248,7 @@ impl ImmuxDBClient {
 
         match response.text() {
             Ok(text) => Ok((status_code, text)),
-            Err(error) => Err(ImmuxDBClientError::Reqwest(error.into())),
+            Err(error) => Err(ImmuxDBHttpClientError::Reqwest(error.into())),
         }
     }
 
@@ -259,7 +257,7 @@ impl ImmuxDBClient {
         transaction_id: &TransactionId,
         grouping: &GroupingLabel,
         unit_key: &UnitKey,
-    ) -> ClientResult {
+    ) -> HttpClientResult {
         let mut response = self
             .client
             .delete(&format!(
@@ -275,11 +273,11 @@ impl ImmuxDBClient {
 
         match response.text() {
             Ok(text) => Ok((status_code, text)),
-            Err(error) => Err(ImmuxDBClientError::Reqwest(error.into())),
+            Err(error) => Err(ImmuxDBHttpClientError::Reqwest(error.into())),
         }
     }
 
-    pub fn remove_all(&self) -> ClientResult {
+    pub fn remove_all(&self) -> HttpClientResult {
         let mut response = self
             .client
             .delete(&format!("http://{}/", &self.host))
@@ -288,11 +286,11 @@ impl ImmuxDBClient {
 
         match response.text() {
             Ok(text) => Ok((status_code, text)),
-            Err(error) => Err(ImmuxDBClientError::Reqwest(error.into())),
+            Err(error) => Err(ImmuxDBHttpClientError::Reqwest(error.into())),
         }
     }
 
-    pub fn create_transaction(&self) -> ClientResult {
+    pub fn create_transaction(&self) -> HttpClientResult {
         let mut response = self
             .client
             .post(&format!(
@@ -305,11 +303,11 @@ impl ImmuxDBClient {
 
         match response.text() {
             Ok(text) => Ok((status_code, text)),
-            Err(error) => Err(ImmuxDBClientError::Reqwest(error.into())),
+            Err(error) => Err(ImmuxDBHttpClientError::Reqwest(error.into())),
         }
     }
 
-    pub fn commit_transaction(&self, transaction_id: &TransactionId) -> ClientResult {
+    pub fn commit_transaction(&self, transaction_id: &TransactionId) -> HttpClientResult {
         let mut response = self
             .client
             .post(&format!(
@@ -324,11 +322,11 @@ impl ImmuxDBClient {
 
         match response.text() {
             Ok(text) => Ok((status_code, text)),
-            Err(error) => Err(ImmuxDBClientError::Reqwest(error.into())),
+            Err(error) => Err(ImmuxDBHttpClientError::Reqwest(error.into())),
         }
     }
 
-    pub fn abort_transaction(&self, transaction_id: &TransactionId) -> ClientResult {
+    pub fn abort_transaction(&self, transaction_id: &TransactionId) -> HttpClientResult {
         let mut response = self
             .client
             .post(&format!(
@@ -343,7 +341,7 @@ impl ImmuxDBClient {
 
         match response.text() {
             Ok(text) => Ok((status_code, text)),
-            Err(error) => Err(ImmuxDBClientError::Reqwest(error.into())),
+            Err(error) => Err(ImmuxDBHttpClientError::Reqwest(error.into())),
         }
     }
 }

@@ -1,8 +1,10 @@
 use std::fmt;
+use std::string::FromUtf8Error;
 
 use crate::constants as Constants;
 use crate::storage::executor::unit_content::UnitContent;
 
+use crate::utils::varint::{varint_decode, varint_encode, VarIntError};
 use regex::Error as RegexError;
 use regex::Regex;
 
@@ -10,6 +12,8 @@ use regex::Regex;
 pub enum FilterError {
     RegexError(RegexError),
     ParseFilterError,
+    VarIntError(VarIntError),
+    FromUtf8Error(FromUtf8Error),
 }
 
 impl From<RegexError> for FilterError {
@@ -18,9 +22,21 @@ impl From<RegexError> for FilterError {
     }
 }
 
+impl From<VarIntError> for FilterError {
+    fn from(err: VarIntError) -> FilterError {
+        FilterError::VarIntError(err)
+    }
+}
+
+impl From<FromUtf8Error> for FilterError {
+    fn from(err: FromUtf8Error) -> FilterError {
+        FilterError::FromUtf8Error(err)
+    }
+}
+
 pub type FilterResult<T> = Result<T, FilterError>;
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum FilterOperator {
     Equal,
     Greater,
@@ -44,13 +60,13 @@ impl fmt::Display for FilterOperator {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct FilterOperands {
     pub map_key: String,
     pub unit_content: UnitContent,
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct FilterUnit {
     pub operands: FilterOperands,
     pub operator: FilterOperator,
@@ -69,7 +85,7 @@ impl fmt::Display for FilterUnit {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum LogicalOperator {
     Or,
     And,
@@ -85,7 +101,7 @@ impl fmt::Display for LogicalOperator {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct Filter {
     pub filter_units: Vec<FilterUnit>,
     pub logical_operators: Vec<LogicalOperator>,
@@ -113,6 +129,29 @@ impl fmt::Display for Filter {
         }
 
         write!(f, "{}", result)
+    }
+}
+
+impl Filter {
+    pub fn marshal(&self) -> Vec<u8> {
+        let mut result = vec![];
+        let filter_str = self.to_string();
+        let filter_str_length = filter_str.as_bytes().len() as u64;
+        let length_bytes = varint_encode(filter_str_length);
+        result.extend_from_slice(&length_bytes);
+        result.extend_from_slice(filter_str.as_bytes());
+        return result;
+    }
+
+    pub fn parse(data: &[u8]) -> Result<(Filter, usize), FilterError> {
+        let mut position = 0;
+        let (data_length, offset) = varint_decode(&data)?;
+        position += offset;
+        let filter_str =
+            String::from_utf8(data[position..position + data_length as usize].to_vec())?;
+        position += data_length as usize;
+        let filter = parse_filter_string(filter_str)?;
+        return Ok((filter, position));
     }
 }
 
@@ -165,11 +204,7 @@ pub fn parse_filter_string(filter_string: String) -> FilterResult<Filter> {
             let left_operand = &operands[0];
             let right_operand = &operands[1];
 
-            let unit_content = if let Ok(number) = right_operand.parse::<f64>() {
-                UnitContent::Float64(number)
-            } else {
-                UnitContent::String(right_operand.to_owned())
-            };
+            let unit_content = UnitContent::from(right_operand.as_str());
 
             let filter_operands = FilterOperands {
                 map_key: left_operand.to_owned(),

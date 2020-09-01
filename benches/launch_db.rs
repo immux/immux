@@ -4,10 +4,10 @@ use std::thread;
 use immuxsys::constants as Constants;
 use immuxsys::storage::executor::executor::Executor;
 use immuxsys::storage::executor::grouping_label::GroupingLabel;
-use immuxsys_client::client::ImmuxDBClient;
+use immuxsys_client::http_client::ImmuxDBHttpClient;
 use immuxsys_dev_utils::data_models::census90::CensusEntry;
 use immuxsys_dev_utils::dev_utils::{
-    csv_to_json_table_with_size, launch_db, measure_single_operation, notified_sleep,
+    csv_to_json_table_with_size, launch_db_server, measure_single_operation, notified_sleep,
 };
 
 #[derive(Clone)]
@@ -39,7 +39,7 @@ fn main() {
         let project_name = format!("{}_{}", bench_name, index);
         let bench_spec = bench_spec.clone();
         thread::spawn(move || {
-            launch_db(&project_name, bench_spec.port).unwrap();
+            launch_db_server(&project_name, bench_spec.port).unwrap();
         });
     }
 
@@ -61,7 +61,7 @@ fn main() {
             .unwrap();
 
             let host = &format!("{}:{}", Constants::SERVER_END_POINT, bench_spec.port);
-            let client = ImmuxDBClient::new(host).unwrap();
+            let client = ImmuxDBHttpClient::new(host).unwrap();
 
             for (unit_key, content) in table.iter() {
                 client.set_unit(&grouping, unit_key, content).unwrap();

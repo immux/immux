@@ -3,10 +3,10 @@ use std::thread;
 
 use immuxsys::constants as Constants;
 use immuxsys::storage::executor::grouping_label::GroupingLabel;
-use immuxsys_client::client::ImmuxDBClient;
+use immuxsys_client::http_client::ImmuxDBHttpClient;
 use immuxsys_dev_utils::data_models::covid::Covid;
 use immuxsys_dev_utils::dev_utils::{
-    csv_to_json_table, e2e_verify_correctness, launch_db, measure_iteration, notified_sleep,
+    csv_to_json_table, e2e_verify_correctness, launch_db_server, measure_iteration, notified_sleep,
     read_usize_from_arguments, UnitList,
 };
 
@@ -22,7 +22,7 @@ fn main() {
         bench_name, row_limit, report_period
     );
 
-    thread::spawn(move || launch_db("bench_covid", port));
+    thread::spawn(move || launch_db_server("bench_covid", port));
     notified_sleep(5);
 
     let paths = vec!["covid"];
@@ -51,7 +51,7 @@ fn main() {
         .collect();
 
     let host = &format!("{}:{}", Constants::SERVER_END_POINT, port);
-    let client = ImmuxDBClient::new(host).unwrap();
+    let client = ImmuxDBHttpClient::new(host).unwrap();
 
     for (table_name, table) in dataset.iter() {
         println!(

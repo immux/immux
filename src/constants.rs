@@ -53,7 +53,8 @@ pub const MAX_KEY_LENGTH: usize = 8 * 1024;
 pub const MAX_TRANSACTION_ID: u64 = u64::MAX;
 
 pub const SERVER_END_POINT: &str = "127.0.0.1";
-pub const SERVER_DEFAULT_PORT: u16 = 6324;
+pub const HTTP_SERVER_DEFAULT_PORT: u16 = 6324;
+pub const TCP_SERVER_DEFAULT_PORT: u16 = 5213;
 pub const HEIGHT: &str = "height";
 pub const REVERT_ALL_KEYWORD: &str = "revert_all";
 pub const COMMIT_TRANSACTION_KEY_WORD: &str = "commit";

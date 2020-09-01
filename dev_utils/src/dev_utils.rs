@@ -3,17 +3,18 @@ use std::fs::read;
 use std::fs::{create_dir_all, remove_dir_all};
 use std::num::ParseIntError;
 use std::path::PathBuf;
+use std::sync::Arc;
 use std::time::Duration;
 use std::time::Instant;
 use std::{io, thread};
 
 use immuxsys::server::server::run_server;
-use immuxsys::storage::executor::executor::Executor;
 use immuxsys::storage::executor::grouping_label::GroupingLabel;
 use immuxsys::storage::executor::unit_content::UnitContent;
 use immuxsys::storage::executor::unit_key::UnitKey;
-use immuxsys_client::client::ImmuxDBClient;
+use immuxsys_client::http_client::ImmuxDBHttpClient;
 
+use immuxsys::server::errors::{ServerError, ServerResult};
 pub use serde::de::{Deserialize, DeserializeOwned};
 pub use serde::ser::Serialize;
 
@@ -27,20 +28,24 @@ pub fn reset_db_dir(path: &str) -> io::Result<()> {
     return Ok(());
 }
 
-pub fn launch_db(project_name: &str, port: u16) -> io::Result<()> {
+pub fn launch_db_server(
+    project_name: &str,
+    http_port: Option<u16>,
+    tcp_port: Option<u16>,
+) -> ServerResult<()> {
     let data_root = format!("/tmp/{}/", project_name);
     reset_db_dir(&data_root)?;
 
-    let path = PathBuf::from(data_root);
-    match Executor::open(&path) {
-        Ok(executor) => match run_server(executor, port) {
-            Ok(_) => println!("Database started"),
-            Err(error) => {
-                println!("Cannot start database: {:?}", error);
-            }
-        },
-        Err(error) => println!("Cannot start database: {:?}", error),
+    let path = Arc::new(PathBuf::from(data_root));
+    let handlers = run_server(path, http_port, tcp_port);
+
+    for handler in handlers {
+        match handler.join() {
+            Ok(server_result) => return server_result,
+            Err(_error) => return Err(ServerError::ThreadError),
+        }
     }
+
     Ok(())
 }
 
@@ -193,7 +198,7 @@ where
 pub fn e2e_verify_correctness(
     grouping: &GroupingLabel,
     table: &[(UnitKey, UnitContent)],
-    client: &ImmuxDBClient,
+    client: &ImmuxDBHttpClient,
 ) -> bool {
     for (unit_key, content) in table {
         let (code, actual_output) = client.get_by_key(&grouping, &unit_key).unwrap();

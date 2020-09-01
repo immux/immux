@@ -1,18 +1,24 @@
-use std::borrow::BorrowMut;
 use std::collections::HashMap;
+use std::io::{Read, Write};
+use std::net::TcpListener;
+use std::path::PathBuf;
+use std::sync::mpsc::{Receiver, Sender};
+use std::sync::{mpsc, Arc};
+use std::thread;
 
 use crate::constants as Constants;
 use crate::server::errors::{ServerError, ServerResult};
 use crate::storage::chain_height::ChainHeight;
 use crate::storage::executor::command::{Command, SelectCondition};
 use crate::storage::executor::executor::Executor;
+use crate::storage::executor::filter::parse_filter_string;
 use crate::storage::executor::grouping_label::GroupingLabel;
 use crate::storage::executor::outcome::Outcome;
 use crate::storage::executor::unit_content::UnitContent;
 use crate::storage::executor::unit_key::UnitKey;
 use crate::storage::transaction_manager::TransactionId;
 
-use crate::storage::executor::filter::parse_filter_string;
+use std::thread::JoinHandle;
 use tiny_http::{Method, Request, Response, Server};
 use url::Url;
 
@@ -39,126 +45,216 @@ impl UrlInformation {
     }
 }
 
-pub fn run_server(mut executor: Executor, port: u16) -> ServerResult<()> {
-    let address = format!("{}:{}", Constants::SERVER_END_POINT, port);
-    match Server::http(address) {
-        Ok(server) => {
-            for mut request in server.incoming_requests() {
-                let (status, body): (u16, String) =
-                    match handle_request(request.borrow_mut(), &mut executor) {
-                        Err(error) => (500, format!("Server error {:?}", error)),
-                        Ok(outcome) => match outcome {
-                            Outcome::Select(outcome) => {
-                                let outcome_string_vec: Vec<String> = outcome
-                                    .iter()
-                                    .map(|unit_content| unit_content.to_string())
-                                    .collect();
-                                let body = outcome_string_vec.join("\r\n");
-                                (200, body)
-                            }
-                            Outcome::InspectOne(outcome) => {
-                                let mut body = String::new();
-                                for (instruction, height) in outcome {
-                                    body += &instruction.to_string();
-                                    body += "\t";
-                                    body += &format!("height: {:?}", height);
-                                    body += "\r\n";
-                                }
-                                (200, body)
-                            }
-                            Outcome::InspectAll(outcome) => {
-                                let mut body = String::new();
-                                for (instruction, height) in outcome {
-                                    body += &instruction.to_string();
-                                    body += "\t";
-                                    body += &format!("height: {:?}", height);
-                                    body += "\r\n";
-                                }
-                                (200, body)
-                            }
-                            Outcome::CreateTransaction(transaction_id) => {
-                                let body = transaction_id.as_u64().to_string();
-                                (200, body)
-                            }
-                            _ => (200, String::from("Unspecified outcome")),
-                        },
-                    };
+fn spawn_db_thread(
+    path: Arc<PathBuf>,
+    http_db_receiver: Receiver<Command>,
+    db_http_sender: Sender<Outcome>,
+    tcp_db_receiver: Receiver<Command>,
+    db_tcp_sender: Sender<Outcome>,
+) -> JoinHandle<ServerResult<()>> {
+    thread::spawn(move || -> ServerResult<()> {
+        let mut executor = Executor::open(&path)?;
 
-                let response = if body.is_empty() {
-                    Response::from_string(UnitContent::Nil.to_string()).with_status_code(status)
-                } else {
-                    Response::from_string(body).with_status_code(status)
-                };
+        loop {
+            //            let received_command = http_db_receiver.recv()?;
+            let received_command = tcp_db_receiver.recv()?;
 
-                match request.respond(response) {
-                    Ok(_) => {}
-                    Err(error) => return Err(ServerError::HttpResponseError(error)),
-                }
-            }
+            let outcome = handle_command(received_command, &mut executor)?;
+
+            //            db_http_sender.send(outcome)?;
+            db_tcp_sender.send(outcome)?;
         }
-        Err(_error) => return Err(ServerError::TinyHTTPError),
-    }
-    return Ok(());
+    })
 }
 
-fn handle_request(request: &mut Request, executor: &mut Executor) -> ServerResult<Outcome> {
-    let instruction = parse_http_request(request)?;
+pub fn run_server(
+    path: Arc<PathBuf>,
+    http_port: Option<u16>,
+    tcp_port: Option<u16>,
+) -> Vec<JoinHandle<ServerResult<()>>> {
+    let (http_db_sender, http_db_receiver) = mpsc::channel::<Command>();
+    let (db_http_sender, db_http_receiver) = mpsc::channel::<Outcome>();
 
-    match instruction {
+    let (tcp_db_sender, tcp_db_receiver) = mpsc::channel::<Command>();
+    let (db_tcp_sender, db_tcp_receiver) = mpsc::channel::<Outcome>();
+
+    let mut handlers = vec![];
+
+    let db_handler = spawn_db_thread(
+        path,
+        http_db_receiver,
+        db_http_sender,
+        tcp_db_receiver,
+        db_tcp_sender,
+    );
+    handlers.push(db_handler);
+
+    if let Some(tcp_port) = tcp_port {
+        let tcp_handler = run_tcp_server(tcp_port, tcp_db_sender, db_tcp_receiver);
+        handlers.push(tcp_handler);
+    }
+
+    if let Some(http_port) = http_port {
+        let http_handler = run_http_server(http_port, http_db_sender, db_http_receiver);
+        handlers.push(http_handler);
+    }
+
+    return handlers;
+}
+
+pub fn run_http_server(
+    http_port: u16,
+    http_db_sender: Sender<Command>,
+    db_http_receiver: Receiver<Outcome>,
+) -> JoinHandle<ServerResult<()>> {
+    let http_address = format!("{}:{}", Constants::SERVER_END_POINT, http_port);
+
+    thread::spawn(move || -> ServerResult<()> {
+        match Server::http(http_address) {
+            Ok(server) => {
+                for mut request in server.incoming_requests() {
+                    let command = parse_http_request(&mut request)?;
+
+                    http_db_sender.send(command)?;
+
+                    let outcome = db_http_receiver.recv()?;
+
+                    let (status, body): (u16, String) = match outcome {
+                        Outcome::Select(outcome) => {
+                            let outcome_string_vec: Vec<String> = outcome
+                                .iter()
+                                .map(|unit_content| unit_content.to_string())
+                                .collect();
+                            let body = outcome_string_vec.join("\r\n");
+                            (200, body)
+                        }
+                        Outcome::InspectOne(outcome) => {
+                            let mut body = String::new();
+                            for (instruction, height) in outcome {
+                                body += &instruction.to_string();
+                                body += "\t";
+                                body += &format!("height: {:?}", height);
+                                body += "\r\n";
+                            }
+                            (200, body)
+                        }
+                        Outcome::InspectAll(outcome) => {
+                            let mut body = String::new();
+                            for (instruction, height) in outcome {
+                                body += &instruction.to_string();
+                                body += "\t";
+                                body += &format!("height: {:?}", height);
+                                body += "\r\n";
+                            }
+                            (200, body)
+                        }
+                        Outcome::CreateTransaction(transaction_id) => {
+                            let body = transaction_id.as_u64().to_string();
+                            (200, body)
+                        }
+                        _ => (200, String::from("Unspecified outcome")),
+                    };
+
+                    let response = if body.is_empty() {
+                        Response::from_string(UnitContent::Nil.to_string()).with_status_code(status)
+                    } else {
+                        Response::from_string(body).with_status_code(status)
+                    };
+
+                    match request.respond(response) {
+                        Ok(_) => {}
+                        Err(error) => return Err(ServerError::HttpResponseError(error)),
+                    }
+                }
+            }
+            Err(_error) => return Err(ServerError::TinyHTTPError),
+        }
+        return Ok(());
+    })
+}
+
+fn run_tcp_server(
+    tcp_port: u16,
+    tcp_db_sender: Sender<Command>,
+    db_tcp_receiver: Receiver<Outcome>,
+) -> JoinHandle<ServerResult<()>> {
+    let tcp_address = format!("{}:{}", Constants::SERVER_END_POINT, tcp_port);
+    let listener = TcpListener::bind(tcp_address).unwrap();
+
+    thread::spawn(move || -> ServerResult<()> {
+        for stream in listener.incoming() {
+            let mut stream = stream?;
+
+            let mut buffer = [0; 1024 * 1024];
+            stream.read(&mut buffer)?;
+            let (command, _) = Command::parse(&buffer)?;
+            tcp_db_sender.send(command)?;
+
+            let outcome = db_tcp_receiver.recv()?;
+            let outcome_bytes = outcome.marshal();
+            stream.write(&outcome_bytes)?;
+            stream.flush()?;
+        }
+        return Ok(());
+    })
+}
+
+fn handle_command(command: Command, executor: &mut Executor) -> ServerResult<Outcome> {
+    match command {
         Command::Select {
             grouping,
             condition,
         } => {
-            let content_vec = executor.get(&grouping, &condition)?;
-            return Ok(Outcome::Select(content_vec));
+            let outcome = executor.get(&grouping, &condition)?;
+            return Ok(outcome);
         }
         Command::Insert {
             grouping,
             key,
             content,
         } => {
-            executor.set(&grouping, &key, &content, None)?;
-            return Ok(Outcome::InsertSuccess);
+            let outcome = executor.set(&grouping, &key, &content, None)?;
+            return Ok(outcome);
         }
         Command::RemoveOne { grouping, key } => {
-            executor.remove_one(&grouping, &key, None)?;
-            return Ok(Outcome::RemoveOneSuccess);
+            let outcome = executor.remove_one(&grouping, &key, None)?;
+            return Ok(outcome);
         }
         Command::RemoveAll => {
-            executor.remove_all()?;
-            return Ok(Outcome::RemoveAllSuccess);
+            let outcome = executor.remove_all()?;
+            return Ok(outcome);
         }
         Command::RevertOne {
             grouping,
             key,
             height,
         } => {
-            executor.revert_one(&grouping, &key, &height, None)?;
-            return Ok(Outcome::RevertOneSuccess);
+            let outcome = executor.revert_one(&grouping, &key, &height, None)?;
+            return Ok(outcome);
         }
         Command::RevertAll { height } => {
-            executor.revert_all(&height)?;
-            return Ok(Outcome::RevertAllSuccess);
+            let outcome = executor.revert_all(&height)?;
+            return Ok(outcome);
         }
         Command::InspectOne { grouping, key } => {
-            let result = executor.inspect_one(&grouping, &key)?;
-            return Ok(Outcome::InspectOne(result));
+            let outcome = executor.inspect_one(&grouping, &key)?;
+            return Ok(outcome);
         }
         Command::InspectAll => {
-            let result = executor.inspect_all()?;
-            return Ok(Outcome::InspectAll(result));
+            let outcome = executor.inspect_all()?;
+            return Ok(outcome);
         }
         Command::CreateTransaction => {
-            let transaction_id = executor.start_transaction()?;
-            return Ok(Outcome::CreateTransaction(transaction_id));
+            let outcome = executor.start_transaction()?;
+            return Ok(outcome);
         }
         Command::TransactionCommit { transaction_id } => {
-            executor.commit_transaction(transaction_id)?;
-            return Ok(Outcome::TransactionCommitSuccess);
+            let outcome = executor.commit_transaction(transaction_id)?;
+            return Ok(outcome);
         }
         Command::TransactionAbort { transaction_id } => {
-            executor.abort_transaction(transaction_id)?;
-            return Ok(Outcome::TransactionAbortSuccess);
+            let outcome = executor.abort_transaction(transaction_id)?;
+            return Ok(outcome);
         }
         Command::TransactionalInsert {
             grouping,
@@ -166,16 +262,16 @@ fn handle_request(request: &mut Request, executor: &mut Executor) -> ServerResul
             content,
             transaction_id,
         } => {
-            executor.set(&grouping, &key, &content, Some(transaction_id))?;
-            return Ok(Outcome::TransactionalInsertSuccess);
+            let outcome = executor.set(&grouping, &key, &content, Some(transaction_id))?;
+            return Ok(outcome);
         }
         Command::TransactionalRemoveOne {
             grouping,
             key,
             transaction_id,
         } => {
-            executor.remove_one(&grouping, &key, Some(transaction_id))?;
-            return Ok(Outcome::TransactionalRemoveOneSuccess);
+            let outcome = executor.remove_one(&grouping, &key, Some(transaction_id))?;
+            return Ok(outcome);
         }
         Command::TransactionalRevertOne {
             grouping,
@@ -183,8 +279,8 @@ fn handle_request(request: &mut Request, executor: &mut Executor) -> ServerResul
             height,
             transaction_id,
         } => {
-            executor.revert_one(&grouping, &key, &height, Some(transaction_id))?;
-            return Ok(Outcome::TransactionalRevertOneSuccess);
+            let outcome = executor.revert_one(&grouping, &key, &height, Some(transaction_id))?;
+            return Ok(outcome);
         }
     }
 }
