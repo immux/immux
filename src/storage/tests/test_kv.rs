@@ -12,6 +12,7 @@ mod kv_tests {
         Filter, FilterOperands, FilterOperator, FilterUnit, LogicalOperator,
     };
     use immuxsys::storage::executor::grouping_label::GroupingLabel;
+    use immuxsys::storage::executor::outcome::Outcome;
     use immuxsys::storage::executor::unit_content::UnitContent;
     use immuxsys::storage::executor::unit_key::UnitKey;
     use immuxsys::storage::kv::{get_log_file_dir, LogKeyValueStore};
@@ -71,7 +72,6 @@ mod kv_tests {
             LogicalOperator::And,
             LogicalOperator::Or,
             LogicalOperator::Or,
-            LogicalOperator::And,
         ];
 
         filter_units.extend(filter_units_vec);
@@ -272,23 +272,44 @@ mod kv_tests {
             executor.set(&grouping, &unit_key, &content, None).unwrap();
         }
 
-        let output = executor.get(&grouping, &condition).unwrap();
+        let outcome = executor.get(&grouping, &condition).unwrap();
 
-        for content in output.iter() {
-            assert!(&satisfied_contents.contains(content));
+        match outcome {
+            Outcome::Select(output) => {
+                for content in output.iter() {
+                    assert!(&satisfied_contents.contains(content));
+                }
+
+                for content in satisfied_contents.iter() {
+                    assert!(&output.contains(content));
+                }
+
+                assert_eq!(output.len(), satisfied_contents.len());
+            }
+            _ => panic!("Unexpected outcome"),
         }
+    }
 
-        for content in satisfied_contents.iter() {
-            assert!(&output.contains(content));
-        }
-
-        assert_eq!(output.len(), satisfied_contents.len());
+    #[test]
+    fn test_filter_parse_marshal() {
+        let expected_output = get_filter();
+        let filter_bytes = expected_output.marshal();
+        let (actual_output, _) = Filter::parse(&filter_bytes).unwrap();
+        assert_eq!(expected_output, actual_output);
     }
 
     #[test]
     fn test_filter_to_string() {
         let expected_output = String::from("age>=12&&height<=170||name==\"Bob\"||boy==true");
         let actual_output = get_filter().to_string();
+        assert_eq!(expected_output, actual_output);
+    }
+
+    #[test]
+    fn test_filter_marshal_parse_reversibility() {
+        let expected_output = get_filter();
+        let filter_bytes = expected_output.marshal();
+        let (actual_output, _) = Filter::parse(&filter_bytes).unwrap();
         assert_eq!(expected_output, actual_output);
     }
 

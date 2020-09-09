@@ -6,31 +6,29 @@ mod http_e2e_tests {
 
     use immuxsys::constants as Constants;
     use immuxsys::storage::chain_height::ChainHeight;
-    use immuxsys::storage::executor::filter::{
-        Filter, FilterOperands, FilterOperator, FilterUnit, LogicalOperator,
-    };
     use immuxsys::storage::executor::grouping_label::GroupingLabel;
     use immuxsys::storage::executor::unit_content::UnitContent;
     use immuxsys::storage::executor::unit_key::UnitKey;
     use immuxsys::storage::transaction_manager::TransactionId;
-    use immuxsys_client::client::ImmuxDBClient;
+    use immuxsys_client::http_client::ImmuxDBHttpClient;
     use immuxsys_dev_utils::data_models::{
         berka99::Account, berka99::Card, berka99::Client, berka99::Disp, berka99::District,
         berka99::Loan, berka99::Order, berka99::Trans, business::Business, census90::CensusEntry,
         covid::Covid,
     };
     use immuxsys_dev_utils::dev_utils::{
-        csv_to_json_table, e2e_verify_correctness, launch_db, notified_sleep, UnitList,
+        csv_to_json_table, e2e_verify_correctness, get_filter, get_key_content_pairs,
+        launch_db_server, notified_sleep, UnitList,
     };
 
     #[test]
-    fn e2e_grouping_get_set() {
+    fn http_e2e_grouping_get_set() {
         let port = 20030;
-        thread::spawn(move || launch_db("e2e_grouping_get_set", port));
+        launch_db_server("http_e2e_grouping_get_set", Some(port), None).unwrap();
         notified_sleep(5);
 
         let host = &format!("{}:{}", Constants::SERVER_END_POINT, port);
-        let client = ImmuxDBClient::new(host).unwrap();
+        let client = ImmuxDBHttpClient::new(host).unwrap();
 
         let grouping = GroupingLabel::new("any_grouping".as_bytes());
         let unit_key = UnitKey::new("key".as_bytes());
@@ -53,13 +51,13 @@ mod http_e2e_tests {
     }
 
     #[test]
-    fn e2e_real_data_get_set() {
+    fn http_e2e_real_data_get_set() {
         let port = 20022;
-        thread::spawn(move || launch_db("e2e_real_data_get_set", port));
+        launch_db_server("http_e2e_real_data_get_set", Some(port), None).unwrap();
         notified_sleep(5);
 
         let host = &format!("{}:{}", Constants::SERVER_END_POINT, port);
-        let client = ImmuxDBClient::new(host).unwrap();
+        let client = ImmuxDBHttpClient::new(host).unwrap();
 
         let paths = [
             "dev_utils/src/data_models/data-raw/account.asc",
@@ -130,13 +128,13 @@ mod http_e2e_tests {
     }
 
     #[test]
-    fn e2e_single_unit_get_set() {
+    fn http_e2e_single_unit_get_set() {
         let port = 10083;
-        thread::spawn(move || launch_db("e2e_single_unit_get_set", port));
+        launch_db_server("http_e2e_single_unit_get_set", Some(port), None).unwrap();
         notified_sleep(5);
 
         let host = &format!("{}:{}", Constants::SERVER_END_POINT, port);
-        let client = ImmuxDBClient::new(host).unwrap();
+        let client = ImmuxDBHttpClient::new(host).unwrap();
 
         let grouping = String::from("any_grouping");
         let key_content_pairs = get_key_content_pairs();
@@ -159,13 +157,13 @@ mod http_e2e_tests {
     }
 
     #[test]
-    fn e2e_revert_one() {
+    fn http_e2e_revert_one() {
         let port = 10084;
-        thread::spawn(move || launch_db("e2e_revert_one", port));
+        launch_db_server("http_e2e_revert_one", Some(port), None).unwrap();
         notified_sleep(5);
 
         let host = &format!("{}:{}", Constants::SERVER_END_POINT, port);
-        let client = ImmuxDBClient::new(host).unwrap();
+        let client = ImmuxDBHttpClient::new(host).unwrap();
 
         let grouping = String::from("any_grouping");
         let unit_key = UnitKey::from("key1");
@@ -207,13 +205,13 @@ mod http_e2e_tests {
     }
 
     #[test]
-    fn e2e_remove_one() {
+    fn http_e2e_remove_one() {
         let port = 10085;
-        thread::spawn(move || launch_db("e2e_remove_one", port));
+        launch_db_server("http_e2e_remove_one", Some(port), None).unwrap();
         notified_sleep(5);
 
         let host = &format!("{}:{}", Constants::SERVER_END_POINT, port);
-        let client = ImmuxDBClient::new(host).unwrap();
+        let client = ImmuxDBHttpClient::new(host).unwrap();
         let grouping = String::from("any_grouping");
 
         let key_content_pairs = get_key_content_pairs();
@@ -250,13 +248,13 @@ mod http_e2e_tests {
     }
 
     #[test]
-    fn e2e_revert_all() {
+    fn http_e2e_revert_all() {
         let port = 10086;
-        thread::spawn(move || launch_db("e2e_revert_all", port));
+        launch_db_server("http_e2e_revert_all", Some(port), None).unwrap();
         notified_sleep(5);
 
         let host = &format!("{}:{}", Constants::SERVER_END_POINT, port);
-        let client = ImmuxDBClient::new(host).unwrap();
+        let client = ImmuxDBHttpClient::new(host).unwrap();
         let grouping = String::from("any_grouping");
 
         let key_content_pairs = get_key_content_pairs();
@@ -290,13 +288,13 @@ mod http_e2e_tests {
     }
 
     #[test]
-    fn e2e_remove_all() {
+    fn http_e2e_remove_all() {
         let port = 10087;
-        thread::spawn(move || launch_db("e2e_remove_all", port));
+        launch_db_server("http_e2e_remove_all", Some(port), None).unwrap();
         notified_sleep(5);
 
         let host = &format!("{}:{}", Constants::SERVER_END_POINT, port);
-        let client = ImmuxDBClient::new(host).unwrap();
+        let client = ImmuxDBHttpClient::new(host).unwrap();
         let grouping = String::from("any_grouping");
 
         let key_content_pairs = get_key_content_pairs();
@@ -319,13 +317,13 @@ mod http_e2e_tests {
     }
 
     #[test]
-    fn e2e_atomicity_commit() {
+    fn http_e2e_atomicity_commit() {
         let port = 10088;
-        thread::spawn(move || launch_db("e2e_atomicity_commit", port));
+        launch_db_server("http_e2e_atomicity_commit", Some(port), None).unwrap();
         notified_sleep(5);
 
         let host = &format!("{}:{}", Constants::SERVER_END_POINT, port);
-        let client = ImmuxDBClient::new(host).unwrap();
+        let client = ImmuxDBHttpClient::new(host).unwrap();
         let grouping = String::from("any_grouping");
 
         let (status_code, transaction_id_str) = client.create_transaction().unwrap();
@@ -358,13 +356,13 @@ mod http_e2e_tests {
     }
 
     #[test]
-    fn e2e_atomicity_abort() {
+    fn http_e2e_atomicity_abort() {
         let port = 10089;
-        thread::spawn(move || launch_db("e2e_atomicity_abort", port));
+        launch_db_server("http_e2e_atomicity_abort", Some(port), None).unwrap();
         notified_sleep(5);
 
         let host = &format!("{}:{}", Constants::SERVER_END_POINT, port);
-        let client = ImmuxDBClient::new(host).unwrap();
+        let client = ImmuxDBHttpClient::new(host).unwrap();
         let grouping = String::from("any_grouping");
 
         let (status_code, transaction_id_str) = client.create_transaction().unwrap();
@@ -396,13 +394,13 @@ mod http_e2e_tests {
     }
 
     #[test]
-    fn e2e_set_isolation() {
+    fn http_e2e_set_isolation() {
         let port = 10090;
-        thread::spawn(move || launch_db("e2e_set_isolation", port));
+        launch_db_server("http_e2e_set_isolation", Some(port), None).unwrap();
         notified_sleep(5);
 
         let host = &format!("{}:{}", Constants::SERVER_END_POINT, port);
-        let client = ImmuxDBClient::new(host).unwrap();
+        let client = ImmuxDBHttpClient::new(host).unwrap();
         let grouping = String::from("any_grouping");
 
         let unit_key = UnitKey::from("key1");
@@ -456,13 +454,13 @@ mod http_e2e_tests {
     }
 
     #[test]
-    fn e2e_remove_one_isolation() {
+    fn http_e2e_remove_one_isolation() {
         let port = 10091;
-        thread::spawn(move || launch_db("e2e_remove_one_isolation", port));
+        launch_db_server("http_e2e_remove_one_isolation", Some(port), None).unwrap();
         notified_sleep(5);
 
         let host = &format!("{}:{}", Constants::SERVER_END_POINT, port);
-        let client = ImmuxDBClient::new(host).unwrap();
+        let client = ImmuxDBHttpClient::new(host).unwrap();
         let grouping = String::from("any_grouping");
 
         let key_content_pairs = get_key_content_pairs();
@@ -520,13 +518,13 @@ mod http_e2e_tests {
     }
 
     #[test]
-    fn e2e_revert_one_isolation() {
+    fn http_e2e_revert_one_isolation() {
         let port = 10092;
-        thread::spawn(move || launch_db("e2e_revert_one_isolation", port));
+        launch_db_server("http_e2e_revert_one_isolation", Some(port), None).unwrap();
         notified_sleep(5);
 
         let host = &format!("{}:{}", Constants::SERVER_END_POINT, port);
-        let client = ImmuxDBClient::new(host).unwrap();
+        let client = ImmuxDBHttpClient::new(host).unwrap();
         let grouping = String::from("any_grouping");
 
         let key = UnitKey::from("key1");
@@ -580,13 +578,13 @@ mod http_e2e_tests {
     }
 
     #[test]
-    fn e2e_remove_all_isolation() {
+    fn http_e2e_remove_all_isolation() {
         let port = 10093;
-        thread::spawn(move || launch_db("e2e_remove_all_isolation", port));
+        launch_db_server("http_e2e_remove_all_isolation", Some(port), None).unwrap();
         notified_sleep(5);
 
         let host = &format!("{}:{}", Constants::SERVER_END_POINT, port);
-        let client = ImmuxDBClient::new(host).unwrap();
+        let client = ImmuxDBHttpClient::new(host).unwrap();
         let grouping = String::from("any_grouping");
 
         let key_content_pairs = get_key_content_pairs();
@@ -618,13 +616,13 @@ mod http_e2e_tests {
     }
 
     #[test]
-    fn e2e_revert_all_isolation() {
+    fn http_e2e_revert_all_isolation() {
         let port = 10094;
-        thread::spawn(move || launch_db("e2e_revert_all_isolation", port));
+        launch_db_server("http_e2e_revert_all_isolation", Some(port), None).unwrap();
         notified_sleep(5);
 
         let host = &format!("{}:{}", Constants::SERVER_END_POINT, port);
-        let client = ImmuxDBClient::new(host).unwrap();
+        let client = ImmuxDBHttpClient::new(host).unwrap();
         let grouping = String::from("any_grouping");
 
         let key_content_pairs = get_key_content_pairs();
@@ -671,13 +669,18 @@ mod http_e2e_tests {
     }
 
     #[test]
-    fn e2e_transaction_not_alive_after_revert_all() {
+    fn http_e2e_transaction_not_alive_after_revert_all() {
         let port = 10095;
-        thread::spawn(move || launch_db("e2e_transaction_not_alive_after_revert_all", port));
+        launch_db_server(
+            "http_e2e_transaction_not_alive_after_revert_all",
+            Some(port),
+            None,
+        )
+        .unwrap();
         notified_sleep(5);
 
         let host = &format!("{}:{}", Constants::SERVER_END_POINT, port);
-        let client = ImmuxDBClient::new(host).unwrap();
+        let client = ImmuxDBHttpClient::new(host).unwrap();
         let grouping = String::from("any_grouping");
 
         let key_content_pairs = get_key_content_pairs();
@@ -702,13 +705,18 @@ mod http_e2e_tests {
     }
 
     #[test]
-    fn e2e_unexpected_commit_transaction_id() {
+    fn http_e2e_unexpected_commit_transaction_id() {
         let port = 10096;
-        thread::spawn(move || launch_db("e2e_unexpected_commit_transaction_id", port));
+        launch_db_server(
+            "http_e2e_unexpected_commit_transaction_id",
+            Some(port),
+            None,
+        )
+        .unwrap();
         notified_sleep(5);
 
         let host = &format!("{}:{}", Constants::SERVER_END_POINT, port);
-        let client = ImmuxDBClient::new(host).unwrap();
+        let client = ImmuxDBHttpClient::new(host).unwrap();
 
         let fake_transaction_id = TransactionId::new(100);
 
@@ -717,13 +725,13 @@ mod http_e2e_tests {
     }
 
     #[test]
-    fn e2e_unexpected_abort_transaction_id() {
+    fn http_e2e_unexpected_abort_transaction_id() {
         let port = 10097;
-        thread::spawn(move || launch_db("e2e_unexpected_abort_transaction_id", port));
+        launch_db_server("http_e2e_unexpected_abort_transaction_id", Some(port), None).unwrap();
         notified_sleep(5);
 
         let host = &format!("{}:{}", Constants::SERVER_END_POINT, port);
-        let client = ImmuxDBClient::new(host).unwrap();
+        let client = ImmuxDBHttpClient::new(host).unwrap();
 
         let fake_transaction_id = TransactionId::new(100);
 
@@ -732,13 +740,13 @@ mod http_e2e_tests {
     }
 
     #[test]
-    fn e2e_last_one_commit_wins() {
+    fn http_e2e_last_one_commit_wins() {
         let port = 10098;
-        thread::spawn(move || launch_db("e2e_last_one_commit_wins", port));
+        launch_db_server("http_e2e_last_one_commit_wins", Some(port), None).unwrap();
         notified_sleep(5);
 
         let host = &format!("{}:{}", Constants::SERVER_END_POINT, port);
-        let client = ImmuxDBClient::new(host).unwrap();
+        let client = ImmuxDBHttpClient::new(host).unwrap();
         let grouping = String::from("any_grouping");
 
         let shared_keys = [UnitKey::from("a"), UnitKey::from("b"), UnitKey::from("c")];
@@ -806,13 +814,13 @@ mod http_e2e_tests {
     }
 
     #[test]
-    fn e2e_read_inside_transaction() {
+    fn http_e2e_read_inside_transaction() {
         let port = 10099;
-        thread::spawn(move || launch_db("e2e_read_inside_transaction", port));
+        launch_db_server("http_e2e_read_inside_transaction", Some(port), None).unwrap();
         notified_sleep(5);
 
         let host = &format!("{}:{}", Constants::SERVER_END_POINT, port);
-        let client = ImmuxDBClient::new(host).unwrap();
+        let client = ImmuxDBHttpClient::new(host).unwrap();
         let grouping = String::from("any_grouping");
 
         let key = UnitKey::from("a");
@@ -841,13 +849,13 @@ mod http_e2e_tests {
     }
 
     #[test]
-    fn e2e_dirty_read() {
+    fn http_e2e_dirty_read() {
         let port = 10100;
-        thread::spawn(move || launch_db("e2e_dirty_read", port));
+        launch_db_server("http_e2e_dirty_read", Some(port), None).unwrap();
         notified_sleep(5);
 
         let host = &format!("{}:{}", Constants::SERVER_END_POINT, port);
-        let client = ImmuxDBClient::new(host).unwrap();
+        let client = ImmuxDBHttpClient::new(host).unwrap();
         let grouping = String::from("any_grouping");
 
         let key = UnitKey::from("a");
@@ -911,7 +919,7 @@ mod http_e2e_tests {
     }
 
     #[test]
-    fn e2e_filter_read() {
+    fn http_e2e_filter_read() {
         let expected_satisfied_contents = vec![
             {
                 let mut map = HashMap::new();
@@ -995,11 +1003,11 @@ mod http_e2e_tests {
         contents.extend_from_slice(&unsatisfied_content);
 
         let port = 10011;
-        thread::spawn(move || launch_db("e2e_filter_read", port));
+        thread::spawn(move || launch_db_server("http_e2e_filter_read", Some(port), None));
         notified_sleep(5);
 
         let host = &format!("{}:{}", Constants::SERVER_END_POINT, port);
-        let client = ImmuxDBClient::new(host).unwrap();
+        let client = ImmuxDBHttpClient::new(host).unwrap();
 
         let grouping = GroupingLabel::new("any_grouping".as_bytes());
 
@@ -1035,89 +1043,5 @@ mod http_e2e_tests {
             actual_satisfied_contents.len(),
             expected_satisfied_contents.len()
         );
-    }
-
-    fn get_filter() -> Filter {
-        let mut filter_units = Vec::new();
-        let mut logical_operators = Vec::new();
-
-        let filter_units_vec = vec![
-            FilterUnit {
-                operator: FilterOperator::GreaterOrEqual,
-                operands: FilterOperands {
-                    map_key: String::from("price"),
-                    unit_content: UnitContent::Float64(1200.0),
-                },
-            },
-            FilterUnit {
-                operator: FilterOperator::LessOrEqual,
-                operands: FilterOperands {
-                    map_key: String::from("size"),
-                    unit_content: UnitContent::Float64(13.0),
-                },
-            },
-            FilterUnit {
-                operator: FilterOperator::Equal,
-                operands: FilterOperands {
-                    map_key: String::from("used"),
-                    unit_content: UnitContent::Bool(true),
-                },
-            },
-            FilterUnit {
-                operator: FilterOperator::Equal,
-                operands: FilterOperands {
-                    map_key: String::from("name"),
-                    unit_content: UnitContent::String(String::from("Apple")),
-                },
-            },
-        ];
-
-        let logical_operators_vec = vec![
-            LogicalOperator::And,
-            LogicalOperator::Or,
-            LogicalOperator::Or,
-        ];
-
-        filter_units.extend(filter_units_vec);
-        logical_operators.extend(logical_operators_vec);
-
-        let filter = Filter {
-            filter_units,
-            logical_operators,
-        };
-
-        return filter;
-    }
-
-    fn get_key_content_pairs() -> UnitList {
-        let mut map = HashMap::new();
-        map.insert(
-            String::from("key1"),
-            UnitContent::String(String::from("string in map")),
-        );
-        map.insert(String::from("key2"), UnitContent::Nil);
-        map.insert(String::from("key3"), UnitContent::Bool(false));
-
-        [
-            (
-                UnitKey::from("key1"),
-                UnitContent::String(String::from("this is a string")),
-            ),
-            (UnitKey::from("key2"), UnitContent::Nil),
-            (UnitKey::from("key3"), UnitContent::Float64(12.0)),
-            (UnitKey::from("key4"), UnitContent::Bool(true)),
-            (UnitKey::from("key5"), UnitContent::Bool(false)),
-            (
-                UnitKey::from("key6"),
-                UnitContent::Array(vec![
-                    UnitContent::String(String::from("string in an array")),
-                    UnitContent::Nil,
-                    UnitContent::Bool(true),
-                    UnitContent::Float64(12.0),
-                ]),
-            ),
-            (UnitKey::from("key7"), UnitContent::Map(map)),
-        ]
-        .to_vec()
     }
 }

@@ -1,21 +1,27 @@
+use std::collections::HashMap;
 use std::error::Error;
 use std::fs::read;
 use std::fs::{create_dir_all, remove_dir_all};
 use std::num::ParseIntError;
 use std::path::PathBuf;
+use std::sync::Arc;
 use std::time::Duration;
 use std::time::Instant;
 use std::{io, thread};
 
 use immuxsys::server::server::run_server;
-use immuxsys::storage::executor::executor::Executor;
+use immuxsys::storage::executor::filter::{
+    Filter, FilterOperands, FilterOperator, FilterUnit, LogicalOperator,
+};
 use immuxsys::storage::executor::grouping_label::GroupingLabel;
 use immuxsys::storage::executor::unit_content::UnitContent;
 use immuxsys::storage::executor::unit_key::UnitKey;
-use immuxsys_client::client::ImmuxDBClient;
+use immuxsys_client::http_client::ImmuxDBHttpClient;
 
+use immuxsys::server::errors::ServerResult;
 pub use serde::de::{Deserialize, DeserializeOwned};
 pub use serde::ser::Serialize;
+use std::thread::JoinHandle;
 
 pub type UnitList = Vec<(UnitKey, UnitContent)>;
 
@@ -27,21 +33,18 @@ pub fn reset_db_dir(path: &str) -> io::Result<()> {
     return Ok(());
 }
 
-pub fn launch_db(project_name: &str, port: u16) -> io::Result<()> {
+pub fn launch_db_server(
+    project_name: &str,
+    http_port: Option<u16>,
+    tcp_port: Option<u16>,
+) -> ServerResult<Vec<JoinHandle<ServerResult<()>>>> {
     let data_root = format!("/tmp/{}/", project_name);
     reset_db_dir(&data_root)?;
 
-    let path = PathBuf::from(data_root);
-    match Executor::open(&path) {
-        Ok(executor) => match run_server(executor, port) {
-            Ok(_) => println!("Database started"),
-            Err(error) => {
-                println!("Cannot start database: {:?}", error);
-            }
-        },
-        Err(error) => println!("Cannot start database: {:?}", error),
-    }
-    Ok(())
+    let path = Arc::new(PathBuf::from(data_root));
+    let handlers = run_server(path, http_port, tcp_port);
+
+    return Ok(handlers);
 }
 
 pub fn notified_sleep(sec: u16) -> () {
@@ -193,7 +196,7 @@ where
 pub fn e2e_verify_correctness(
     grouping: &GroupingLabel,
     table: &[(UnitKey, UnitContent)],
-    client: &ImmuxDBClient,
+    client: &ImmuxDBHttpClient,
 ) -> bool {
     for (unit_key, content) in table {
         let (code, actual_output) = client.get_by_key(&grouping, &unit_key).unwrap();
@@ -206,4 +209,88 @@ pub fn e2e_verify_correctness(
     }
 
     return true;
+}
+
+pub fn get_key_content_pairs() -> UnitList {
+    let mut map = HashMap::new();
+    map.insert(
+        String::from("key1"),
+        UnitContent::String(String::from("string in map")),
+    );
+    map.insert(String::from("key2"), UnitContent::Nil);
+    map.insert(String::from("key3"), UnitContent::Bool(false));
+
+    [
+        (
+            UnitKey::from("key1"),
+            UnitContent::String(String::from("this is a string")),
+        ),
+        (UnitKey::from("key2"), UnitContent::Nil),
+        (UnitKey::from("key3"), UnitContent::Float64(12.0)),
+        (UnitKey::from("key4"), UnitContent::Bool(true)),
+        (UnitKey::from("key5"), UnitContent::Bool(false)),
+        (
+            UnitKey::from("key6"),
+            UnitContent::Array(vec![
+                UnitContent::String(String::from("string in an array")),
+                UnitContent::Nil,
+                UnitContent::Bool(true),
+                UnitContent::Float64(12.0),
+            ]),
+        ),
+        (UnitKey::from("key7"), UnitContent::Map(map)),
+    ]
+    .to_vec()
+}
+
+pub fn get_filter() -> Filter {
+    let mut filter_units = Vec::new();
+    let mut logical_operators = Vec::new();
+
+    let filter_units_vec = vec![
+        FilterUnit {
+            operator: FilterOperator::GreaterOrEqual,
+            operands: FilterOperands {
+                map_key: String::from("price"),
+                unit_content: UnitContent::Float64(1200.0),
+            },
+        },
+        FilterUnit {
+            operator: FilterOperator::LessOrEqual,
+            operands: FilterOperands {
+                map_key: String::from("size"),
+                unit_content: UnitContent::Float64(13.0),
+            },
+        },
+        FilterUnit {
+            operator: FilterOperator::Equal,
+            operands: FilterOperands {
+                map_key: String::from("used"),
+                unit_content: UnitContent::Bool(true),
+            },
+        },
+        FilterUnit {
+            operator: FilterOperator::Equal,
+            operands: FilterOperands {
+                map_key: String::from("name"),
+                unit_content: UnitContent::String(String::from("Apple")),
+            },
+        },
+    ];
+
+    let logical_operators_vec = vec![
+        LogicalOperator::And,
+        LogicalOperator::Or,
+        LogicalOperator::Or,
+    ];
+
+    filter_units.extend(filter_units_vec);
+    logical_operators.extend(logical_operators_vec);
+
+    let filter = Filter {
+        filter_units,
+        logical_operators,
+    };
+
+    return filter;
 }
