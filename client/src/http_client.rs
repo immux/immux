@@ -108,8 +108,16 @@ impl ImmuxDBHttpClient {
         }
     }
 
-    pub fn get_by_grouping(&self, _grouping: &GroupingLabel) -> HttpClientResult {
-        return Err(ImmuxDBHttpClientError::Unimplemented);
+    pub fn get_by_grouping(&self, grouping: &GroupingLabel) -> HttpClientResult {
+        let url = format!("http://{}/{}", &self.host, grouping);
+
+        let mut response = self.client.get(&url).send()?;
+        let status_code = response.status();
+
+        match response.text() {
+            Ok(text) => Ok((status_code, text)),
+            Err(error) => Err(ImmuxDBClientError::Reqwest(error.into())),
+        }
     }
 
     pub fn set_unit(

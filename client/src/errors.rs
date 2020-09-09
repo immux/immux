@@ -7,7 +7,6 @@ use std::fmt::Formatter;
 pub enum ImmuxDBHttpClientError {
     Everything,
     Reqwest(reqwest::Error),
-    Unimplemented,
 }
 
 impl std::fmt::Display for ImmuxDBHttpClientError {

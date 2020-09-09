@@ -21,9 +21,6 @@ pub enum ServerError {
     TCPServerError(Error),
     CommandError(CommandError),
     ThreadError,
-
-    //    unimplemented error
-    UnimplementedForGetGrouping,
 }
 
 impl From<Error> for ServerError {

@@ -30,6 +30,84 @@ mod http_e2e_tests {
         let host = &format!("{}:{}", Constants::SERVER_END_POINT, port);
         let client = ImmuxDBHttpClient::new(host).unwrap();
 
+        let grouping = GroupingLabel::new("target_grouping".as_bytes());
+        let kv_pairs = vec![
+            (UnitKey::from("0"), UnitContent::String(String::from("0"))),
+            (UnitKey::from("1"), UnitContent::Float64(12.0)),
+            (
+                UnitKey::from("2"),
+                UnitContent::Array(vec![
+                    UnitContent::Float64(11.0),
+                    UnitContent::String(String::from("0")),
+                    UnitContent::String(String::from("4")),
+                    UnitContent::Nil,
+                ]),
+            ),
+            (UnitKey::from("3"), {
+                let mut map = HashMap::new();
+                map.insert(String::from("1"), UnitContent::String(String::from("2")));
+                map.insert(String::from("3"), UnitContent::Float64(4.0));
+                map.insert(String::from("5"), UnitContent::Bool(true));
+                map.insert(String::from("6"), UnitContent::Float64(13.0));
+
+                UnitContent::Map(map)
+            }),
+            (UnitKey::from("4"), UnitContent::String(String::from("3"))),
+            (UnitKey::from("5"), UnitContent::String(String::from("4"))),
+            (UnitKey::from("6"), {
+                let mut map = HashMap::new();
+                map.insert(
+                    String::from("brand"),
+                    UnitContent::String(String::from("Apple")),
+                );
+                map.insert(String::from("price"), UnitContent::Float64(3000.0));
+                map.insert(String::from("used"), UnitContent::Bool(true));
+                map.insert(String::from("size"), UnitContent::Float64(13.0));
+
+                UnitContent::Map(map)
+            }),
+        ];
+
+        for (unit_key, content) in kv_pairs.iter() {
+            client.set_unit(&grouping, &unit_key, &content).unwrap();
+        }
+
+        let (status_code, actual_output_str) = client.get_by_grouping(&grouping).unwrap();
+
+        assert_eq!(status_code, 200);
+
+        let actual_output_str_vec: Vec<&str> = actual_output_str.split("\r\n").collect();
+
+        let expected_output: Vec<UnitContent> = kv_pairs
+            .iter()
+            .map(|(_key, content)| content.to_owned())
+            .collect();
+
+        let actual_output: Vec<UnitContent> = actual_output_str_vec
+            .iter()
+            .map(|actual_unit_str| UnitContent::from(*actual_unit_str))
+            .collect();
+
+        for content in actual_output.iter() {
+            assert!(expected_output.contains(content));
+        }
+
+        for content in expected_output.iter() {
+            assert!(actual_output.contains(content));
+        }
+
+        assert_eq!(actual_output.len(), expected_output.len());
+    }
+
+    #[test]
+    fn e2e_unit_get_set() {
+        let port = 20031;
+        thread::spawn(move || launch_db("e2e_unit_get_set", port));
+        notified_sleep(5);
+
+        let host = &format!("{}:{}", Constants::SERVER_END_POINT, port);
+        let client = ImmuxDBClient::new(host).unwrap();
+
         let grouping = GroupingLabel::new("any_grouping".as_bytes());
         let unit_key = UnitKey::new("key".as_bytes());
         let expected_content = UnitContent::String("content".to_string());
