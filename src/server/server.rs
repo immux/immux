@@ -276,7 +276,16 @@ fn parse_http_request(request: &mut Request) -> ServerResult<Command> {
 
                         return Ok(instruction);
                     } else {
-                        return Err(ServerError::UnimplementedForGetGrouping);
+                        let grouping_str = segments[1];
+                        let grouping = GroupingLabel::new(grouping_str.as_bytes());
+                        let condition = SelectCondition::UnconditionalMatch;
+
+                        let instruction = Command::Select {
+                            grouping,
+                            condition,
+                        };
+
+                        return Ok(instruction);
                     }
                 }
             } else {
