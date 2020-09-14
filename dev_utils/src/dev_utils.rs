@@ -4,12 +4,11 @@ use std::fs::read;
 use std::fs::{create_dir_all, remove_dir_all};
 use std::num::ParseIntError;
 use std::path::PathBuf;
-use std::sync::Arc;
 use std::time::Duration;
 use std::time::Instant;
 use std::{io, thread};
 
-use immuxsys::server::server::run_server;
+use immuxsys::server::server::run_db_servers;
 use immuxsys::storage::executor::filter::{
     Filter, FilterOperands, FilterOperator, FilterUnit, LogicalOperator,
 };
@@ -21,7 +20,6 @@ use immuxsys_client::http_client::ImmuxDBHttpClient;
 use immuxsys::server::errors::ServerResult;
 pub use serde::de::{Deserialize, DeserializeOwned};
 pub use serde::ser::Serialize;
-use std::thread::JoinHandle;
 
 pub type UnitList = Vec<(UnitKey, UnitContent)>;
 
@@ -37,14 +35,14 @@ pub fn launch_db_server(
     project_name: &str,
     http_port: Option<u16>,
     tcp_port: Option<u16>,
-) -> ServerResult<Vec<JoinHandle<ServerResult<()>>>> {
+) -> ServerResult<Vec<ServerResult<()>>> {
     let data_root = format!("/tmp/{}/", project_name);
     reset_db_dir(&data_root)?;
 
-    let path = Arc::new(PathBuf::from(data_root));
-    let handlers = run_server(path, http_port, tcp_port);
+    let path = PathBuf::from(data_root);
+    let server_results = run_db_servers(&path, http_port, tcp_port);
 
-    return Ok(handlers);
+    return Ok(server_results);
 }
 
 pub fn notified_sleep(sec: u16) -> () {

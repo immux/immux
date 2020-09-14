@@ -2,14 +2,14 @@ use std::collections::HashMap;
 use std::io::{Read, Write};
 use std::net::TcpListener;
 use std::path::PathBuf;
+use std::sync::mpsc;
 use std::sync::mpsc::{Receiver, Sender};
-use std::sync::{mpsc, Arc};
 use std::thread;
 use std::thread::JoinHandle;
 
 use crate::constants as Constants;
 use crate::server::errors::{ServerError, ServerResult};
-use crate::server::message::{Message, MessageSender};
+use crate::server::message::{AnnotatedCommand, AnnotatedCommandSender};
 use crate::storage::chain_height::ChainHeight;
 use crate::storage::executor::command::{Command, SelectCondition};
 use crate::storage::executor::executor::Executor;
@@ -47,11 +47,12 @@ impl UrlInformation {
 }
 
 fn spawn_db_thread(
-    path: Arc<PathBuf>,
-    server_db_receiver: Receiver<Message>,
+    path: &PathBuf,
+    server_db_receiver: Receiver<AnnotatedCommand>,
     db_http_sender: Sender<Outcome>,
     db_tcp_sender: Sender<Outcome>,
 ) -> JoinHandle<ServerResult<()>> {
+    let path = path.clone();
     thread::spawn(move || -> ServerResult<()> {
         let mut executor = Executor::open(&path)?;
 
@@ -62,10 +63,10 @@ fn spawn_db_thread(
             let outcome = handle_command(received_command, &mut executor)?;
 
             match message.sender {
-                MessageSender::HTTP => {
+                AnnotatedCommandSender::HTTP => {
                     db_http_sender.send(outcome)?;
                 }
-                MessageSender::TCP => {
+                AnnotatedCommandSender::TCP => {
                     db_tcp_sender.send(outcome)?;
                 }
             }
@@ -73,36 +74,44 @@ fn spawn_db_thread(
     })
 }
 
-pub fn run_server(
-    path: Arc<PathBuf>,
+pub fn run_db_servers(
+    path: &PathBuf,
     http_port: Option<u16>,
     tcp_port: Option<u16>,
-) -> Vec<JoinHandle<ServerResult<()>>> {
-    let (server_db_sender, server_db_receiver) = mpsc::channel::<Message>();
+) -> Vec<ServerResult<()>> {
+    let (server_db_sender, server_db_receiver) = mpsc::channel::<AnnotatedCommand>();
     let (db_http_sender, db_http_receiver) = mpsc::channel::<Outcome>();
     let (db_tcp_sender, db_tcp_receiver) = mpsc::channel::<Outcome>();
 
-    let mut handlers = vec![];
+    let mut handles = vec![];
 
-    let db_handler = spawn_db_thread(path, server_db_receiver, db_http_sender, db_tcp_sender);
-    handlers.push(db_handler);
+    let db_handle = spawn_db_thread(&path, server_db_receiver, db_http_sender, db_tcp_sender);
+    handles.push(db_handle);
 
     if let Some(tcp_port) = tcp_port {
-        let tcp_handler = run_tcp_server(tcp_port, server_db_sender.clone(), db_tcp_receiver);
-        handlers.push(tcp_handler);
+        let tcp_handle = run_tcp_server(tcp_port, server_db_sender.clone(), db_tcp_receiver);
+        handles.push(tcp_handle);
     }
 
     if let Some(http_port) = http_port {
-        let http_handler = run_http_server(http_port, server_db_sender, db_http_receiver);
-        handlers.push(http_handler);
+        let http_handle = run_http_server(http_port, server_db_sender, db_http_receiver);
+        handles.push(http_handle);
     }
 
-    return handlers;
+    let mut server_results = vec![];
+
+    for handle in handles {
+        match handle.join() {
+            Ok(thread_result) => server_results.push(thread_result),
+            Err(_error) => server_results.push(Err(ServerError::ThreadError)),
+        }
+    }
+    return server_results;
 }
 
 pub fn run_http_server(
     http_port: u16,
-    server_db_sender: Sender<Message>,
+    server_db_sender: Sender<AnnotatedCommand>,
     db_http_receiver: Receiver<Outcome>,
 ) -> JoinHandle<ServerResult<()>> {
     let http_address = format!("{}:{}", Constants::SERVER_END_POINT, http_port);
@@ -112,7 +121,7 @@ pub fn run_http_server(
             Ok(server) => {
                 for mut request in server.incoming_requests() {
                     let command = parse_http_request(&mut request)?;
-                    let message = Message::new(command, MessageSender::HTTP);
+                    let message = AnnotatedCommand::new(command, AnnotatedCommandSender::HTTP);
                     server_db_sender.send(message)?;
 
                     let outcome = db_http_receiver.recv()?;
@@ -173,7 +182,7 @@ pub fn run_http_server(
 
 fn run_tcp_server(
     tcp_port: u16,
-    server_db_sender: Sender<Message>,
+    server_db_sender: Sender<AnnotatedCommand>,
     db_tcp_receiver: Receiver<Outcome>,
 ) -> JoinHandle<ServerResult<()>> {
     let tcp_address = format!("{}:{}", Constants::SERVER_END_POINT, tcp_port);
@@ -187,7 +196,7 @@ fn run_tcp_server(
                 let mut buffer = [0; 1024 * 1024];
                 stream.read(&mut buffer)?;
                 let (command, _) = Command::parse(&buffer)?;
-                let message = Message::new(command, MessageSender::TCP);
+                let message = AnnotatedCommand::new(command, AnnotatedCommandSender::TCP);
                 server_db_sender.send(message)?;
 
                 let outcome = db_tcp_receiver.recv()?;

@@ -223,12 +223,14 @@ pub enum CommandPrefix {
     RevertAll = 0x06,
     RemoveOne = 0x07,
     RemoveAll = 0x08,
-    CreateTransaction = 0x09,
-    TransactionalInsert = 0x0a,
-    TransactionalRemoveOne = 0x0b,
-    TransactionalRevertOne = 0x0c,
-    TransactionCommit = 0x0d,
-    TransactionAbort = 0x10,
+
+    TransactionalInsert = 0x54,
+    TransactionalRevertOne = 0x55,
+    TransactionalRemoveOne = 0x57,
+
+    CreateTransaction = 0xc0,
+    TransactionCommit = 0xc1,
+    TransactionAbort = 0xc2,
 }
 
 impl Command {

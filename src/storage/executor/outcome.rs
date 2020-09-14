@@ -35,20 +35,22 @@ impl From<CommandError> for OutcomeError {
 
 #[derive(Debug)]
 pub enum OutcomePrefix {
-    SelectSuccess = 0x00,
-    InspectOneSuccess = 0x01,
-    InspectAllSuccess = 0x02,
-    InsertSuccess = 0x03,
-    RevertOneSuccess = 0x04,
-    RevertAllSuccess = 0x05,
-    RemoveOneSuccess = 0x06,
-    RemoveAllSuccess = 0x07,
-    CreateTransactionSuccess = 0x08,
-    TransactionalInsertSuccess = 0x09,
-    TransactionalRevertOneSuccess = 0x0a,
-    TransactionalRemoveOneSuccess = 0x0b,
-    TransactionCommitSuccess = 0x0c,
-    TransactionAbortSuccess = 0x0d,
+    SelectSuccess = 0x11,
+    InspectOneSuccess = 0x12,
+    InspectAllSuccess = 0x13,
+    InsertSuccess = 0x14,
+    RevertOneSuccess = 0x15,
+    RevertAllSuccess = 0x16,
+    RemoveOneSuccess = 0x17,
+    RemoveAllSuccess = 0x18,
+
+    TransactionalInsertSuccess = 0x64,
+    TransactionalRevertOneSuccess = 0x65,
+    TransactionalRemoveOneSuccess = 0x67,
+
+    CreateTransactionSuccess = 0xd0,
+    TransactionCommitSuccess = 0xd1,
+    TransactionAbortSuccess = 0xd2,
 }
 
 #[derive(Debug, PartialEq)]

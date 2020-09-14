@@ -1,17 +1,17 @@
 use crate::storage::executor::command::Command;
 
-pub enum MessageSender {
+pub enum AnnotatedCommandSender {
     TCP,
     HTTP,
 }
 
-pub struct Message {
+pub struct AnnotatedCommand {
     pub command: Command,
-    pub sender: MessageSender,
+    pub sender: AnnotatedCommandSender,
 }
 
-impl Message {
-    pub fn new(command: Command, sender: MessageSender) -> Self {
-        Message { command, sender }
+impl AnnotatedCommand {
+    pub fn new(command: Command, sender: AnnotatedCommandSender) -> Self {
+        AnnotatedCommand { command, sender }
     }
 }

@@ -24,7 +24,9 @@ mod http_e2e_tests {
     #[test]
     fn http_e2e_grouping_get_set() {
         let port = 20030;
-        launch_db_server("http_e2e_grouping_get_set", Some(port), None).unwrap();
+        thread::spawn(move || {
+            launch_db_server("http_e2e_grouping_get_set", Some(port), None).unwrap()
+        });
         notified_sleep(5);
 
         let host = &format!("{}:{}", Constants::SERVER_END_POINT, port);
@@ -100,13 +102,15 @@ mod http_e2e_tests {
     }
 
     #[test]
-    fn e2e_unit_get_set() {
+    fn http_e2e_wrong_grouping() {
         let port = 20031;
-        thread::spawn(move || launch_db("e2e_unit_get_set", port));
+        thread::spawn(move || {
+            launch_db_server("http_e2e_wrong_grouping", Some(port), None).unwrap()
+        });
         notified_sleep(5);
 
         let host = &format!("{}:{}", Constants::SERVER_END_POINT, port);
-        let client = ImmuxDBClient::new(host).unwrap();
+        let client = ImmuxDBHttpClient::new(host).unwrap();
 
         let grouping = GroupingLabel::new("any_grouping".as_bytes());
         let unit_key = UnitKey::new("key".as_bytes());
@@ -131,7 +135,9 @@ mod http_e2e_tests {
     #[test]
     fn http_e2e_real_data_get_set() {
         let port = 20022;
-        launch_db_server("http_e2e_real_data_get_set", Some(port), None).unwrap();
+        thread::spawn(move || {
+            launch_db_server("http_e2e_real_data_get_set", Some(port), None).unwrap()
+        });
         notified_sleep(5);
 
         let host = &format!("{}:{}", Constants::SERVER_END_POINT, port);
@@ -208,7 +214,9 @@ mod http_e2e_tests {
     #[test]
     fn http_e2e_single_unit_get_set() {
         let port = 10083;
-        launch_db_server("http_e2e_single_unit_get_set", Some(port), None).unwrap();
+        thread::spawn(move || {
+            launch_db_server("http_e2e_single_unit_get_set", Some(port), None).unwrap()
+        });
         notified_sleep(5);
 
         let host = &format!("{}:{}", Constants::SERVER_END_POINT, port);
@@ -237,7 +245,7 @@ mod http_e2e_tests {
     #[test]
     fn http_e2e_revert_one() {
         let port = 10084;
-        launch_db_server("http_e2e_revert_one", Some(port), None).unwrap();
+        thread::spawn(move || launch_db_server("http_e2e_revert_one", Some(port), None).unwrap());
         notified_sleep(5);
 
         let host = &format!("{}:{}", Constants::SERVER_END_POINT, port);
@@ -285,7 +293,7 @@ mod http_e2e_tests {
     #[test]
     fn http_e2e_remove_one() {
         let port = 10085;
-        launch_db_server("http_e2e_remove_one", Some(port), None).unwrap();
+        thread::spawn(move || launch_db_server("http_e2e_remove_one", Some(port), None).unwrap());
         notified_sleep(5);
 
         let host = &format!("{}:{}", Constants::SERVER_END_POINT, port);
@@ -328,7 +336,7 @@ mod http_e2e_tests {
     #[test]
     fn http_e2e_revert_all() {
         let port = 10086;
-        launch_db_server("http_e2e_revert_all", Some(port), None).unwrap();
+        thread::spawn(move || launch_db_server("http_e2e_revert_all", Some(port), None).unwrap());
         notified_sleep(5);
 
         let host = &format!("{}:{}", Constants::SERVER_END_POINT, port);
@@ -368,7 +376,7 @@ mod http_e2e_tests {
     #[test]
     fn http_e2e_remove_all() {
         let port = 10087;
-        launch_db_server("http_e2e_remove_all", Some(port), None).unwrap();
+        thread::spawn(move || launch_db_server("http_e2e_remove_all", Some(port), None).unwrap());
         notified_sleep(5);
 
         let host = &format!("{}:{}", Constants::SERVER_END_POINT, port);
@@ -397,7 +405,9 @@ mod http_e2e_tests {
     #[test]
     fn http_e2e_atomicity_commit() {
         let port = 10088;
-        launch_db_server("http_e2e_atomicity_commit", Some(port), None).unwrap();
+        thread::spawn(move || {
+            launch_db_server("http_e2e_atomicity_commit", Some(port), None).unwrap()
+        });
         notified_sleep(5);
 
         let host = &format!("{}:{}", Constants::SERVER_END_POINT, port);
@@ -436,7 +446,9 @@ mod http_e2e_tests {
     #[test]
     fn http_e2e_atomicity_abort() {
         let port = 10089;
-        launch_db_server("http_e2e_atomicity_abort", Some(port), None).unwrap();
+        thread::spawn(move || {
+            launch_db_server("http_e2e_atomicity_abort", Some(port), None).unwrap()
+        });
         notified_sleep(5);
 
         let host = &format!("{}:{}", Constants::SERVER_END_POINT, port);
@@ -474,7 +486,9 @@ mod http_e2e_tests {
     #[test]
     fn http_e2e_set_isolation() {
         let port = 10090;
-        launch_db_server("http_e2e_set_isolation", Some(port), None).unwrap();
+        thread::spawn(move || {
+            launch_db_server("http_e2e_set_isolation", Some(port), None).unwrap()
+        });
         notified_sleep(5);
 
         let host = &format!("{}:{}", Constants::SERVER_END_POINT, port);
@@ -534,7 +548,9 @@ mod http_e2e_tests {
     #[test]
     fn http_e2e_remove_one_isolation() {
         let port = 10091;
-        launch_db_server("http_e2e_remove_one_isolation", Some(port), None).unwrap();
+        thread::spawn(move || {
+            launch_db_server("http_e2e_remove_one_isolation", Some(port), None).unwrap()
+        });
         notified_sleep(5);
 
         let host = &format!("{}:{}", Constants::SERVER_END_POINT, port);
@@ -598,7 +614,9 @@ mod http_e2e_tests {
     #[test]
     fn http_e2e_revert_one_isolation() {
         let port = 10092;
-        launch_db_server("http_e2e_revert_one_isolation", Some(port), None).unwrap();
+        thread::spawn(move || {
+            launch_db_server("http_e2e_revert_one_isolation", Some(port), None).unwrap()
+        });
         notified_sleep(5);
 
         let host = &format!("{}:{}", Constants::SERVER_END_POINT, port);
@@ -658,7 +676,9 @@ mod http_e2e_tests {
     #[test]
     fn http_e2e_remove_all_isolation() {
         let port = 10093;
-        launch_db_server("http_e2e_remove_all_isolation", Some(port), None).unwrap();
+        thread::spawn(move || {
+            launch_db_server("http_e2e_remove_all_isolation", Some(port), None).unwrap()
+        });
         notified_sleep(5);
 
         let host = &format!("{}:{}", Constants::SERVER_END_POINT, port);
@@ -696,7 +716,9 @@ mod http_e2e_tests {
     #[test]
     fn http_e2e_revert_all_isolation() {
         let port = 10094;
-        launch_db_server("http_e2e_revert_all_isolation", Some(port), None).unwrap();
+        thread::spawn(move || {
+            launch_db_server("http_e2e_revert_all_isolation", Some(port), None).unwrap()
+        });
         notified_sleep(5);
 
         let host = &format!("{}:{}", Constants::SERVER_END_POINT, port);
@@ -749,12 +771,14 @@ mod http_e2e_tests {
     #[test]
     fn http_e2e_transaction_not_alive_after_revert_all() {
         let port = 10095;
-        launch_db_server(
-            "http_e2e_transaction_not_alive_after_revert_all",
-            Some(port),
-            None,
-        )
-        .unwrap();
+        thread::spawn(move || {
+            launch_db_server(
+                "http_e2e_transaction_not_alive_after_revert_all",
+                Some(port),
+                None,
+            )
+            .unwrap()
+        });
         notified_sleep(5);
 
         let host = &format!("{}:{}", Constants::SERVER_END_POINT, port);
@@ -785,12 +809,14 @@ mod http_e2e_tests {
     #[test]
     fn http_e2e_unexpected_commit_transaction_id() {
         let port = 10096;
-        launch_db_server(
-            "http_e2e_unexpected_commit_transaction_id",
-            Some(port),
-            None,
-        )
-        .unwrap();
+        thread::spawn(move || {
+            launch_db_server(
+                "http_e2e_unexpected_commit_transaction_id",
+                Some(port),
+                None,
+            )
+            .unwrap()
+        });
         notified_sleep(5);
 
         let host = &format!("{}:{}", Constants::SERVER_END_POINT, port);
@@ -805,7 +831,9 @@ mod http_e2e_tests {
     #[test]
     fn http_e2e_unexpected_abort_transaction_id() {
         let port = 10097;
-        launch_db_server("http_e2e_unexpected_abort_transaction_id", Some(port), None).unwrap();
+        thread::spawn(move || {
+            launch_db_server("http_e2e_unexpected_abort_transaction_id", Some(port), None).unwrap()
+        });
         notified_sleep(5);
 
         let host = &format!("{}:{}", Constants::SERVER_END_POINT, port);
@@ -820,7 +848,9 @@ mod http_e2e_tests {
     #[test]
     fn http_e2e_last_one_commit_wins() {
         let port = 10098;
-        launch_db_server("http_e2e_last_one_commit_wins", Some(port), None).unwrap();
+        thread::spawn(move || {
+            launch_db_server("http_e2e_last_one_commit_wins", Some(port), None).unwrap()
+        });
         notified_sleep(5);
 
         let host = &format!("{}:{}", Constants::SERVER_END_POINT, port);
@@ -894,7 +924,9 @@ mod http_e2e_tests {
     #[test]
     fn http_e2e_read_inside_transaction() {
         let port = 10099;
-        launch_db_server("http_e2e_read_inside_transaction", Some(port), None).unwrap();
+        thread::spawn(move || {
+            launch_db_server("http_e2e_read_inside_transaction", Some(port), None).unwrap()
+        });
         notified_sleep(5);
 
         let host = &format!("{}:{}", Constants::SERVER_END_POINT, port);
@@ -929,7 +961,7 @@ mod http_e2e_tests {
     #[test]
     fn http_e2e_dirty_read() {
         let port = 10100;
-        launch_db_server("http_e2e_dirty_read", Some(port), None).unwrap();
+        thread::spawn(move || launch_db_server("http_e2e_dirty_read", Some(port), None).unwrap());
         notified_sleep(5);
 
         let host = &format!("{}:{}", Constants::SERVER_END_POINT, port);

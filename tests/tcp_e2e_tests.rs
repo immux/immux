@@ -2,10 +2,10 @@
 mod tcp_e2e_tests {
     use std::collections::HashMap;
     use std::error::Error;
+    use std::thread;
 
     use immuxsys::constants as Constants;
     use immuxsys::storage::chain_height::ChainHeight;
-    use immuxsys::storage::executor::command::{Command, SelectCondition};
     use immuxsys::storage::executor::grouping_label::GroupingLabel;
     use immuxsys::storage::executor::outcome::Outcome;
     use immuxsys::storage::executor::unit_content::UnitContent;
@@ -26,7 +26,9 @@ mod tcp_e2e_tests {
     #[test]
     fn tcp_e2e_grouping_get_set() {
         let port = 8000;
-        launch_db_server("tcp_e2e_grouping_get_set", None, Some(port)).unwrap();
+        thread::spawn(move || {
+            launch_db_server("tcp_e2e_grouping_get_set", None, Some(port)).unwrap()
+        });
         notified_sleep(5);
 
         let host = &format!("{}:{}", Constants::SERVER_END_POINT, port);
@@ -36,29 +38,12 @@ mod tcp_e2e_tests {
         let unit_key = UnitKey::new("key".as_bytes());
         let content = UnitContent::String("content".to_string());
 
-        let command = Command::Insert {
-            grouping,
-            key: unit_key.clone(),
-            content,
-        };
-
-        client.write(&command.marshal()).unwrap();
-
-        let buffer = client.read().unwrap();
-        let (outcome, _) = Outcome::parse(&buffer).unwrap();
+        let outcome = client.set_unit(&grouping, &unit_key, &content).unwrap();
 
         assert_eq!(outcome, Outcome::InsertSuccess);
 
         let grouping = GroupingLabel::new("the_other_grouping".as_bytes());
-        let condition = SelectCondition::Key(unit_key, None);
-        let command = Command::Select {
-            grouping,
-            condition,
-        };
-
-        client.write(&command.marshal()).unwrap();
-        let buffer = client.read().unwrap();
-        let (outcome, _) = Outcome::parse(&buffer).unwrap();
+        let outcome = client.get_by_key(&grouping, &unit_key).unwrap();
 
         assert_eq!(outcome, Outcome::Select(vec![]));
     }
@@ -66,7 +51,9 @@ mod tcp_e2e_tests {
     #[test]
     fn tcp_e2e_single_unit_get_set() {
         let port = 8001;
-        launch_db_server("tcp_e2e_single_unit_get_set", None, Some(port)).unwrap();
+        thread::spawn(move || {
+            launch_db_server("tcp_e2e_single_unit_get_set", None, Some(port)).unwrap()
+        });
         notified_sleep(5);
 
         let host = &format!("{}:{}", Constants::SERVER_END_POINT, port);
@@ -75,27 +62,14 @@ mod tcp_e2e_tests {
         let grouping = GroupingLabel::new("a".as_bytes());
         let unit_key = UnitKey::new("key".as_bytes());
         let unit_content = UnitContent::String("content".to_string());
-        let command = Command::Insert {
-            grouping: grouping.clone(),
-            key: unit_key.clone(),
-            content: unit_content.clone(),
-        };
 
-        client.write(&command.marshal()).unwrap();
-        let buffer = client.read().unwrap();
-        let (outcome, _) = Outcome::parse(&buffer).unwrap();
+        let outcome = client
+            .set_unit(&grouping, &unit_key, &unit_content)
+            .unwrap();
 
         assert_eq!(outcome, Outcome::InsertSuccess);
 
-        let condition = SelectCondition::Key(unit_key, None);
-        let command = Command::Select {
-            grouping,
-            condition,
-        };
-
-        client.write(&command.marshal()).unwrap();
-        let buffer = client.read().unwrap();
-        let (actual_output, _) = Outcome::parse(&buffer).unwrap();
+        let actual_output = client.get_by_key(&grouping, &unit_key).unwrap();
         let expected_output = Outcome::Select(vec![unit_content]);
 
         assert_eq!(expected_output, actual_output);
@@ -104,13 +78,13 @@ mod tcp_e2e_tests {
     #[test]
     fn tcp_e2e_revert_one() {
         let port = 8002;
-        launch_db_server("tcp_e2e_revert_one", None, Some(port)).unwrap();
+        thread::spawn(move || launch_db_server("tcp_e2e_revert_one", None, Some(port)).unwrap());
         notified_sleep(5);
 
         let host = &format!("{}:{}", Constants::SERVER_END_POINT, port);
         let mut client = ImmuxDBTcpClient::new(host).unwrap();
 
-        let grouping = String::from("any_grouping");
+        let grouping = GroupingLabel::new("any_grouping".as_bytes());
         let unit_key = UnitKey::from("key1");
         let target_height = ChainHeight::new(3);
 
@@ -124,41 +98,17 @@ mod tcp_e2e_tests {
         ];
 
         for content in contents.iter() {
-            let command = Command::Insert {
-                grouping: GroupingLabel::new(&grouping.as_bytes()),
-                key: unit_key.clone(),
-                content: content.clone(),
-            };
-            client.write(&command.marshal()).unwrap();
-
-            let buffer = client.read().unwrap();
-            let (outcome, _) = Outcome::parse(&buffer).unwrap();
+            let outcome = client.set_unit(&grouping, &unit_key, content).unwrap();
 
             assert_eq!(outcome, Outcome::InsertSuccess);
         }
 
-        let revert_command = Command::RevertOne {
-            grouping: GroupingLabel::new(&grouping.as_bytes()),
-            key: unit_key.clone(),
-            height: target_height.clone(),
-        };
-
-        client.write(&revert_command.marshal()).unwrap();
-
-        let buffer = client.read().unwrap();
-        let (outcome, _) = Outcome::parse(&buffer).unwrap();
+        let outcome = client
+            .revert_one(&grouping, &unit_key, &target_height)
+            .unwrap();
         assert_eq!(outcome, Outcome::RevertOneSuccess);
 
-        let condition = SelectCondition::Key(unit_key, None);
-        let select_command = Command::Select {
-            grouping: GroupingLabel::new(&grouping.as_bytes()),
-            condition,
-        };
-
-        client.write(&select_command.marshal()).unwrap();
-
-        let buffer = client.read().unwrap();
-        let (actual_outcome, _) = Outcome::parse(&buffer).unwrap();
+        let actual_outcome = client.get_by_key(&grouping, &unit_key).unwrap();
 
         let expected_content = &contents[target_height.as_u64() as usize];
         assert_eq!(
@@ -170,7 +120,9 @@ mod tcp_e2e_tests {
     #[test]
     fn tcp_e2e_real_data_get_set() {
         let port = 8003;
-        launch_db_server("tcp_e2e_real_data_get_set", None, Some(port)).unwrap();
+        thread::spawn(move || {
+            launch_db_server("tcp_e2e_real_data_get_set", None, Some(port)).unwrap()
+        });
         notified_sleep(5);
 
         let host = &format!("{}:{}", Constants::SERVER_END_POINT, port);
@@ -229,14 +181,8 @@ mod tcp_e2e_tests {
 
         for (grouping, table) in dataset.iter() {
             for (key, content) in table.iter() {
-                let command = Command::Insert {
-                    grouping: GroupingLabel::new(&grouping.as_bytes()),
-                    key: key.to_owned(),
-                    content: content.to_owned(),
-                };
-                client.write(&command.marshal()).unwrap();
-                let buffer = client.read().unwrap();
-                let (outcome, _) = Outcome::parse(&buffer).unwrap();
+                let grouping = GroupingLabel::new(grouping.as_bytes());
+                let outcome = client.set_unit(&grouping, &key, &content).unwrap();
 
                 assert_eq!(outcome, Outcome::InsertSuccess);
             }
@@ -244,14 +190,9 @@ mod tcp_e2e_tests {
 
         for (grouping, table) in dataset.iter() {
             for (key, content) in table.iter() {
-                let condition = SelectCondition::Key(key.to_owned(), None);
-                let command = Command::Select {
-                    grouping: GroupingLabel::new(&grouping.as_bytes()),
-                    condition,
-                };
-                client.write(&command.marshal()).unwrap();
-                let buffer = client.read().unwrap();
-                let (outcome, _) = Outcome::parse(&buffer).unwrap();
+                let grouping = GroupingLabel::new(grouping.as_bytes());
+                let outcome = client.get_by_key(&grouping, &key).unwrap();
+
                 assert_eq!(outcome, Outcome::Select(vec![content.to_owned()]));
             }
         }
@@ -260,7 +201,7 @@ mod tcp_e2e_tests {
     #[test]
     fn tcp_e2e_remove_one() {
         let port = 8004;
-        launch_db_server("tcp_e2e_remove_one", None, Some(port)).unwrap();
+        thread::spawn(move || launch_db_server("tcp_e2e_remove_one", None, Some(port)).unwrap());
         notified_sleep(5);
 
         let host = &format!("{}:{}", Constants::SERVER_END_POINT, port);
@@ -272,40 +213,16 @@ mod tcp_e2e_tests {
         let (target_key, _target_content) = &key_content_pairs[target_pair_index];
 
         for (key, content) in key_content_pairs.iter() {
-            let command = Command::Insert {
-                grouping: grouping.to_owned(),
-                key: key.to_owned(),
-                content: content.to_owned(),
-            };
-            client.write(&command.marshal()).unwrap();
-
-            let buffer = client.read().unwrap();
-            let (outcome, _) = Outcome::parse(&buffer).unwrap();
+            let outcome = client.set_unit(&grouping, &key, &content).unwrap();
 
             assert_eq!(outcome, Outcome::InsertSuccess);
         }
 
-        let command = Command::RemoveOne {
-            grouping: grouping.clone(),
-            key: target_key.clone(),
-        };
-
-        client.write(&command.marshal()).unwrap();
-
-        let buffer = client.read().unwrap();
-        let (outcome, _) = Outcome::parse(&buffer).unwrap();
+        let outcome = client.remove_one(&grouping, &target_key).unwrap();
         assert_eq!(outcome, Outcome::RemoveOneSuccess);
 
         for (key, content) in key_content_pairs.iter() {
-            let condition = SelectCondition::Key(key.clone(), None);
-            let command = Command::Select {
-                grouping: grouping.clone(),
-                condition,
-            };
-            client.write(&command.marshal()).unwrap();
-
-            let buffer = client.read().unwrap();
-            let (outcome, _) = Outcome::parse(&buffer).unwrap();
+            let outcome = client.get_by_key(&grouping, &key).unwrap();
 
             if key == target_key {
                 assert_eq!(outcome, Outcome::Select(vec![]));
@@ -318,7 +235,7 @@ mod tcp_e2e_tests {
     #[test]
     fn tcp_e2e_revert_all() {
         let port = 8005;
-        launch_db_server("tcp_e2e_revert_all", None, Some(port)).unwrap();
+        thread::spawn(move || launch_db_server("tcp_e2e_revert_all", None, Some(port)).unwrap());
         notified_sleep(5);
 
         let host = &format!("{}:{}", Constants::SERVER_END_POINT, port);
@@ -330,38 +247,17 @@ mod tcp_e2e_tests {
         let target_height = ChainHeight::new(target_pair_index);
 
         for (key, content) in key_content_pairs.iter() {
-            let command = Command::Insert {
-                grouping: grouping.clone(),
-                key: key.clone(),
-                content: content.clone(),
-            };
-            client.write(&command.marshal()).unwrap();
-            let buffer = client.read().unwrap();
-            let (outcome, _) = Outcome::parse(&buffer).unwrap();
+            let outcome = client.set_unit(&grouping, &key, &content).unwrap();
 
             assert_eq!(outcome, Outcome::InsertSuccess);
         }
 
-        let command = Command::RevertAll {
-            height: target_height.clone(),
-        };
-        client.write(&command.marshal()).unwrap();
-
-        let buffer = client.read().unwrap();
-        let (outcome, _) = Outcome::parse(&buffer).unwrap();
+        let outcome = client.revert_all(&target_height).unwrap();
 
         assert_eq!(outcome, Outcome::RevertAllSuccess);
 
         for (index, (key, content)) in key_content_pairs.iter().enumerate() {
-            let condition = SelectCondition::Key(key.clone(), None);
-            let command = Command::Select {
-                grouping: grouping.clone(),
-                condition,
-            };
-            client.write(&command.marshal()).unwrap();
-
-            let buffer = client.read().unwrap();
-            let (outcome, _) = Outcome::parse(&buffer).unwrap();
+            let outcome = client.get_by_key(&grouping, &key).unwrap();
 
             if index <= target_height.as_u64() as usize {
                 assert_eq!(outcome, Outcome::Select(vec![content.clone()]));
@@ -374,7 +270,7 @@ mod tcp_e2e_tests {
     #[test]
     fn tcp_e2e_remove_all() {
         let port = 8006;
-        launch_db_server("tcp_e2e_remove_all", None, Some(port)).unwrap();
+        thread::spawn(move || launch_db_server("tcp_e2e_remove_all", None, Some(port)).unwrap());
         notified_sleep(5);
 
         let host = &format!("{}:{}", Constants::SERVER_END_POINT, port);
@@ -384,38 +280,17 @@ mod tcp_e2e_tests {
         let key_content_pairs = get_key_content_pairs();
 
         for (key, content) in key_content_pairs.iter() {
-            let command = Command::Insert {
-                grouping: grouping.clone(),
-                key: key.clone(),
-                content: content.clone(),
-            };
-
-            client.write(&command.marshal()).unwrap();
-
-            let buffer = client.read().unwrap();
-            let (outcome, _) = Outcome::parse(&buffer).unwrap();
+            let outcome = client.set_unit(&grouping, &key, &content).unwrap();
 
             assert_eq!(outcome, Outcome::InsertSuccess);
         }
 
-        let command = Command::RemoveAll;
-        client.write(&command.marshal()).unwrap();
-
-        let buffer = client.read().unwrap();
-        let (outcome, _) = Outcome::parse(&buffer).unwrap();
+        let outcome = client.remove_all().unwrap();
 
         assert_eq!(outcome, Outcome::RemoveAllSuccess);
 
         for (key, _content) in key_content_pairs.iter() {
-            let condition = SelectCondition::Key(key.clone(), None);
-            let command = Command::Select {
-                grouping: grouping.clone(),
-                condition,
-            };
-            client.write(&command.marshal()).unwrap();
-
-            let buffer = client.read().unwrap();
-            let (outcome, _) = Outcome::parse(&buffer).unwrap();
+            let outcome = client.get_by_key(&grouping, &key).unwrap();
 
             assert_eq!(outcome, Outcome::Select(vec![]));
         }
@@ -424,7 +299,9 @@ mod tcp_e2e_tests {
     #[test]
     fn tcp_e2e_atomicity_commit() {
         let port = 8007;
-        launch_db_server("tcp_e2e_atomicity_commit", None, Some(port)).unwrap();
+        thread::spawn(move || {
+            launch_db_server("tcp_e2e_atomicity_commit", None, Some(port)).unwrap()
+        });
         notified_sleep(5);
 
         let host = &format!("{}:{}", Constants::SERVER_END_POINT, port);
@@ -432,11 +309,7 @@ mod tcp_e2e_tests {
         let grouping = GroupingLabel::new("any_grouping".as_bytes());
         let expected_transaction_id = TransactionId::new(1);
 
-        let command = Command::CreateTransaction;
-        client.write(&command.marshal()).unwrap();
-
-        let buffer = client.read().unwrap();
-        let (outcome, _) = Outcome::parse(&buffer).unwrap();
+        let outcome = client.create_transaction().unwrap();
 
         assert_eq!(
             outcome,
@@ -446,42 +319,19 @@ mod tcp_e2e_tests {
         let key_content_pairs = get_key_content_pairs();
 
         for (key, content) in key_content_pairs.iter() {
-            let command = Command::TransactionalInsert {
-                grouping: grouping.clone(),
-                key: key.clone(),
-                content: content.clone(),
-                transaction_id: expected_transaction_id,
-            };
-
-            client.write(&command.marshal()).unwrap();
-
-            let buffer = client.read().unwrap();
-            let (outcome, _) = Outcome::parse(&buffer).unwrap();
+            let outcome = client
+                .transactional_set_unit(&grouping, &key, &content, &expected_transaction_id)
+                .unwrap();
 
             assert_eq!(outcome, Outcome::TransactionalInsertSuccess);
         }
 
-        let command = Command::TransactionCommit {
-            transaction_id: expected_transaction_id,
-        };
-        client.write(&command.marshal()).unwrap();
-
-        let buffer = client.read().unwrap();
-        let (outcome, _) = Outcome::parse(&buffer).unwrap();
+        let outcome = client.commit_transaction(&expected_transaction_id).unwrap();
 
         assert_eq!(outcome, Outcome::TransactionCommitSuccess);
 
         for (key, content) in key_content_pairs.iter() {
-            let condition = SelectCondition::Key(key.clone(), None);
-            let command = Command::Select {
-                grouping: grouping.clone(),
-                condition,
-            };
-
-            client.write(&command.marshal()).unwrap();
-
-            let buffer = client.read().unwrap();
-            let (outcome, _) = Outcome::parse(&buffer).unwrap();
+            let outcome = client.get_by_key(&grouping, &key).unwrap();
             assert_eq!(outcome, Outcome::Select(vec![content.clone()]));
         }
     }
@@ -489,7 +339,9 @@ mod tcp_e2e_tests {
     #[test]
     fn tcp_e2e_atomicity_abort() {
         let port = 8008;
-        launch_db_server("tcp_e2e_atomicity_abort", None, Some(port)).unwrap();
+        thread::spawn(move || {
+            launch_db_server("tcp_e2e_atomicity_abort", None, Some(port)).unwrap()
+        });
         notified_sleep(5);
 
         let host = &format!("{}:{}", Constants::SERVER_END_POINT, port);
@@ -497,11 +349,7 @@ mod tcp_e2e_tests {
         let grouping = GroupingLabel::new("any_grouping".as_bytes());
         let expected_transaction_id = TransactionId::new(1);
 
-        let command = Command::CreateTransaction;
-        client.write(&command.marshal()).unwrap();
-
-        let buffer = client.read().unwrap();
-        let (outcome, _) = Outcome::parse(&buffer).unwrap();
+        let outcome = client.create_transaction().unwrap();
 
         assert_eq!(
             outcome,
@@ -511,42 +359,19 @@ mod tcp_e2e_tests {
         let key_content_pairs = get_key_content_pairs();
 
         for (key, content) in key_content_pairs.iter() {
-            let command = Command::TransactionalInsert {
-                grouping: grouping.clone(),
-                key: key.clone(),
-                content: content.clone(),
-                transaction_id: expected_transaction_id,
-            };
-
-            client.write(&command.marshal()).unwrap();
-
-            let buffer = client.read().unwrap();
-            let (outcome, _) = Outcome::parse(&buffer).unwrap();
+            let outcome = client
+                .transactional_set_unit(&grouping, &key, &content, &expected_transaction_id)
+                .unwrap();
 
             assert_eq!(outcome, Outcome::TransactionalInsertSuccess);
         }
 
-        let command = Command::TransactionAbort {
-            transaction_id: expected_transaction_id,
-        };
-        client.write(&command.marshal()).unwrap();
-
-        let buffer = client.read().unwrap();
-        let (outcome, _) = Outcome::parse(&buffer).unwrap();
+        let outcome = client.abort_transaction(&expected_transaction_id).unwrap();
 
         assert_eq!(outcome, Outcome::TransactionAbortSuccess);
 
         for (key, _content) in key_content_pairs.iter() {
-            let condition = SelectCondition::Key(key.clone(), None);
-            let command = Command::Select {
-                grouping: grouping.clone(),
-                condition,
-            };
-
-            client.write(&command.marshal()).unwrap();
-
-            let buffer = client.read().unwrap();
-            let (outcome, _) = Outcome::parse(&buffer).unwrap();
+            let outcome = client.get_by_key(&grouping, &key).unwrap();
 
             assert_eq!(outcome, Outcome::Select(vec![]));
         }
@@ -555,7 +380,7 @@ mod tcp_e2e_tests {
     #[test]
     fn tcp_e2e_set_isolation() {
         let port = 8009;
-        launch_db_server("tcp_e2e_set_isolation", None, Some(port)).unwrap();
+        thread::spawn(move || launch_db_server("tcp_e2e_set_isolation", None, Some(port)).unwrap());
         notified_sleep(5);
 
         let host = &format!("{}:{}", Constants::SERVER_END_POINT, port);
@@ -564,80 +389,38 @@ mod tcp_e2e_tests {
 
         let transaction_id = TransactionId::new(1);
 
-        let command = Command::CreateTransaction;
-        client.write(&command.marshal()).unwrap();
-
-        let buffer = client.read().unwrap();
-        let (outcome, _) = Outcome::parse(&buffer).unwrap();
+        let outcome = client.create_transaction().unwrap();
 
         assert_eq!(outcome, Outcome::CreateTransaction(transaction_id.clone()));
 
         let unit_key = UnitKey::from("key1");
         let content = UnitContent::String(String::from("This is string"));
-        let command = Command::TransactionalInsert {
-            grouping: grouping.clone(),
-            key: unit_key.clone(),
-            content: content.clone(),
-            transaction_id: transaction_id.clone(),
-        };
-
-        client.write(&command.marshal()).unwrap();
-
-        let buffer = client.read().unwrap();
-        let (outcome, _) = Outcome::parse(&buffer).unwrap();
+        let outcome = client
+            .transactional_set_unit(&grouping, &unit_key, &content, &transaction_id)
+            .unwrap();
 
         assert_eq!(outcome, Outcome::TransactionalInsertSuccess);
 
         {
-            let condition = SelectCondition::Key(unit_key.clone(), Some(transaction_id.clone()));
-            let command = Command::Select {
-                grouping: grouping.clone(),
-                condition,
-            };
-            client.write(&command.marshal()).unwrap();
-
-            let buffer = client.read().unwrap();
-            let (outcome, _) = Outcome::parse(&buffer).unwrap();
+            let outcome = client
+                .transactional_get(&grouping, &unit_key, &transaction_id)
+                .unwrap();
 
             assert_eq!(outcome, Outcome::Select(vec![content.clone()]));
         }
 
         {
-            let condition = SelectCondition::Key(unit_key.clone(), None);
-            let command = Command::Select {
-                grouping: grouping.clone(),
-                condition,
-            };
-
-            client.write(&command.marshal()).unwrap();
-
-            let buffer = client.read().unwrap();
-            let (outcome, _) = Outcome::parse(&buffer).unwrap();
+            let outcome = client.get_by_key(&grouping, &unit_key).unwrap();
 
             assert_eq!(outcome, Outcome::Select(vec![]));
         }
 
-        let command = Command::TransactionCommit {
-            transaction_id: transaction_id.clone(),
-        };
-        client.write(&command.marshal()).unwrap();
-
-        let buffer = client.read().unwrap();
-        let (outcome, _) = Outcome::parse(&buffer).unwrap();
+        let outcome = client.commit_transaction(&transaction_id).unwrap();
 
         assert_eq!(outcome, Outcome::TransactionCommitSuccess);
 
         {
-            let condition = SelectCondition::Key(unit_key.clone(), None);
-            let command = Command::Select {
-                grouping: grouping.clone(),
-                condition,
-            };
-
-            client.write(&command.marshal()).unwrap();
-
-            let buffer = client.read().unwrap();
-            let (outcome, _) = Outcome::parse(&buffer).unwrap();
+            let outcome = client.get_by_key(&grouping, &unit_key).unwrap();
 
             assert_eq!(outcome, Outcome::Select(vec![content]));
         }
@@ -646,7 +429,9 @@ mod tcp_e2e_tests {
     #[test]
     fn tcp_e2e_remove_one_isolation() {
         let port = 8010;
-        launch_db_server("tcp_e2e_remove_one_isolation", None, Some(port)).unwrap();
+        thread::spawn(move || {
+            launch_db_server("tcp_e2e_remove_one_isolation", None, Some(port)).unwrap()
+        });
         notified_sleep(5);
 
         let host = &format!("{}:{}", Constants::SERVER_END_POINT, port);
@@ -659,65 +444,30 @@ mod tcp_e2e_tests {
         let (target_key, _target_content) = &key_content_pairs[target_pair_index];
 
         for (key, content) in key_content_pairs.iter() {
-            let command = Command::Insert {
-                grouping: grouping.clone(),
-                key: key.clone(),
-                content: content.clone(),
-            };
-
-            client.write(&command.marshal()).unwrap();
-
-            let buffer = client.read().unwrap();
-            let (outcome, _) = Outcome::parse(&buffer).unwrap();
+            let outcome = client.set_unit(&grouping, &key, &content).unwrap();
 
             assert_eq!(outcome, Outcome::InsertSuccess);
         }
 
-        let command = Command::CreateTransaction;
-        client.write(&command.marshal()).unwrap();
-
-        let buffer = client.read().unwrap();
-        let (outcome, _) = Outcome::parse(&buffer).unwrap();
+        let outcome = client.create_transaction().unwrap();
 
         assert_eq!(
             outcome,
             Outcome::CreateTransaction(expected_transaction_id.clone())
         );
 
-        let command = Command::TransactionalRemoveOne {
-            grouping: grouping.clone(),
-            key: target_key.clone(),
-            transaction_id: expected_transaction_id,
-        };
-
-        client.write(&command.marshal()).unwrap();
-
-        let buffer = client.read().unwrap();
-        let (outcome, _) = Outcome::parse(&buffer).unwrap();
+        let outcome = client
+            .transactional_remove_one(&expected_transaction_id, &grouping, &target_key)
+            .unwrap();
 
         assert_eq!(outcome, Outcome::TransactionalRemoveOneSuccess);
 
-        let command = Command::TransactionCommit {
-            transaction_id: expected_transaction_id.clone(),
-        };
-        client.write(&command.marshal()).unwrap();
-
-        let buffer = client.read().unwrap();
-        let (outcome, _) = Outcome::parse(&buffer).unwrap();
+        let outcome = client.commit_transaction(&expected_transaction_id).unwrap();
 
         assert_eq!(outcome, Outcome::TransactionCommitSuccess);
 
         for (key, content) in key_content_pairs.iter() {
-            let condition = SelectCondition::Key(key.clone(), None);
-            let command = Command::Select {
-                grouping: grouping.clone(),
-                condition,
-            };
-
-            client.write(&command.marshal()).unwrap();
-
-            let buffer = client.read().unwrap();
-            let (outcome, _) = Outcome::parse(&buffer).unwrap();
+            let outcome = client.get_by_key(&grouping, &key).unwrap();
 
             if key == target_key {
                 assert_eq!(outcome, Outcome::Select(vec![]));
@@ -730,7 +480,9 @@ mod tcp_e2e_tests {
     #[test]
     fn tcp_e2e_revert_one_isolation() {
         let port = 8011;
-        launch_db_server("tcp_e2e_revert_one_isolation", None, Some(port)).unwrap();
+        thread::spawn(move || {
+            launch_db_server("tcp_e2e_revert_one_isolation", None, Some(port)).unwrap()
+        });
         notified_sleep(5);
 
         let host = &format!("{}:{}", Constants::SERVER_END_POINT, port);
@@ -752,81 +504,32 @@ mod tcp_e2e_tests {
         ];
 
         for content in contents.iter() {
-            let command = Command::Insert {
-                grouping: grouping.clone(),
-                key: key.clone(),
-                content: content.clone(),
-            };
-
-            client.write(&command.marshal()).unwrap();
-
-            let buffer = client.read().unwrap();
-            let (outcome, _) = Outcome::parse(&buffer).unwrap();
+            let outcome = client.set_unit(&grouping, &key, &content).unwrap();
 
             assert_eq!(outcome, Outcome::InsertSuccess);
         }
 
-        let command = Command::CreateTransaction;
-        client.write(&command.marshal()).unwrap();
-
-        let buffer = client.read().unwrap();
-        let (outcome, _) = Outcome::parse(&buffer).unwrap();
+        let outcome = client.create_transaction().unwrap();
 
         assert_eq!(
             outcome,
             Outcome::CreateTransaction(expected_transaction_id.clone())
         );
 
-        let command = Command::TransactionalRevertOne {
-            grouping: grouping.clone(),
-            key: key.clone(),
-            height: target_height.clone(),
-            transaction_id: expected_transaction_id.clone(),
-        };
-
-        client.write(&command.marshal()).unwrap();
-
-        let buffer = client.read().unwrap();
-        let (outcome, _) = Outcome::parse(&buffer).unwrap();
+        let outcome = client
+            .transactional_revert_one(&grouping, &key, &target_height, &expected_transaction_id)
+            .unwrap();
 
         assert_eq!(outcome, Outcome::TransactionalRevertOneSuccess);
 
-        let condition = SelectCondition::Key(key.clone(), None);
-        let command = Command::Select {
-            grouping: grouping.clone(),
-            condition,
-        };
-
-        client.write(&command.marshal()).unwrap();
-
-        let buffer = client.read().unwrap();
-        let (outcome, _) = Outcome::parse(&buffer).unwrap();
-
+        let outcome = client.get_by_key(&grouping, &key).unwrap();
         let expected_output = contents.last().unwrap();
         assert_eq!(outcome, Outcome::Select(vec![expected_output.clone()]));
 
-        let command = Command::TransactionCommit {
-            transaction_id: expected_transaction_id.clone(),
-        };
-
-        client.write(&command.marshal()).unwrap();
-
-        let buffer = client.read().unwrap();
-        let (outcome, _) = Outcome::parse(&buffer).unwrap();
-
+        let outcome = client.commit_transaction(&expected_transaction_id).unwrap();
         assert_eq!(outcome, Outcome::TransactionCommitSuccess);
 
-        let condition = SelectCondition::Key(key.clone(), None);
-        let command = Command::Select {
-            grouping: grouping.clone(),
-            condition,
-        };
-
-        client.write(&command.marshal()).unwrap();
-
-        let buffer = client.read().unwrap();
-        let (outcome, _) = Outcome::parse(&buffer).unwrap();
-
+        let outcome = client.get_by_key(&grouping, &key).unwrap();
         let expected_content = &contents[target_pair_index as usize];
         assert_eq!(outcome, Outcome::Select(vec![expected_content.clone()]));
     }
@@ -834,7 +537,9 @@ mod tcp_e2e_tests {
     #[test]
     fn tcp_e2e_remove_all_isolation() {
         let port = 8012;
-        launch_db_server("tcp_e2e_remove_all_isolation", None, Some(port)).unwrap();
+        thread::spawn(move || {
+            launch_db_server("tcp_e2e_remove_all_isolation", None, Some(port)).unwrap()
+        });
         notified_sleep(5);
 
         let host = &format!("{}:{}", Constants::SERVER_END_POINT, port);
@@ -845,49 +550,26 @@ mod tcp_e2e_tests {
         let key_content_pairs = get_key_content_pairs();
 
         for (key, content) in key_content_pairs.iter() {
-            let command = Command::Insert {
-                grouping: grouping.clone(),
-                key: key.clone(),
-                content: content.clone(),
-            };
-
-            client.write(&command.marshal()).unwrap();
-
-            let buffer = client.read().unwrap();
-            let (outcome, _) = Outcome::parse(&buffer).unwrap();
+            let outcome = client.set_unit(&grouping, &key, &content).unwrap();
 
             assert_eq!(outcome, Outcome::InsertSuccess);
         }
 
-        let command = Command::CreateTransaction;
-        client.write(&command.marshal()).unwrap();
-
-        let buffer = client.read().unwrap();
-        let (outcome, _) = Outcome::parse(&buffer).unwrap();
+        let outcome = client.create_transaction().unwrap();
 
         assert_eq!(
             outcome,
             Outcome::CreateTransaction(expected_transaction_id.clone())
         );
 
-        let command = Command::RemoveAll;
-        client.write(&command.marshal()).unwrap();
-
-        let buffer = client.read().unwrap();
-        let (outcome, _) = Outcome::parse(&buffer).unwrap();
+        let outcome = client.remove_all().unwrap();
 
         assert_eq!(outcome, Outcome::RemoveAllSuccess);
 
         for (key, _content) in key_content_pairs.iter() {
-            let condition = SelectCondition::Key(key.clone(), Some(expected_transaction_id));
-            let command = Command::Select {
-                grouping: grouping.clone(),
-                condition,
-            };
-            client.write(&command.marshal()).unwrap();
-
-            let buffer = client.read().unwrap();
-            let (outcome, _) = Outcome::parse(&buffer).unwrap();
+            let outcome = client
+                .transactional_get(&grouping, &key, &expected_transaction_id)
+                .unwrap();
 
             assert_eq!(outcome, Outcome::Select(vec![]));
         }
@@ -896,7 +578,9 @@ mod tcp_e2e_tests {
     #[test]
     fn tcp_e2e_revert_all_isolation() {
         let port = 8013;
-        launch_db_server("tcp_e2e_revert_all_isolation", None, Some(port)).unwrap();
+        thread::spawn(move || {
+            launch_db_server("tcp_e2e_revert_all_isolation", None, Some(port)).unwrap()
+        });
         notified_sleep(5);
 
         let host = &format!("{}:{}", Constants::SERVER_END_POINT, port);
@@ -909,50 +593,23 @@ mod tcp_e2e_tests {
         let target_height = ChainHeight::new(target_pair_index);
 
         for (key, content) in key_content_pairs.iter() {
-            let command = Command::Insert {
-                grouping: grouping.clone(),
-                key: key.clone(),
-                content: content.clone(),
-            };
-
-            client.write(&command.marshal()).unwrap();
-
-            let buffer = client.read().unwrap();
-            let (outcome, _) = Outcome::parse(&buffer).unwrap();
+            let outcome = client.set_unit(&grouping, &key, &content).unwrap();
 
             assert_eq!(outcome, Outcome::InsertSuccess);
         }
 
-        let command = Command::CreateTransaction;
-        client.write(&command.marshal()).unwrap();
-
-        let buffer = client.read().unwrap();
-        let (outcome, _) = Outcome::parse(&buffer).unwrap();
+        let outcome = client.create_transaction().unwrap();
 
         assert_eq!(outcome, Outcome::CreateTransaction(expected_transaction_id));
 
-        let command = Command::RevertAll {
-            height: target_height.clone(),
-        };
-
-        client.write(&command.marshal()).unwrap();
-
-        let buffer = client.read().unwrap();
-        let (outcome, _) = Outcome::parse(&buffer).unwrap();
+        let outcome = client.revert_all(&target_height).unwrap();
 
         assert_eq!(outcome, Outcome::RevertAllSuccess);
 
         for (index, (key, content)) in key_content_pairs.iter().enumerate() {
-            let condition = SelectCondition::Key(key.clone(), Some(expected_transaction_id));
-            let command = Command::Select {
-                grouping: grouping.clone(),
-                condition,
-            };
-
-            client.write(&command.marshal()).unwrap();
-
-            let buffer = client.read().unwrap();
-            let (outcome, _) = Outcome::parse(&buffer).unwrap();
+            let outcome = client
+                .transactional_get(&grouping, &key, &expected_transaction_id)
+                .unwrap();
 
             if index <= target_height.as_u64() as usize {
                 assert_eq!(outcome, Outcome::Select(vec![content.clone()]));
@@ -966,12 +623,14 @@ mod tcp_e2e_tests {
     #[should_panic]
     fn tcp_e2e_transaction_not_alive_after_revert_all() {
         let port = 8014;
-        let handlers = launch_db_server(
-            "tcp_e2e_transaction_not_alive_after_revert_all",
-            None,
-            Some(port),
-        )
-        .unwrap();
+        thread::spawn(move || {
+            launch_db_server(
+                "tcp_e2e_transaction_not_alive_after_revert_all",
+                None,
+                Some(port),
+            )
+            .unwrap()
+        });
         notified_sleep(5);
 
         let host = &format!("{}:{}", Constants::SERVER_END_POINT, port);
@@ -984,57 +643,29 @@ mod tcp_e2e_tests {
         let target_height = ChainHeight::new(target_pair_index);
 
         for (key, content) in key_content_pairs.iter() {
-            let command = Command::Insert {
-                grouping: grouping.clone(),
-                key: key.clone(),
-                content: content.clone(),
-            };
-
-            client.write(&command.marshal()).unwrap();
-
-            let buffer = client.read().unwrap();
-            let (outcome, _) = Outcome::parse(&buffer).unwrap();
+            let outcome = client.set_unit(&grouping, &key, &content).unwrap();
 
             assert_eq!(outcome, Outcome::InsertSuccess);
         }
 
-        let command = Command::CreateTransaction;
-        client.write(&command.marshal()).unwrap();
-
-        let buffer = client.read().unwrap();
-        let (outcome, _) = Outcome::parse(&buffer).unwrap();
+        let outcome = client.create_transaction().unwrap();
 
         assert_eq!(outcome, Outcome::CreateTransaction(expected_transaction_id));
 
-        let command = Command::RevertAll {
-            height: target_height.clone(),
-        };
-
-        client.write(&command.marshal()).unwrap();
-
-        let buffer = client.read().unwrap();
-        let (outcome, _) = Outcome::parse(&buffer).unwrap();
+        let outcome = client.revert_all(&target_height).unwrap();
 
         assert_eq!(outcome, Outcome::RevertAllSuccess);
 
-        let command = Command::TransactionCommit {
-            transaction_id: expected_transaction_id,
-        };
-
-        client.write(&command.marshal()).unwrap();
-
-        for handler in handlers {
-            let server_result = handler.join().unwrap();
-            server_result.unwrap();
-        }
+        client.commit_transaction(&expected_transaction_id).unwrap();
     }
 
     #[test]
     #[should_panic]
     fn tcp_e2e_unexpected_commit_transaction_id() {
         let port = 8016;
-        let handlers =
-            launch_db_server("tcp_e2e_unexpected_commit_transaction_id", None, Some(port)).unwrap();
+        thread::spawn(move || {
+            launch_db_server("tcp_e2e_unexpected_commit_transaction_id", None, Some(port)).unwrap()
+        });
         notified_sleep(5);
 
         let host = &format!("{}:{}", Constants::SERVER_END_POINT, port);
@@ -1042,23 +673,16 @@ mod tcp_e2e_tests {
 
         let fake_transaction_id = TransactionId::new(100);
 
-        let command = Command::TransactionCommit {
-            transaction_id: fake_transaction_id,
-        };
-
-        client.write(&command.marshal()).unwrap();
-        for handler in handlers {
-            let server_result = handler.join().unwrap();
-            server_result.unwrap();
-        }
+        client.commit_transaction(&fake_transaction_id).unwrap();
     }
 
     #[test]
     #[should_panic]
     fn tcp_e2e_unexpected_abort_transaction_id() {
         let port = 8015;
-        let handlers =
-            launch_db_server("tcp_e2e_unexpected_abort_transaction_id", None, Some(port)).unwrap();
+        thread::spawn(move || {
+            launch_db_server("tcp_e2e_unexpected_abort_transaction_id", None, Some(port)).unwrap()
+        });
         notified_sleep(5);
 
         let host = &format!("{}:{}", Constants::SERVER_END_POINT, port);
@@ -1066,21 +690,15 @@ mod tcp_e2e_tests {
 
         let fake_transaction_id = TransactionId::new(100);
 
-        let command = Command::TransactionAbort {
-            transaction_id: fake_transaction_id,
-        };
-
-        client.write(&command.marshal()).unwrap();
-        for handler in handlers {
-            let server_result = handler.join().unwrap();
-            server_result.unwrap();
-        }
+        client.abort_transaction(&fake_transaction_id).unwrap();
     }
 
     #[test]
     fn tcp_e2e_last_one_commit_wins() {
         let port = 8017;
-        launch_db_server("tcp_e2e_last_one_commit_wins", None, Some(port)).unwrap();
+        thread::spawn(move || {
+            launch_db_server("tcp_e2e_last_one_commit_wins", None, Some(port)).unwrap()
+        });
         notified_sleep(5);
 
         let host = &format!("{}:{}", Constants::SERVER_END_POINT, port);
@@ -1111,89 +729,35 @@ mod tcp_e2e_tests {
         let expected_tid_1 = TransactionId::new(1);
         let expected_tid_2 = TransactionId::new(2);
 
-        let command = Command::CreateTransaction;
-        client.write(&command.marshal()).unwrap();
-
-        let buffer = client.read().unwrap();
-        let (outcome, _) = Outcome::parse(&buffer).unwrap();
-
+        let outcome = client.create_transaction().unwrap();
         assert_eq!(outcome, Outcome::CreateTransaction(expected_tid_1));
 
-        let command = Command::CreateTransaction;
-        client.write(&command.marshal()).unwrap();
-
-        let buffer = client.read().unwrap();
-        let (outcome, _) = Outcome::parse(&buffer).unwrap();
-
+        let outcome = client.create_transaction().unwrap();
         assert_eq!(outcome, Outcome::CreateTransaction(expected_tid_2));
 
         for kv_pairs in mixed_kv_pairs {
             let kv_1 = kv_pairs.0;
             let kv_2 = kv_pairs.1;
 
-            let command = Command::TransactionalInsert {
-                grouping: grouping.clone(),
-                key: kv_1.0.clone(),
-                content: kv_1.1.clone(),
-                transaction_id: expected_tid_1,
-            };
-
-            client.write(&command.marshal()).unwrap();
-
-            let buffer = client.read().unwrap();
-            let (outcome, _) = Outcome::parse(&buffer).unwrap();
-
+            let outcome = client
+                .transactional_set_unit(&grouping, &kv_1.0, &kv_1.1, &expected_tid_1)
+                .unwrap();
             assert_eq!(outcome, Outcome::TransactionalInsertSuccess);
 
-            let command = Command::TransactionalInsert {
-                grouping: grouping.clone(),
-                key: kv_2.0.clone(),
-                content: kv_2.1.clone(),
-                transaction_id: expected_tid_2,
-            };
-
-            client.write(&command.marshal()).unwrap();
-
-            let buffer = client.read().unwrap();
-            let (outcome, _) = Outcome::parse(&buffer).unwrap();
-
+            let outcome = client
+                .transactional_set_unit(&grouping, &kv_2.0, &kv_2.1, &expected_tid_2)
+                .unwrap();
             assert_eq!(outcome, Outcome::TransactionalInsertSuccess);
         }
 
-        let command = Command::TransactionCommit {
-            transaction_id: expected_tid_1,
-        };
-
-        client.write(&command.marshal()).unwrap();
-
-        let buffer = client.read().unwrap();
-        let (outcome, _) = Outcome::parse(&buffer).unwrap();
-
+        let outcome = client.commit_transaction(&expected_tid_1).unwrap();
         assert_eq!(outcome, Outcome::TransactionCommitSuccess);
 
-        let command = Command::TransactionCommit {
-            transaction_id: expected_tid_2,
-        };
-
-        client.write(&command.marshal()).unwrap();
-
-        let buffer = client.read().unwrap();
-        let (outcome, _) = Outcome::parse(&buffer).unwrap();
-
+        let outcome = client.commit_transaction(&expected_tid_2).unwrap();
         assert_eq!(outcome, Outcome::TransactionCommitSuccess);
 
         for (index, key) in shared_keys.iter().enumerate() {
-            let condition = SelectCondition::Key(key.clone(), None);
-            let command = Command::Select {
-                grouping: grouping.clone(),
-                condition,
-            };
-
-            client.write(&command.marshal()).unwrap();
-
-            let buffer = client.read().unwrap();
-            let (outcome, _) = Outcome::parse(&buffer).unwrap();
-
+            let outcome = client.get_by_key(&grouping, &key).unwrap();
             let expected_content = key_value_pairs_2[index].1.clone();
             assert_eq!(outcome, Outcome::Select(vec![expected_content]));
         }
@@ -1202,7 +766,9 @@ mod tcp_e2e_tests {
     #[test]
     fn tcp_e2e_read_inside_transaction() {
         let port = 8018;
-        launch_db_server("tcp_e2e_read_inside_transaction", None, Some(port)).unwrap();
+        thread::spawn(move || {
+            launch_db_server("tcp_e2e_read_inside_transaction", None, Some(port)).unwrap()
+        });
         notified_sleep(5);
 
         let host = &format!("{}:{}", Constants::SERVER_END_POINT, port);
@@ -1212,41 +778,18 @@ mod tcp_e2e_tests {
         let key = UnitKey::from("a");
         let value = UnitContent::String(String::from("1"));
 
-        let command = Command::Insert {
-            grouping: grouping.clone(),
-            key: key.clone(),
-            content: value.clone(),
-        };
-
-        client.write(&command.marshal()).unwrap();
-
-        let buffer = client.read().unwrap();
-        let (outcome, _) = Outcome::parse(&buffer).unwrap();
-
+        let outcome = client.set_unit(&grouping, &key, &value).unwrap();
         assert_eq!(outcome, Outcome::InsertSuccess);
 
         let expected_tid = TransactionId::new(1);
-        let command = Command::CreateTransaction;
-
-        client.write(&command.marshal()).unwrap();
-
-        let buffer = client.read().unwrap();
-        let (outcome, _) = Outcome::parse(&buffer).unwrap();
+        let outcome = client.create_transaction().unwrap();
 
         assert_eq!(outcome, Outcome::CreateTransaction(expected_tid));
 
         {
-            let condition = SelectCondition::Key(key.clone(), Some(expected_tid));
-            let command = Command::Select {
-                grouping: grouping.clone(),
-                condition,
-            };
-
-            client.write(&command.marshal()).unwrap();
-
-            let buffer = client.read().unwrap();
-            let (outcome, _) = Outcome::parse(&buffer).unwrap();
-
+            let outcome = client
+                .transactional_get(&grouping, &key, &expected_tid)
+                .unwrap();
             assert_eq!(outcome, Outcome::Select(vec![value]));
         }
     }
@@ -1254,7 +797,7 @@ mod tcp_e2e_tests {
     #[test]
     fn tcp_e2e_dirty_read() {
         let port = 8019;
-        launch_db_server("tcp_e2e_dirty_read", None, Some(port)).unwrap();
+        thread::spawn(move || launch_db_server("tcp_e2e_dirty_read", None, Some(port)).unwrap());
         notified_sleep(5);
 
         let host = &format!("{}:{}", Constants::SERVER_END_POINT, port);
@@ -1265,96 +808,35 @@ mod tcp_e2e_tests {
         let origin_value = UnitContent::String(String::from("1"));
         let value_in_transaction = UnitContent::String(String::from("2"));
 
-        let command = Command::Insert {
-            grouping: grouping.clone(),
-            key: key.clone(),
-            content: origin_value.clone(),
-        };
-
-        client.write(&command.marshal()).unwrap();
-
-        let buffer = client.read().unwrap();
-        let (outcome, _) = Outcome::parse(&buffer).unwrap();
-
+        let outcome = client.set_unit(&grouping, &key, &origin_value).unwrap();
         assert_eq!(outcome, Outcome::InsertSuccess);
 
         let expected_tid = TransactionId::new(1);
-
-        let command = Command::CreateTransaction;
-        client.write(&command.marshal()).unwrap();
-
-        let buffer = client.read().unwrap();
-        let (outcome, _) = Outcome::parse(&buffer).unwrap();
-
+        let outcome = client.create_transaction().unwrap();
         assert_eq!(outcome, Outcome::CreateTransaction(expected_tid));
 
         {
-            let condition = SelectCondition::Key(key.clone(), None);
-            let command = Command::Select {
-                grouping: grouping.clone(),
-                condition,
-            };
-
-            client.write(&command.marshal()).unwrap();
-
-            let buffer = client.read().unwrap();
-            let (outcome, _) = Outcome::parse(&buffer).unwrap();
-
+            let outcome = client.get_by_key(&grouping, &key).unwrap();
             assert_eq!(outcome, Outcome::Select(vec![origin_value.clone()]));
         }
 
         {
-            let command = Command::TransactionalInsert {
-                grouping: grouping.clone(),
-                key: key.clone(),
-                content: value_in_transaction.clone(),
-                transaction_id: expected_tid,
-            };
-
-            client.write(&command.marshal()).unwrap();
-
-            let buffer = client.read().unwrap();
-            let (outcome, _) = Outcome::parse(&buffer).unwrap();
-
+            let outcome = client
+                .transactional_set_unit(&grouping, &key, &value_in_transaction, &expected_tid)
+                .unwrap();
             assert_eq!(outcome, Outcome::TransactionalInsertSuccess);
 
-            let condition = SelectCondition::Key(key.clone(), None);
-            let command = Command::Select {
-                grouping: grouping.clone(),
-                condition,
-            };
-
-            client.write(&command.marshal()).unwrap();
-
-            let buffer = client.read().unwrap();
-            let (outcome, _) = Outcome::parse(&buffer).unwrap();
-
+            let outcome = client.get_by_key(&grouping, &key).unwrap();
             assert_eq!(outcome, Outcome::Select(vec![origin_value.clone()]));
         }
 
-        let command = Command::TransactionCommit {
-            transaction_id: expected_tid.clone(),
-        };
-
-        client.write(&command.marshal()).unwrap();
-
-        let buffer = client.read().unwrap();
-        let (outcome, _) = Outcome::parse(&buffer).unwrap();
-
+        let outcome = client.commit_transaction(&expected_tid).unwrap();
         assert_eq!(outcome, Outcome::TransactionCommitSuccess);
 
         {
-            let condition = SelectCondition::Key(key.clone(), Some(expected_tid));
-            let command = Command::Select {
-                grouping: grouping.clone(),
-                condition,
-            };
-
-            client.write(&command.marshal()).unwrap();
-
-            let buffer = client.read().unwrap();
-            let (outcome, _) = Outcome::parse(&buffer).unwrap();
-
+            let outcome = client
+                .transactional_get(&grouping, &key, &expected_tid)
+                .unwrap();
             assert_eq!(outcome, Outcome::Select(vec![value_in_transaction]));
         }
     }
@@ -1444,7 +926,7 @@ mod tcp_e2e_tests {
         contents.extend_from_slice(&unsatisfied_content);
 
         let port = 8020;
-        launch_db_server("tcp_e2e_filter_read", None, Some(port)).unwrap();
+        thread::spawn(move || launch_db_server("tcp_e2e_filter_read", None, Some(port)).unwrap());
         notified_sleep(5);
 
         let host = &format!("{}:{}", Constants::SERVER_END_POINT, port);
@@ -1456,32 +938,14 @@ mod tcp_e2e_tests {
             let key_str = format!("{}", index);
             let unit_key = UnitKey::new(key_str.as_bytes());
 
-            let command = Command::Insert {
-                grouping: grouping.clone(),
-                key: unit_key.clone(),
-                content: unit_content.clone(),
-            };
-
-            client.write(&command.marshal()).unwrap();
-
-            let buffer = client.read().unwrap();
-            let (outcome, _) = Outcome::parse(&buffer).unwrap();
-
+            let outcome = client
+                .set_unit(&grouping, &unit_key, &unit_content)
+                .unwrap();
             assert_eq!(outcome, Outcome::InsertSuccess);
         }
 
         let filter = get_filter();
-
-        let condition = SelectCondition::Filter(filter);
-        let command = Command::Select {
-            grouping: grouping.clone(),
-            condition,
-        };
-
-        client.write(&command.marshal()).unwrap();
-
-        let buffer = client.read().unwrap();
-        let (outcome, _) = Outcome::parse(&buffer).unwrap();
+        let outcome = client.get_by_filter(&grouping, &filter).unwrap();
 
         match outcome {
             Outcome::Select(actual_satisfied_contents) => {

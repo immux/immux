@@ -116,7 +116,7 @@ impl ImmuxDBHttpClient {
 
         match response.text() {
             Ok(text) => Ok((status_code, text)),
-            Err(error) => Err(ImmuxDBClientError::Reqwest(error.into())),
+            Err(error) => Err(ImmuxDBHttpClientError::Reqwest(error.into())),
         }
     }
 
