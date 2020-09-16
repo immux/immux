@@ -306,6 +306,40 @@ mod unit_content_tests {
     }
 
     #[test]
+    fn unit_content_marshal_parse_reversibility() {
+        let mut map = HashMap::new();
+        map.insert(
+            String::from("brand"),
+            UnitContent::String(String::from("apple")),
+        );
+        map.insert(String::from("price"), UnitContent::Float64(4000.0));
+        let map_content = UnitContent::Map(map);
+
+        let contents = vec![
+            map_content,
+            UnitContent::String(String::from("this is a string")),
+            UnitContent::Bool(true),
+            UnitContent::Bool(false),
+            UnitContent::Nil,
+            UnitContent::String(String::from("true")),
+            UnitContent::String(String::from("false")),
+            UnitContent::String(String::from("Nil")),
+            UnitContent::Array(vec![
+                UnitContent::Float64(1.0),
+                UnitContent::String(String::from("Andy")),
+            ]),
+        ];
+
+        for content in contents {
+            let expected_output = &content;
+            let content_bytes = content.marshal();
+            let (actual_output, offset) = UnitContent::parse(&content_bytes).unwrap();
+            assert_eq!(expected_output, &actual_output);
+            assert_eq!(content_bytes.len(), offset);
+        }
+    }
+
+    #[test]
     fn unit_content_from_string() {
         let mut map = HashMap::new();
         map.insert(
