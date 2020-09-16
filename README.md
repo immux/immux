@@ -13,7 +13,7 @@ GET /.transactions/tid/grouping/unit_id ("get" within transaction)
 GET /grouping/id/.journal ("inspect_one")
 GET /.journal ("inspect all")
 GET /grouping?filter=xx&lt=xxx&gtxxx
-GET /grouping (get all in grouping) (not implemented yet)
+GET /grouping (get all in grouping)
 
 PUT /grouping/id {data} ("set")
 PUT /grouping/id?height={height} ("revert one")
