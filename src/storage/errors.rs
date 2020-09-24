@@ -12,7 +12,7 @@ pub enum KVError {
     RevertOutOfRange,
     ParseIntError(ParseIntError),
     ChainHeightError(ChainHeightError),
-    PointToUnexpectedCommand,
+    PointToUnexpectedInstruction,
     TransactionManagerError(TransactionManagerError),
 }
 
