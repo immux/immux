@@ -1,0 +1,145 @@
+@import '~antd/lib/style/themes/default';
+
+.menu:global(.@{ant-prefix}-menu) {
+  border-right: none;
+
+  :global {
+    .@{ant-prefix}-menu-item {
+      display: flex;
+      align-items: center;
+      border-radius: @border-radius-base;
+      transition: all 0.2s;
+
+      &:hover {
+        background: #f7f7f7;
+        color: @text-color;
+
+        :local {
+          .actions {
+            opacity: 1;
+          }
+        }
+      }
+
+      &.@{ant-prefix}-menu-item-selected {
+        background: @primary-1;
+        color: @primary-color;
+
+        &:after {
+          content: none;
+        }
+      }
+
+      .@{ant-prefix}-avatar {
+        margin-right: @padding-xs;
+      }
+    }
+  }
+
+  .content {
+    flex: 1;
+  }
+
+  .actions {
+    flex: 0;
+    opacity: 0;
+    transition: opacity 0.2s;
+
+    :global {
+      .@{iconfont-css-prefix} {
+        margin-right: 0;
+
+        &:not(:last-child) {
+          margin-right: @padding-xs;
+        }
+
+        &:hover {
+          color: @primary-color;
+        }
+      }
+    }
+  }
+}
+
+.card:global(.@{ant-prefix}-card) {
+  margin-top: @padding-xs;
+
+  :global {
+    .@{ant-prefix}-card {
+      &-head {
+        display: flex;
+        align-items: center;
+        padding: 0 @padding-md;
+        border-bottom: none;
+        line-height: round(@font-size-base * 1.4);
+        min-height: 36px;
+
+        &:hover .@{ant-prefix}-card-extra {
+          opacity: 1;
+        }
+
+        &-wrapper {
+          flex: 1;
+          cursor: pointer;
+        }
+
+        &-title {
+          font-weight: 400;
+          font-size: @font-size-base;
+          transition: color 0.2s;
+          color: @text-color-secondary;
+
+          &:hover {
+            color: @text-color;
+          }
+        }
+      }
+
+      &-head-title,
+      &-extra {
+        padding: 0;
+        color: #8c8c8c;
+      }
+
+      &-extra {
+        opacity: 0;
+        transition: opacity @animation-duration-base;
+
+        .@{iconfont-css-prefix} {
+          display: flex;
+          justify-content: center;
+          align-items: center;
+          width: @padding-lg;
+          height: @padding-lg;
+          transition: all 0.2s;
+
+          &:hover {
+            background: @primary-1;
+            color: @primary-color;
+          }
+
+          &:active {
+            background: darken(@primary-1, 4%);
+            color: @primary-7;
+          }
+
+          &:not(:last-child) {
+            margin-right: @padding-xs;
+          }
+        }
+      }
+
+      &-body {
+        padding: 0;
+      }
+    }
+  }
+
+  &.padding-content :global {
+    .@{ant-prefix}-card-body {
+      padding-left: @padding-md;
+      padding-right: @padding-md;
+      color: #262626;
+    }
+  }
+}

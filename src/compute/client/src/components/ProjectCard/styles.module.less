@@ -1,0 +1,263 @@
+@import '~antd/lib/style/themes/default';
+
+.theme(@theme) {
+  @color-1: '@{theme}-1';
+  @color-2: '@{theme}-2';
+  @color-3: '@{theme}-3';
+  @color-4: '@{theme}-4';
+  @color-6: '@{theme}-6';
+
+  &.@{theme} {
+    &:hover {
+      :global {
+        .@{ant-prefix}-card-body {
+          background: @@color-3;
+        }
+      }
+
+      .card-icon {
+        :global {
+          .@{iconfont-css-prefix} {
+            color: @@color-4;
+          }
+        }
+      }
+
+      .card-title,
+      .card-desc {
+        color: @white;
+      }
+
+      .extra-icon :global {
+        .@{iconfont-css-prefix} {
+          color: @@color-6;
+        }
+      }
+    }
+
+    :global {
+      .@{ant-prefix}-card {
+        &:hover {
+          box-shadow: 0 (@padding-xs / 2) @padding-xs fade(@primary-7, 10%);
+        }
+
+        &-body {
+          background: @@color-1;
+        }
+      }
+    }
+
+    .card-icon {
+      :global {
+        .@{iconfont-css-prefix} {
+          color: @@color-2;
+        }
+      }
+    }
+
+    .card-title {
+      color: @@color-6;
+    }
+
+    .card-desc {
+      color: @@color-3;
+    }
+
+    .extra-icon :global {
+      .@{iconfont-css-prefix} {
+        color: @@color-4;
+      }
+    }
+  }
+}
+
+.card {
+  padding-bottom: @padding-md;
+  border-radius: @border-radius-base;
+  transition: all @animation-duration-base;
+  cursor: pointer;
+
+  &:hover {
+    .extra-icon {
+      color: @white;
+    }
+
+    .icons .actions {
+      opacity: 1;
+    }
+
+    :global {
+      .@{ant-prefix}-card-body {
+        background: #bfbfbf;
+      }
+    }
+  }
+
+  &:hover &-content {
+    color: @white;
+  }
+
+  &:hover &-title small {
+    color: #f7f7f7;
+  }
+
+  &:hover &-desc {
+    opacity: 1;
+    margin-top: (@padding-xs / 2);
+    max-height: 40px;
+  }
+
+  &:hover &-icon :global {
+    .@{iconfont-css-prefix} {
+      color: #bbb;
+    }
+  }
+
+  &:active {
+    transform: scale(0.98);
+  }
+
+  :global {
+    .@{ant-prefix}-card {
+      padding-bottom: percentage(1 / 1.7);
+      height: 0;
+
+      &:hover {
+        box-shadow: 0 (@padding-xs / 2) @padding-xs fade(@black, 10%);
+      }
+
+      &-body {
+        position: absolute;
+        top: 0;
+        right: 0;
+        bottom: 0;
+        left: 0;
+        padding: 0;
+        background: #f7f7f7;
+        transition: background @animation-duration-base;
+      }
+    }
+  }
+
+  &-icon {
+    position: absolute;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    overflow: hidden;
+    font-size: 96px;
+
+    &.rotate :global {
+      .@{iconfont-css-prefix} {
+        transform: rotate(30deg);
+      }
+    }
+
+    :global {
+      .@{iconfont-css-prefix} {
+        position: absolute;
+        top: -@padding-xs;
+        right: -@padding-xs;
+        color: #eee;
+        transition: color @animation-duration-base;
+      }
+    }
+  }
+
+  &-content {
+    position: absolute;
+    right: @padding-md;
+    bottom: @padding-xs;
+    left: @padding-md;
+  }
+
+  &-header {
+    display: flex;
+
+    :global {
+      .@{ant-prefix}-tag {
+        border: none;
+        background: fade(@black, 20%);
+        line-height: @line-height-base * 1.115;
+        color: @white;
+      }
+    }
+  }
+
+  &-title {
+    flex: auto;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    transition: all @animation-duration-base;
+
+    small {
+      margin-left: @padding-xs;
+      color: @text-color-secondary;
+      transition: @animation-duration-base;
+
+      &:before {
+        content: '(';
+        margin-right: 0.25em;
+      }
+
+      &:after {
+        content: ')';
+        margin-left: 0.25em;
+      }
+    }
+  }
+
+  &-desc {
+    opacity: 0;
+    display: -webkit-box;
+    max-height: 0;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    font-size: @font-size-sm;
+    transition: all @animation-duration-base;
+  }
+
+  .theme(primary);
+
+  each(@preset-colors, {
+    .theme(@value);
+  });
+}
+
+.extra-icon {
+  position: absolute;
+  z-index: 2;
+  top: @padding-xs;
+  left: @padding-md;
+  font-size: @padding-lg;
+}
+
+.icons {
+  position: absolute;
+  z-index: 2;
+  top: @padding-xs;
+  right: @padding-md;
+  display: flex;
+  font-size: @font-size-lg;
+
+  .actions {
+    opacity: 0;
+    margin-right: @padding-xs;
+    transition: all @animation-duration-base;
+
+    > a,
+    & {
+      color: #f0f0f0;
+
+      &:hover {
+        color: @white;
+      }
+    }
+  }
+
+  .fixed-icons {
+  }
+}
