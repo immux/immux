@@ -1,6 +1,6 @@
 ## Description
 
-The master repository for Immux code, currently including:
+The master repository for Immux intergrated computing infrastructure, including:
 - **ImmuxDB**, the immutable database, and
 - **ImmuxCompute**, the immutable computing service.
 
@@ -142,3 +142,7 @@ flamegraph target/release/realistic-SOME_HASH
 Inspect the "flamegraph.svg" in a web browser (it's interactive).
 
 The exact executable name needs to be checked manually at the moment.
+
+## License
+
+GPLv3
