@@ -1,0 +1,100 @@
+@import '~antd/lib/style/themes/default';
+
+.aside {
+  width: 248px !important;
+}
+
+.section {
+  margin-top: @padding-md * 2;
+}
+
+.all-collection:global(.@{ant-prefix}-menu-item) {
+  font-weight: 500;
+
+  > a {
+    color: @primary-color !important;
+  }
+}
+
+.browsing-history {
+  &:hover .delete-btn {
+    opacity: 1;
+  }
+
+  .not-found {
+    font-style: italic;
+    color: @text-color-secondary;
+
+    small {
+      margin-left: @padding-xss;
+    }
+  }
+
+  .delete-btn {
+    opacity: 0;
+    padding: @padding-xss;
+    font-size: @font-size-base;
+    color: @error-color;
+    transition: all @animation-duration-base;
+    cursor: pointer;
+
+    &:hover {
+      background: @red-1;
+    }
+  }
+
+  .extra {
+    min-width: 88px;
+    text-align: right;
+  }
+
+  .name-space {
+    margin-right: @padding-xs;
+    color: @text-color-secondary;
+    transition: color @animation-duration-base;
+
+    &:before {
+      content: '@';
+      margin-right: 0.25em;
+      color: fade(@black, 20%);
+    }
+
+    &:hover {
+      &,
+      & > small {
+        color: @primary-color;
+      }
+    }
+
+    > small {
+      color: fade(@black, 30%);
+      transition: color @animation-duration-base;
+    }
+  }
+
+  .name-space,
+  :global(.@{ant-prefix}-list-item-meta-title) {
+    display: flex;
+    align-items: center;
+
+    > small {
+      margin-left: @padding-xs;
+
+      &:before {
+        content: '(';
+        margin-right: 0.25em;
+      }
+
+      &:after {
+        content: ')';
+        margin-left: 0.25em;
+      }
+    }
+  }
+
+  :global {
+    .@{ant-prefix}-list-item-meta-title > small {
+      color: @text-color-secondary;
+    }
+  }
+}

@@ -1,0 +1,38 @@
+@import '~antd/lib/style/themes/default';
+
+html {
+  /* width */
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+
+  /* Track */
+  ::-webkit-scrollbar-track {
+    background: #f9f9f9;
+  }
+
+  /* Handle */
+  ::-webkit-scrollbar-thumb {
+    background: #c0c0c0;
+  }
+
+  /* Handle on hover */
+  ::-webkit-scrollbar-thumb:hover {
+    background: #aaa;
+  }
+}
+
+.app {
+  width: 100%;
+}
+
+.switch-wrapper {
+  position: relative;
+
+  > div {
+    position: absolute;
+    width: 100%;
+    min-height: 100vh;
+  }
+}
