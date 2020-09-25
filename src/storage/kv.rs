@@ -5,7 +5,7 @@ use std::io::{BufReader, Seek, SeekFrom};
 use std::path::{Path, PathBuf};
 
 use crate::constants as Constants;
-use crate::storage::buffer_parser::CommandBufferParser;
+use crate::storage::buffer_parser::InstructionBufferParser;
 use crate::storage::chain_height::ChainHeight;
 use crate::storage::errors::{KVError, KVResult};
 use crate::storage::instruction::{Instruction, InstructionError};
@@ -64,7 +64,7 @@ impl LogKeyValueStore {
             return Err(InstructionError::KeyExceedsMaxLength.into());
         }
 
-        let command = {
+        let instruction = {
             if let Some(transaction_id) = transaction_id {
                 self.transaction_manager
                     .validate_transaction_id(&transaction_id)?;
@@ -84,7 +84,7 @@ impl LogKeyValueStore {
             }
         };
 
-        let log_pointer = append_command(command, &mut self.writer)?;
+        let log_pointer = append_instruction(instruction, &mut self.writer)?;
 
         self.current_height.increment()?;
 
@@ -109,9 +109,9 @@ impl LogKeyValueStore {
                     let mut buffer = vec![0; log_pointer.len];
                     log_pointer_reader.read(&mut buffer)?;
 
-                    let (command, _) = Instruction::parse(buffer.as_slice())?;
+                    let (instruction, _) = Instruction::parse(buffer.as_slice())?;
 
-                    match command {
+                    match instruction {
                         Instruction::Set { key: _, value } => Ok(Some(value)),
                         Instruction::RevertOne { key, height } => {
                             get_revert_value(&mut self.reader, &key, &height)
@@ -131,7 +131,7 @@ impl LogKeyValueStore {
                             key: _,
                             transaction_id: _,
                         } => Ok(None),
-                        _ => Err(KVError::PointToUnexpectedCommand),
+                        _ => Err(KVError::PointToUnexpectedInstruction),
                     }
                 } else {
                     return if transaction_id.is_some() {
@@ -155,9 +155,9 @@ impl LogKeyValueStore {
                     let mut log_pointer_reader = self.reader.by_ref().take(log_pointer.len as u64);
                     let mut buffer = vec![0; log_pointer.len];
                     log_pointer_reader.read(&mut buffer)?;
-                    let (command, _) = Instruction::parse(buffer.as_slice())?;
+                    let (instruction, _) = Instruction::parse(buffer.as_slice())?;
 
-                    match command {
+                    match instruction {
                         Instruction::Set { key, value } => {
                             result.push((key, value));
                         }
@@ -189,7 +189,7 @@ impl LogKeyValueStore {
             return Err(KVError::RevertOutOfRange);
         }
 
-        let command = {
+        let instruction = {
             if let Some(transaction_id) = transaction_id {
                 Instruction::TransactionalRevertOne {
                     key: key.clone(),
@@ -211,7 +211,7 @@ impl LogKeyValueStore {
                 .add_affected_keys(&transaction_id, &key);
         }
 
-        let log_pointer = append_command(command, &mut self.writer)?;
+        let log_pointer = append_instruction(instruction, &mut self.writer)?;
 
         self.current_height.increment()?;
 
@@ -225,11 +225,11 @@ impl LogKeyValueStore {
             return Err(KVError::RevertOutOfRange);
         }
 
-        let command = Instruction::RevertAll {
+        let instruction = Instruction::RevertAll {
             height: height.clone(),
         };
 
-        append_command(command, &mut self.writer)?;
+        append_instruction(instruction, &mut self.writer)?;
 
         self.current_height.increment()?;
         let (new_key_pointer_map, _, _) = load_key_pointer_map(&mut self.reader, Some(height))?;
@@ -248,7 +248,7 @@ impl LogKeyValueStore {
             return Err(InstructionError::KeyExceedsMaxLength.into());
         }
 
-        let command = {
+        let instruction = {
             if let Some(transaction_id) = transaction_id {
                 Instruction::TransactionalRemoveOne {
                     key: key.clone(),
@@ -259,7 +259,7 @@ impl LogKeyValueStore {
             }
         };
 
-        let log_pointer = append_command(command, &mut self.writer)?;
+        let log_pointer = append_instruction(instruction, &mut self.writer)?;
 
         if let Some(transaction_id) = transaction_id {
             self.transaction_manager
@@ -276,9 +276,9 @@ impl LogKeyValueStore {
     }
 
     pub fn remove_all(&mut self) -> KVResult<()> {
-        let command = Instruction::RemoveAll;
+        let instruction = Instruction::RemoveAll;
 
-        append_command(command, &mut self.writer)?;
+        append_instruction(instruction, &mut self.writer)?;
 
         for log_pointers in self.key_pointer_map.values_mut() {
             log_pointers.remove(&None);
@@ -290,35 +290,35 @@ impl LogKeyValueStore {
     }
 
     pub fn inspect_all(&mut self) -> KVResult<Vec<(Instruction, ChainHeight)>> {
-        let mut command_buffer: Vec<u8> = Vec::new();
+        let mut instruction_buffer: Vec<u8> = Vec::new();
         self.reader.seek(SeekFrom::Start(0))?;
-        self.reader.read_to_end(&mut command_buffer)?;
+        self.reader.read_to_end(&mut instruction_buffer)?;
 
-        let command_buffer_parser = CommandBufferParser::new(&command_buffer, 0);
+        let instruction_buffer_parser = InstructionBufferParser::new(&instruction_buffer, 0);
 
-        let commands_with_height = command_buffer_parser
+        let instructions_with_height = instruction_buffer_parser
             .enumerate()
-            .map(|(index, (command, _))| (command, ChainHeight::new((index) as u64)))
+            .map(|(index, (instruction, _))| (instruction, ChainHeight::new((index) as u64)))
             .collect();
-        return Ok(commands_with_height);
+        return Ok(instructions_with_height);
     }
 
     pub fn inspect_one(&mut self, target_key: &KVKey) -> KVResult<Vec<(Instruction, ChainHeight)>> {
-        let mut command_buffer: Vec<u8> = Vec::new();
+        let mut instruction_buffer: Vec<u8> = Vec::new();
         self.reader.seek(SeekFrom::Start(0))?;
-        self.reader.read_to_end(&mut command_buffer)?;
+        self.reader.read_to_end(&mut instruction_buffer)?;
 
-        let command_buffer_parser = CommandBufferParser::new(&command_buffer, 0);
+        let instruction_buffer_parser = InstructionBufferParser::new(&instruction_buffer, 0);
 
         let mut appeared_key = HashSet::new();
-        let ret = command_buffer_parser
+        let result = instruction_buffer_parser
             .enumerate()
-            .filter_map(|(index, (command, _))| match &command {
+            .filter_map(|(index, (instruction, _))| match &instruction {
                 Instruction::Set { key, value: _ } => {
                     appeared_key.insert(key.clone());
 
                     if target_key == key {
-                        return Some((command, ChainHeight::new((index) as u64)));
+                        return Some((instruction, ChainHeight::new((index) as u64)));
                     } else {
                         return None;
                     }
@@ -327,14 +327,14 @@ impl LogKeyValueStore {
                     appeared_key.insert(key.clone());
 
                     if target_key == key {
-                        return Some((command, ChainHeight::new((index) as u64)));
+                        return Some((instruction, ChainHeight::new((index) as u64)));
                     } else {
                         return None;
                     }
                 }
                 Instruction::RevertAll { height: _ } => {
                     if appeared_key.contains(&target_key) {
-                        return Some((command, ChainHeight::new((index) as u64)));
+                        return Some((instruction, ChainHeight::new((index) as u64)));
                     } else {
                         return None;
                     }
@@ -343,14 +343,14 @@ impl LogKeyValueStore {
                     appeared_key.insert(key.clone());
 
                     if target_key == key {
-                        return Some((command, ChainHeight::new((index) as u64)));
+                        return Some((instruction, ChainHeight::new((index) as u64)));
                     } else {
                         return None;
                     }
                 }
                 Instruction::RemoveAll => {
                     if appeared_key.contains(&target_key) {
-                        return Some((command, ChainHeight::new((index) as u64)));
+                        return Some((instruction, ChainHeight::new((index) as u64)));
                     } else {
                         return None;
                     }
@@ -358,13 +358,13 @@ impl LogKeyValueStore {
                 _ => None,
             })
             .collect();
-        return Ok(ret);
+        return Ok(result);
     }
 
     pub fn start_transaction(&mut self) -> KVResult<TransactionId> {
         let transaction_id = self.transaction_manager.generate_new_transaction_id()?;
-        let command = Instruction::TransactionStart { transaction_id };
-        append_command(command, &mut self.writer)?;
+        let instruction = Instruction::TransactionStart { transaction_id };
+        append_instruction(instruction, &mut self.writer)?;
 
         self.transaction_manager
             .initialize_affected_keys(&transaction_id);
@@ -378,8 +378,8 @@ impl LogKeyValueStore {
         self.transaction_manager
             .validate_transaction_id(&transaction_id)?;
 
-        let command = Instruction::TransactionCommit { transaction_id };
-        append_command(command, &mut self.writer)?;
+        let instruction = Instruction::TransactionCommit { transaction_id };
+        append_instruction(instruction, &mut self.writer)?;
 
         update_committed_log_pointers(
             &mut self.transaction_manager,
@@ -396,8 +396,8 @@ impl LogKeyValueStore {
         self.transaction_manager
             .validate_transaction_id(&transaction_id)?;
 
-        let command = Instruction::TransactionAbort { transaction_id };
-        append_command(command, &mut self.writer)?;
+        let instruction = Instruction::TransactionAbort { transaction_id };
+        append_instruction(instruction, &mut self.writer)?;
 
         update_aborted_log_pointers(
             &mut self.transaction_manager,
@@ -416,50 +416,52 @@ fn get_revert_value(
     key: &KVKey,
     height: &ChainHeight,
 ) -> KVResult<Option<KVValue>> {
-    let mut command_buffer: Vec<u8> = Vec::new();
+    let mut instruction_buffer: Vec<u8> = Vec::new();
     reader.seek(SeekFrom::Start(0))?;
-    reader.read_to_end(&mut command_buffer)?;
-    let command_buffer_parser = CommandBufferParser::new(&command_buffer, 0);
+    reader.read_to_end(&mut instruction_buffer)?;
+    let instruction_buffer_parser = InstructionBufferParser::new(&instruction_buffer, 0);
 
-    let commands: Vec<Instruction> = command_buffer_parser.map(|(command, _)| command).collect();
-    let value = recursive_find(&key, &commands, &height)?;
+    let instructions: Vec<Instruction> = instruction_buffer_parser
+        .map(|(instruction, _)| instruction)
+        .collect();
+    let value = recursive_find(&key, &instructions, &height)?;
 
     return Ok(value);
 }
 
 fn recursive_find(
     target_key: &KVKey,
-    commands: &Vec<Instruction>,
+    instructions: &Vec<Instruction>,
     target_height: &ChainHeight,
 ) -> KVResult<Option<KVValue>> {
-    let target_command = &commands.as_slice()[target_height.as_u64() as usize];
+    let target_instruction = &instructions.as_slice()[target_height.as_u64() as usize];
 
-    match target_command {
+    match target_instruction {
         Instruction::Set { key, value } => {
             if target_key == key {
                 return Ok(Some(value.to_owned()));
             } else {
                 let next_target_height = &target_height.clone().decrement()?;
-                return recursive_find(&target_key, &commands, &next_target_height);
+                return recursive_find(&target_key, &instructions, &next_target_height);
             }
         }
         Instruction::RevertOne { key, height } => {
             if target_key == key {
-                return recursive_find(&target_key, &commands, height);
+                return recursive_find(&target_key, &instructions, height);
             } else {
                 let next_target_height = &target_height.clone().decrement()?;
-                return recursive_find(&target_key, &commands, &next_target_height);
+                return recursive_find(&target_key, &instructions, &next_target_height);
             }
         }
         Instruction::RevertAll { height } => {
-            return recursive_find(&target_key, &commands, height);
+            return recursive_find(&target_key, &instructions, height);
         }
         Instruction::RemoveOne { key } => {
             if target_key == key {
                 return Ok(None);
             } else {
                 let next_target_height = &target_height.clone().decrement()?;
-                return recursive_find(&target_key, &commands, next_target_height);
+                return recursive_find(&target_key, &instructions, next_target_height);
             }
         }
         Instruction::RemoveAll => {
@@ -467,7 +469,7 @@ fn recursive_find(
         }
         _ => {
             let next_target_height = &target_height.clone().decrement()?;
-            return recursive_find(&target_key, &commands, &next_target_height);
+            return recursive_find(&target_key, &instructions, &next_target_height);
         }
     }
 }
@@ -480,7 +482,7 @@ fn load_key_pointer_map(
     ChainHeight,
     TransactionManager,
 )> {
-    let mut command_buffer: Vec<u8> = Vec::new();
+    let mut instruction_buffer: Vec<u8> = Vec::new();
     let mut current_position = 0;
     let mut height = ChainHeight::new(0);
     let mut key_pointer_map: HashMap<KVKey, HashMap<Option<TransactionId>, LogPointer>> =
@@ -488,17 +490,17 @@ fn load_key_pointer_map(
     let mut transaction_manager = TransactionManager::new();
 
     reader.seek(SeekFrom::Start(0))?;
-    reader.read_to_end(&mut command_buffer)?;
-    let command_buffer_parser = CommandBufferParser::new(&command_buffer, 0);
+    reader.read_to_end(&mut instruction_buffer)?;
+    let instruction_buffer_parser = InstructionBufferParser::new(&instruction_buffer, 0);
 
-    for (command, command_length) in command_buffer_parser {
-        match command {
+    for (instruction, instruction_length) in instruction_buffer_parser {
+        match instruction {
             Instruction::Set { key, value: _ } => {
-                let log_pointer = LogPointer::new(current_position, command_length);
+                let log_pointer = LogPointer::new(current_position, instruction_length);
                 update_key_pointer_map(&key, &log_pointer, &mut key_pointer_map, None);
             }
             Instruction::RevertOne { key, height: _ } => {
-                let log_pointer = LogPointer::new(current_position, command_length);
+                let log_pointer = LogPointer::new(current_position, instruction_length);
                 update_key_pointer_map(&key, &log_pointer, &mut key_pointer_map, None);
             }
             Instruction::RevertAll { height } => {
@@ -507,7 +509,7 @@ fn load_key_pointer_map(
                 key_pointer_map = new_key_pointer_map;
             }
             Instruction::RemoveOne { key } => {
-                let log_pointer = LogPointer::new(current_position, command_length);
+                let log_pointer = LogPointer::new(current_position, instruction_length);
                 update_key_pointer_map(&key, &log_pointer, &mut key_pointer_map, None);
             }
             Instruction::RemoveAll => {
@@ -524,7 +526,7 @@ fn load_key_pointer_map(
                 value: _,
                 transaction_id,
             } => {
-                let log_pointer = LogPointer::new(current_position, command_length);
+                let log_pointer = LogPointer::new(current_position, instruction_length);
                 update_key_pointer_map(
                     &key,
                     &log_pointer,
@@ -538,7 +540,7 @@ fn load_key_pointer_map(
                 height: _,
                 transaction_id,
             } => {
-                let log_pointer = LogPointer::new(current_position, command_length);
+                let log_pointer = LogPointer::new(current_position, instruction_length);
                 update_key_pointer_map(
                     &key,
                     &log_pointer,
@@ -552,7 +554,7 @@ fn load_key_pointer_map(
                 key,
                 transaction_id,
             } => {
-                let log_pointer = LogPointer::new(current_position, command_length);
+                let log_pointer = LogPointer::new(current_position, instruction_length);
                 update_key_pointer_map(
                     &key,
                     &log_pointer,
@@ -578,7 +580,7 @@ fn load_key_pointer_map(
             }
         }
 
-        current_position += command_length as u64;
+        current_position += instruction_length as u64;
 
         if let Some(target_height) = target_height {
             if target_height == &height {
@@ -640,14 +642,14 @@ fn update_key_pointer_map(
     }
 }
 
-fn append_command(instruction: Instruction, writer: &mut LogWriter) -> KVResult<LogPointer> {
-    let command_bytes: Vec<u8> = instruction.serialize();
+fn append_instruction(instruction: Instruction, writer: &mut LogWriter) -> KVResult<LogPointer> {
+    let instruction_bytes: Vec<u8> = instruction.serialize();
 
     let current_pos = writer.get_current_pos();
-    writer.write_all(command_bytes.as_slice())?;
+    writer.write_all(instruction_bytes.as_slice())?;
     writer.flush()?;
 
-    let log_pointer = LogPointer::new(current_pos, command_bytes.len());
+    let log_pointer = LogPointer::new(current_pos, instruction_bytes.len());
 
     return Ok(log_pointer);
 }
