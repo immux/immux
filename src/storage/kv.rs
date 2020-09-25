@@ -1,22 +1,20 @@
 use std::collections::{HashMap, HashSet};
-use std::fs::{create_dir_all, File, OpenOptions};
-use std::io::Read;
-use std::io::{BufReader, Seek, SeekFrom};
+use std::fs::create_dir_all;
 use std::path::{Path, PathBuf};
 
 use crate::constants as Constants;
-use crate::storage::buffer_parser::InstructionBufferParser;
 use crate::storage::chain_height::ChainHeight;
 use crate::storage::errors::{KVError, KVResult};
 use crate::storage::instruction::{Instruction, InstructionError};
 use crate::storage::kvkey::KVKey;
 use crate::storage::kvvalue::KVValue;
 use crate::storage::log_pointer::LogPointer;
+use crate::storage::log_reader::LogReader;
 use crate::storage::log_writer::LogWriter;
 use crate::storage::transaction_manager::{TransactionId, TransactionManager};
 
 pub struct LogKeyValueStore {
-    reader: BufReader<File>,
+    reader: LogReader,
     writer: LogWriter,
     key_pointer_map: HashMap<KVKey, HashMap<Option<TransactionId>, LogPointer>>,
     current_height: ChainHeight,
@@ -24,22 +22,14 @@ pub struct LogKeyValueStore {
 }
 
 impl LogKeyValueStore {
-    pub fn open(path: &PathBuf) -> KVResult<LogKeyValueStore> {
-        create_dir_all(&path)?;
+    pub fn open(data_dir: &PathBuf) -> KVResult<LogKeyValueStore> {
+        create_dir_all(&data_dir)?;
 
-        let log_file_path = get_log_file_dir(&path);
+        let log_file_path = get_log_file_path(&data_dir);
 
-        let writer_file_option = OpenOptions::new()
-            .create(true)
-            .append(true)
-            .open(&log_file_path.to_owned())?;
-        let writer = LogWriter::new(writer_file_option)?;
+        let writer = LogWriter::new(&log_file_path)?;
 
-        let reader_file_option = OpenOptions::new()
-            .read(true)
-            .open(&log_file_path.to_owned())?;
-        let mut reader = BufReader::new(reader_file_option);
-
+        let mut reader = LogReader::new(&log_file_path)?;
         let (key_pointer_map, current_height, transaction_manager) =
             load_key_pointer_map(&mut reader, None)?;
 
@@ -84,7 +74,7 @@ impl LogKeyValueStore {
             }
         };
 
-        let log_pointer = append_instruction(instruction, &mut self.writer)?;
+        let log_pointer = self.writer.append_instruction(&instruction)?;
 
         self.current_height.increment()?;
 
@@ -102,15 +92,7 @@ impl LogKeyValueStore {
             None => Ok(None),
             Some(log_pointers) => {
                 if let Some(log_pointer) = log_pointers.get(&transaction_id) {
-                    self.reader.seek(SeekFrom::Start(log_pointer.pos))?;
-
-                    let mut log_pointer_reader = self.reader.by_ref().take(log_pointer.len as u64);
-
-                    let mut buffer = vec![0; log_pointer.len];
-                    log_pointer_reader.read(&mut buffer)?;
-
-                    let (instruction, _) = Instruction::parse(buffer.as_slice())?;
-
+                    let instruction = self.reader.read_pointer(log_pointer)?;
                     match instruction {
                         Instruction::Set { key: _, value } => Ok(Some(value)),
                         Instruction::RevertOne { key, height } => {
@@ -151,11 +133,7 @@ impl LogKeyValueStore {
             match log_pointer.get(&None) {
                 None => {}
                 Some(log_pointer) => {
-                    self.reader.seek(SeekFrom::Start(log_pointer.pos))?;
-                    let mut log_pointer_reader = self.reader.by_ref().take(log_pointer.len as u64);
-                    let mut buffer = vec![0; log_pointer.len];
-                    log_pointer_reader.read(&mut buffer)?;
-                    let (instruction, _) = Instruction::parse(buffer.as_slice())?;
+                    let instruction = self.reader.read_pointer(log_pointer)?;
 
                     match instruction {
                         Instruction::Set { key, value } => {
@@ -211,7 +189,7 @@ impl LogKeyValueStore {
                 .add_affected_keys(&transaction_id, &key);
         }
 
-        let log_pointer = append_instruction(instruction, &mut self.writer)?;
+        let log_pointer = self.writer.append_instruction(&instruction)?;
 
         self.current_height.increment()?;
 
@@ -229,7 +207,7 @@ impl LogKeyValueStore {
             height: height.clone(),
         };
 
-        append_instruction(instruction, &mut self.writer)?;
+        self.writer.append_instruction(&instruction)?;
 
         self.current_height.increment()?;
         let (new_key_pointer_map, _, _) = load_key_pointer_map(&mut self.reader, Some(height))?;
@@ -259,7 +237,7 @@ impl LogKeyValueStore {
             }
         };
 
-        let log_pointer = append_instruction(instruction, &mut self.writer)?;
+        let log_pointer = self.writer.append_instruction(&instruction)?;
 
         if let Some(transaction_id) = transaction_id {
             self.transaction_manager
@@ -278,7 +256,7 @@ impl LogKeyValueStore {
     pub fn remove_all(&mut self) -> KVResult<()> {
         let instruction = Instruction::RemoveAll;
 
-        append_instruction(instruction, &mut self.writer)?;
+        self.writer.append_instruction(&instruction)?;
 
         for log_pointers in self.key_pointer_map.values_mut() {
             log_pointers.remove(&None);
@@ -290,13 +268,9 @@ impl LogKeyValueStore {
     }
 
     pub fn inspect_all(&mut self) -> KVResult<Vec<(Instruction, ChainHeight)>> {
-        let mut instruction_buffer: Vec<u8> = Vec::new();
-        self.reader.seek(SeekFrom::Start(0))?;
-        self.reader.read_to_end(&mut instruction_buffer)?;
+        let instruction_iterator = self.reader.read_all()?;
 
-        let instruction_buffer_parser = InstructionBufferParser::new(&instruction_buffer, 0);
-
-        let instructions_with_height = instruction_buffer_parser
+        let instructions_with_height = instruction_iterator
             .enumerate()
             .map(|(index, (instruction, _))| (instruction, ChainHeight::new((index) as u64)))
             .collect();
@@ -304,14 +278,10 @@ impl LogKeyValueStore {
     }
 
     pub fn inspect_one(&mut self, target_key: &KVKey) -> KVResult<Vec<(Instruction, ChainHeight)>> {
-        let mut instruction_buffer: Vec<u8> = Vec::new();
-        self.reader.seek(SeekFrom::Start(0))?;
-        self.reader.read_to_end(&mut instruction_buffer)?;
-
-        let instruction_buffer_parser = InstructionBufferParser::new(&instruction_buffer, 0);
+        let instruction_iterator = self.reader.read_all()?;
 
         let mut appeared_key = HashSet::new();
-        let result = instruction_buffer_parser
+        let result = instruction_iterator
             .enumerate()
             .filter_map(|(index, (instruction, _))| match &instruction {
                 Instruction::Set { key, value: _ } => {
@@ -364,7 +334,7 @@ impl LogKeyValueStore {
     pub fn start_transaction(&mut self) -> KVResult<TransactionId> {
         let transaction_id = self.transaction_manager.generate_new_transaction_id()?;
         let instruction = Instruction::TransactionStart { transaction_id };
-        append_instruction(instruction, &mut self.writer)?;
+        self.writer.append_instruction(&instruction)?;
 
         self.transaction_manager
             .initialize_affected_keys(&transaction_id);
@@ -379,7 +349,7 @@ impl LogKeyValueStore {
             .validate_transaction_id(&transaction_id)?;
 
         let instruction = Instruction::TransactionCommit { transaction_id };
-        append_instruction(instruction, &mut self.writer)?;
+        self.writer.append_instruction(&instruction)?;
 
         update_committed_log_pointers(
             &mut self.transaction_manager,
@@ -397,7 +367,7 @@ impl LogKeyValueStore {
             .validate_transaction_id(&transaction_id)?;
 
         let instruction = Instruction::TransactionAbort { transaction_id };
-        append_instruction(instruction, &mut self.writer)?;
+        self.writer.append_instruction(&instruction)?;
 
         update_aborted_log_pointers(
             &mut self.transaction_manager,
@@ -412,16 +382,13 @@ impl LogKeyValueStore {
 }
 
 fn get_revert_value(
-    reader: &mut BufReader<File>,
+    reader: &mut LogReader,
     key: &KVKey,
     height: &ChainHeight,
 ) -> KVResult<Option<KVValue>> {
-    let mut instruction_buffer: Vec<u8> = Vec::new();
-    reader.seek(SeekFrom::Start(0))?;
-    reader.read_to_end(&mut instruction_buffer)?;
-    let instruction_buffer_parser = InstructionBufferParser::new(&instruction_buffer, 0);
+    let instruction_iterator = reader.read_all()?;
 
-    let instructions: Vec<Instruction> = instruction_buffer_parser
+    let instructions: Vec<Instruction> = instruction_iterator
         .map(|(instruction, _)| instruction)
         .collect();
     let value = recursive_find(&key, &instructions, &height)?;
@@ -475,25 +442,21 @@ fn recursive_find(
 }
 
 fn load_key_pointer_map(
-    mut reader: &mut BufReader<File>,
+    mut reader: &mut LogReader,
     target_height: Option<&ChainHeight>,
 ) -> KVResult<(
     HashMap<KVKey, HashMap<Option<TransactionId>, LogPointer>>,
     ChainHeight,
     TransactionManager,
 )> {
-    let mut instruction_buffer: Vec<u8> = Vec::new();
+    let instruction_iterator = reader.read_all()?;
     let mut current_position = 0;
     let mut height = ChainHeight::new(0);
     let mut key_pointer_map: HashMap<KVKey, HashMap<Option<TransactionId>, LogPointer>> =
         HashMap::new();
     let mut transaction_manager = TransactionManager::new();
 
-    reader.seek(SeekFrom::Start(0))?;
-    reader.read_to_end(&mut instruction_buffer)?;
-    let instruction_buffer_parser = InstructionBufferParser::new(&instruction_buffer, 0);
-
-    for (instruction, instruction_length) in instruction_buffer_parser {
+    for (instruction, instruction_length) in instruction_iterator {
         match instruction {
             Instruction::Set { key, value: _ } => {
                 let log_pointer = LogPointer::new(current_position, instruction_length);
@@ -642,19 +605,7 @@ fn update_key_pointer_map(
     }
 }
 
-fn append_instruction(instruction: Instruction, writer: &mut LogWriter) -> KVResult<LogPointer> {
-    let instruction_bytes: Vec<u8> = instruction.serialize();
-
-    let current_pos = writer.get_current_pos();
-    writer.write_all(instruction_bytes.as_slice())?;
-    writer.flush()?;
-
-    let log_pointer = LogPointer::new(current_pos, instruction_bytes.len());
-
-    return Ok(log_pointer);
-}
-
-pub fn get_log_file_dir(dir: &PathBuf) -> PathBuf {
+pub fn get_log_file_path(dir: &PathBuf) -> PathBuf {
     let log_file_name = format!("{}.log", Constants::LOG_FILE_NAME);
     let log_path = dir.join(Path::new(&log_file_name));
     return log_path;
