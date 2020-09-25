@@ -1,12 +1,21 @@
 ## Description
 
 The master repository for Immux code, currently including:
-- ImmuxDB, the immutable database, and
-- Foldr, the immutable computing service.
+- **ImmuxDB**, the immutable database, and
+- **ImmuxCompute**, the immutable computing service.
+
+This repo builds upon an earlier 1.0 version and is under construction.
 
 ## ImmuxDB
 
-### Http end point
+### Run the servers
+
+```
+cargo build
+cargo run
+```
+
+### HTTP API
 ```
 GET /grouping/id ("get", outside of transactions)
 GET /.transactions/tid/grouping/unit_id ("get" within transaction)
@@ -34,13 +43,6 @@ GET /grouping/.index (get indices)
 POST /grouping/.index?field={field} (create index)
 DELETE /grouping/.index/index-number (delete index)
 */
-```
-
-### Run the server
-
-```
-cargo build
-cargo run
 ```
 
 ### Test
