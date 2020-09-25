@@ -1,12 +1,21 @@
 ## Description
 
-The master repository for Immux code, currently including:
-- ImmuxDB, the immutable database, and
-- Foldr, the immutable computing service.
+The master repository for Immux intergrated computing infrastructure, including:
+- **ImmuxDB**, the immutable database, and
+- **ImmuxCompute**, the immutable computing service.
+
+This repo builds upon an earlier 1.0 version and is under construction.
 
 ## ImmuxDB
 
-### Http end point
+### Run the servers
+
+```
+cargo build
+cargo run
+```
+
+### HTTP API
 ```
 GET /grouping/id ("get", outside of transactions)
 GET /.transactions/tid/grouping/unit_id ("get" within transaction)
@@ -34,13 +43,6 @@ GET /grouping/.index (get indices)
 POST /grouping/.index?field={field} (create index)
 DELETE /grouping/.index/index-number (delete index)
 */
-```
-
-### Run the server
-
-```
-cargo build
-cargo run
 ```
 
 ### Test
@@ -140,3 +142,7 @@ flamegraph target/release/realistic-SOME_HASH
 Inspect the "flamegraph.svg" in a web browser (it's interactive).
 
 The exact executable name needs to be checked manually at the moment.
+
+## License
+
+GPLv3
