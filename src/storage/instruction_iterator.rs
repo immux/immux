@@ -1,17 +1,17 @@
 use crate::storage::instruction::Instruction;
 
-pub struct InstructionBufferParser<'a> {
-    buffer: &'a [u8],
+pub struct InstructionIterator {
+    buffer: Vec<u8>,
     index: usize,
 }
 
-impl<'a> InstructionBufferParser<'a> {
-    pub fn new(buffer: &[u8], index: usize) -> InstructionBufferParser {
-        return InstructionBufferParser { buffer, index };
+impl From<Vec<u8>> for InstructionIterator {
+    fn from(buffer: Vec<u8>) -> Self {
+        return InstructionIterator { buffer, index: 0 };
     }
 }
 
-impl<'a> Iterator for InstructionBufferParser<'a> {
+impl Iterator for InstructionIterator {
     type Item = (Instruction, usize);
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -26,10 +26,10 @@ impl<'a> Iterator for InstructionBufferParser<'a> {
 }
 
 #[cfg(test)]
-mod tests {
-    use crate::storage::buffer_parser::InstructionBufferParser;
+mod instruction_iterator_tests {
     use crate::storage::chain_height::ChainHeight;
     use crate::storage::instruction::Instruction;
+    use crate::storage::instruction_iterator::InstructionIterator;
     use crate::storage::kvkey::KVKey;
     use crate::storage::kvvalue::KVValue;
 
@@ -70,40 +70,34 @@ mod tests {
     }
 
     #[test]
-    fn iterate_buffer_parser() {
+    fn iterate_iterator() {
         let instructions = get_instructions();
         let buffer = serialize_instructions(&instructions);
 
-        let instruction_buffer_parser = InstructionBufferParser {
-            buffer: &buffer,
-            index: 0,
-        };
+        let iterator = InstructionIterator::from(buffer);
 
-        for (index, (actual_instruction, _)) in instruction_buffer_parser.enumerate() {
+        for (index, (actual_instruction, _)) in iterator.enumerate() {
             let expected_instruction = &instructions[index];
             assert_eq!(&actual_instruction, expected_instruction);
         }
     }
 
     #[test]
-    fn iterate_buffer_parser_with_broken_instruction() {
+    fn iterate_with_broken_instruction() {
         let instructions = get_instructions();
         let mut buffer = serialize_instructions(&instructions);
 
         let some_broken_bytes = [0xff, 0x00, 0xfa];
         buffer.extend_from_slice(&some_broken_bytes);
 
-        let mut instruction_buffer_parser = InstructionBufferParser {
-            buffer: &buffer,
-            index: 0,
-        };
+        let mut iterator = InstructionIterator::from(buffer);
 
         for expected_instruction in instructions {
-            let (actual_instruction, _) = &instruction_buffer_parser.next().unwrap();
+            let (actual_instruction, _) = &iterator.next().unwrap();
             assert_eq!(actual_instruction, &expected_instruction);
         }
 
-        let broken_piece = instruction_buffer_parser.next();
+        let broken_piece = iterator.next();
         assert_eq!(broken_piece, None);
     }
 }

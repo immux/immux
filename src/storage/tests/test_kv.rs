@@ -15,14 +15,14 @@ mod kv_tests {
     use immuxsys::storage::executor::outcome::Outcome;
     use immuxsys::storage::executor::unit_content::UnitContent;
     use immuxsys::storage::executor::unit_key::UnitKey;
-    use immuxsys::storage::kv::{get_log_file_dir, LogKeyValueStore};
+    use immuxsys::storage::kv::{get_log_file_path, LogKeyValueStore};
     use immuxsys::storage::kvkey::KVKey;
     use immuxsys::storage::kvvalue::KVValue;
     use immuxsys::storage::transaction_manager::TransactionId;
     use immuxsys::utils::ints::{u64_to_u8_array, u8_array_to_u64};
 
     fn get_store_engine(path: &PathBuf) -> LogKeyValueStore {
-        let log_file_path = get_log_file_dir(&path);
+        let log_file_path = get_log_file_path(&path);
 
         if log_file_path.exists() {
             remove_file(log_file_path).unwrap();
