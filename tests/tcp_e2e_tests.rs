@@ -12,6 +12,7 @@ mod tcp_e2e_tests {
     use immuxsys::storage::executor::unit_key::UnitKey;
     use immuxsys::storage::transaction_manager::TransactionId;
     use immuxsys_client::tcp_client::ImmuxDBTcpClient;
+    use immuxsys_client::ImmuxDBClient;
     use immuxsys_dev_utils::data_models::berka99::{
         Account, Card, Client, Disp, District, Loan, Order, Trans,
     };
@@ -32,7 +33,7 @@ mod tcp_e2e_tests {
         notified_sleep(5);
 
         let host = &format!("{}:{}", Constants::SERVER_END_POINT, port);
-        let mut client = ImmuxDBTcpClient::new(host).unwrap();
+        let client = ImmuxDBTcpClient::new(host).unwrap();
 
         let grouping = GroupingLabel::new("any_grouping".as_bytes());
         let unit_key = UnitKey::new("key".as_bytes());
@@ -57,7 +58,7 @@ mod tcp_e2e_tests {
         notified_sleep(5);
 
         let host = &format!("{}:{}", Constants::SERVER_END_POINT, port);
-        let mut client = ImmuxDBTcpClient::new(host).unwrap();
+        let client = ImmuxDBTcpClient::new(host).unwrap();
 
         let grouping = GroupingLabel::new("a".as_bytes());
         let unit_key = UnitKey::new("key".as_bytes());
@@ -82,7 +83,7 @@ mod tcp_e2e_tests {
         notified_sleep(5);
 
         let host = &format!("{}:{}", Constants::SERVER_END_POINT, port);
-        let mut client = ImmuxDBTcpClient::new(host).unwrap();
+        let client = ImmuxDBTcpClient::new(host).unwrap();
 
         let grouping = GroupingLabel::new("any_grouping".as_bytes());
         let unit_key = UnitKey::from("key1");
@@ -126,7 +127,7 @@ mod tcp_e2e_tests {
         notified_sleep(5);
 
         let host = &format!("{}:{}", Constants::SERVER_END_POINT, port);
-        let mut client = ImmuxDBTcpClient::new(host).unwrap();
+        let client = ImmuxDBTcpClient::new(host).unwrap();
 
         let paths = [
             "dev_utils/src/data_models/data-raw/account.asc",
@@ -205,7 +206,7 @@ mod tcp_e2e_tests {
         notified_sleep(5);
 
         let host = &format!("{}:{}", Constants::SERVER_END_POINT, port);
-        let mut client = ImmuxDBTcpClient::new(host).unwrap();
+        let client = ImmuxDBTcpClient::new(host).unwrap();
         let grouping = &GroupingLabel::new("any_grouping".as_bytes());
 
         let key_content_pairs = get_key_content_pairs();
@@ -239,7 +240,7 @@ mod tcp_e2e_tests {
         notified_sleep(5);
 
         let host = &format!("{}:{}", Constants::SERVER_END_POINT, port);
-        let mut client = ImmuxDBTcpClient::new(host).unwrap();
+        let client = ImmuxDBTcpClient::new(host).unwrap();
         let grouping = GroupingLabel::new("any_grouping".as_bytes());
 
         let key_content_pairs = get_key_content_pairs();
@@ -274,7 +275,7 @@ mod tcp_e2e_tests {
         notified_sleep(5);
 
         let host = &format!("{}:{}", Constants::SERVER_END_POINT, port);
-        let mut client = ImmuxDBTcpClient::new(host).unwrap();
+        let client = ImmuxDBTcpClient::new(host).unwrap();
         let grouping = GroupingLabel::new("any_grouping".as_bytes());
 
         let key_content_pairs = get_key_content_pairs();
@@ -305,7 +306,7 @@ mod tcp_e2e_tests {
         notified_sleep(5);
 
         let host = &format!("{}:{}", Constants::SERVER_END_POINT, port);
-        let mut client = ImmuxDBTcpClient::new(host).unwrap();
+        let client = ImmuxDBTcpClient::new(host).unwrap();
         let grouping = GroupingLabel::new("any_grouping".as_bytes());
         let expected_transaction_id = TransactionId::new(1);
 
@@ -345,7 +346,7 @@ mod tcp_e2e_tests {
         notified_sleep(5);
 
         let host = &format!("{}:{}", Constants::SERVER_END_POINT, port);
-        let mut client = ImmuxDBTcpClient::new(host).unwrap();
+        let client = ImmuxDBTcpClient::new(host).unwrap();
         let grouping = GroupingLabel::new("any_grouping".as_bytes());
         let expected_transaction_id = TransactionId::new(1);
 
@@ -384,7 +385,7 @@ mod tcp_e2e_tests {
         notified_sleep(5);
 
         let host = &format!("{}:{}", Constants::SERVER_END_POINT, port);
-        let mut client = ImmuxDBTcpClient::new(host).unwrap();
+        let client = ImmuxDBTcpClient::new(host).unwrap();
         let grouping = GroupingLabel::new("any_grouping".as_bytes());
 
         let transaction_id = TransactionId::new(1);
@@ -435,7 +436,7 @@ mod tcp_e2e_tests {
         notified_sleep(5);
 
         let host = &format!("{}:{}", Constants::SERVER_END_POINT, port);
-        let mut client = ImmuxDBTcpClient::new(host).unwrap();
+        let client = ImmuxDBTcpClient::new(host).unwrap();
         let grouping = GroupingLabel::new("any_grouping".as_bytes());
         let expected_transaction_id = TransactionId::new(1);
 
@@ -486,7 +487,7 @@ mod tcp_e2e_tests {
         notified_sleep(5);
 
         let host = &format!("{}:{}", Constants::SERVER_END_POINT, port);
-        let mut client = ImmuxDBTcpClient::new(host).unwrap();
+        let client = ImmuxDBTcpClient::new(host).unwrap();
         let grouping = GroupingLabel::new("any_grouping".as_bytes());
         let expected_transaction_id = TransactionId::new(1);
 
@@ -543,7 +544,7 @@ mod tcp_e2e_tests {
         notified_sleep(5);
 
         let host = &format!("{}:{}", Constants::SERVER_END_POINT, port);
-        let mut client = ImmuxDBTcpClient::new(host).unwrap();
+        let client = ImmuxDBTcpClient::new(host).unwrap();
         let grouping = GroupingLabel::new("any_grouping".as_bytes());
         let expected_transaction_id = TransactionId::new(1);
 
@@ -584,7 +585,7 @@ mod tcp_e2e_tests {
         notified_sleep(5);
 
         let host = &format!("{}:{}", Constants::SERVER_END_POINT, port);
-        let mut client = ImmuxDBTcpClient::new(host).unwrap();
+        let client = ImmuxDBTcpClient::new(host).unwrap();
         let grouping = GroupingLabel::new("any_grouping".as_bytes());
         let expected_transaction_id = TransactionId::new(1);
 
@@ -634,7 +635,7 @@ mod tcp_e2e_tests {
         notified_sleep(5);
 
         let host = &format!("{}:{}", Constants::SERVER_END_POINT, port);
-        let mut client = ImmuxDBTcpClient::new(host).unwrap();
+        let client = ImmuxDBTcpClient::new(host).unwrap();
         let grouping = GroupingLabel::new("any_grouping".as_bytes());
         let expected_transaction_id = TransactionId::new(1);
 
@@ -669,7 +670,7 @@ mod tcp_e2e_tests {
         notified_sleep(5);
 
         let host = &format!("{}:{}", Constants::SERVER_END_POINT, port);
-        let mut client = ImmuxDBTcpClient::new(host).unwrap();
+        let client = ImmuxDBTcpClient::new(host).unwrap();
 
         let fake_transaction_id = TransactionId::new(100);
 
@@ -686,7 +687,7 @@ mod tcp_e2e_tests {
         notified_sleep(5);
 
         let host = &format!("{}:{}", Constants::SERVER_END_POINT, port);
-        let mut client = ImmuxDBTcpClient::new(host).unwrap();
+        let client = ImmuxDBTcpClient::new(host).unwrap();
 
         let fake_transaction_id = TransactionId::new(100);
 
@@ -702,7 +703,7 @@ mod tcp_e2e_tests {
         notified_sleep(5);
 
         let host = &format!("{}:{}", Constants::SERVER_END_POINT, port);
-        let mut client = ImmuxDBTcpClient::new(host).unwrap();
+        let client = ImmuxDBTcpClient::new(host).unwrap();
         let grouping = GroupingLabel::new("any_grouping".as_bytes());
 
         let shared_keys = [UnitKey::from("a"), UnitKey::from("b"), UnitKey::from("c")];
@@ -772,7 +773,7 @@ mod tcp_e2e_tests {
         notified_sleep(5);
 
         let host = &format!("{}:{}", Constants::SERVER_END_POINT, port);
-        let mut client = ImmuxDBTcpClient::new(host).unwrap();
+        let client = ImmuxDBTcpClient::new(host).unwrap();
         let grouping = GroupingLabel::new("any_grouping".as_bytes());
 
         let key = UnitKey::from("a");
@@ -801,7 +802,7 @@ mod tcp_e2e_tests {
         notified_sleep(5);
 
         let host = &format!("{}:{}", Constants::SERVER_END_POINT, port);
-        let mut client = ImmuxDBTcpClient::new(host).unwrap();
+        let client = ImmuxDBTcpClient::new(host).unwrap();
         let grouping = GroupingLabel::new("any_grouping".as_bytes());
 
         let key = UnitKey::from("a");
@@ -930,7 +931,7 @@ mod tcp_e2e_tests {
         notified_sleep(5);
 
         let host = &format!("{}:{}", Constants::SERVER_END_POINT, port);
-        let mut client = ImmuxDBTcpClient::new(host).unwrap();
+        let client = ImmuxDBTcpClient::new(host).unwrap();
 
         let grouping = GroupingLabel::new("any_grouping".as_bytes());
 

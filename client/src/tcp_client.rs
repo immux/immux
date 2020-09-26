@@ -1,8 +1,10 @@
+use std::cell::RefCell;
 use std::io::{Read, Write};
 use std::net::TcpStream;
 
 use crate::errors::ImmuxDBTcpClientResult;
 
+use crate::ImmuxDBClient;
 use immuxsys::storage::chain_height::ChainHeight;
 use immuxsys::storage::executor::command::Command;
 use immuxsys::storage::executor::command::SelectCondition;
@@ -14,17 +16,34 @@ use immuxsys::storage::executor::unit_key::UnitKey;
 use immuxsys::storage::transaction_manager::TransactionId;
 
 pub struct ImmuxDBTcpClient {
-    stream: TcpStream,
+    stream: RefCell<TcpStream>,
+}
+
+fn write(stream: &mut TcpStream, buffer: &[u8]) -> ImmuxDBTcpClientResult<()> {
+    stream.write_all(buffer)?;
+    stream.flush()?;
+    return Ok(());
+}
+
+fn read(stream: &mut TcpStream) -> ImmuxDBTcpClientResult<Vec<u8>> {
+    let mut buffer = [0; 1024 * 5];
+    stream.read(&mut buffer)?;
+    return Ok(buffer.to_vec());
 }
 
 impl ImmuxDBTcpClient {
     pub fn new(host: &String) -> ImmuxDBTcpClientResult<ImmuxDBTcpClient> {
         let stream = TcpStream::connect(host)?;
-        return Ok(ImmuxDBTcpClient { stream });
+        let stream_cell = RefCell::new(stream);
+        return Ok(ImmuxDBTcpClient {
+            stream: stream_cell,
+        });
     }
+}
 
-    pub fn get_by_key(
-        &mut self,
+impl ImmuxDBClient<ImmuxDBTcpClientResult<Outcome>> for ImmuxDBTcpClient {
+    fn get_by_key(
+        &self,
         grouping: &GroupingLabel,
         unit_key: &UnitKey,
     ) -> ImmuxDBTcpClientResult<Outcome> {
@@ -34,15 +53,16 @@ impl ImmuxDBTcpClient {
             condition,
         };
 
-        self.write(&command.marshal())?;
-        let buffer = self.read()?;
+        let mut stream = self.stream.borrow_mut();
+        write(&mut *stream, &command.marshal())?;
+        let buffer = read(&mut *stream)?;
         let (outcome, _) = Outcome::parse(&buffer)?;
 
         return Ok(outcome);
     }
 
-    pub fn get_by_filter(
-        &mut self,
+    fn get_by_filter(
+        &self,
         grouping: &GroupingLabel,
         filter: &Filter,
     ) -> ImmuxDBTcpClientResult<Outcome> {
@@ -52,16 +72,17 @@ impl ImmuxDBTcpClient {
             condition,
         };
 
-        self.write(&command.marshal())?;
+        let mut stream = self.stream.borrow_mut();
+        write(&mut *stream, &command.marshal())?;
 
-        let buffer = self.read()?;
+        let buffer = read(&mut *stream)?;
         let (outcome, _) = Outcome::parse(&buffer)?;
 
         return Ok(outcome);
     }
 
-    pub fn transactional_get(
-        &mut self,
+    fn transactional_get(
+        &self,
         grouping: &GroupingLabel,
         unit_key: &UnitKey,
         transaction_id: &TransactionId,
@@ -72,16 +93,17 @@ impl ImmuxDBTcpClient {
             condition,
         };
 
-        self.write(&command.marshal())?;
+        let mut stream = self.stream.borrow_mut();
+        write(&mut *stream, &command.marshal())?;
 
-        let buffer = self.read()?;
+        let buffer = read(&mut *stream)?;
         let (outcome, _) = Outcome::parse(&buffer)?;
 
         return Ok(outcome);
     }
 
-    pub fn inspect_one(
-        &mut self,
+    fn inspect_one(
+        &self,
         grouping: &GroupingLabel,
         unit_key: &UnitKey,
     ) -> ImmuxDBTcpClientResult<Outcome> {
@@ -90,16 +112,42 @@ impl ImmuxDBTcpClient {
             key: unit_key.clone(),
         };
 
-        self.write(&command.marshal())?;
+        let mut stream = self.stream.borrow_mut();
+        write(&mut *stream, &command.marshal())?;
 
-        let buffer = self.read()?;
+        let buffer = read(&mut *stream)?;
         let (outcome, _) = Outcome::parse(&buffer)?;
 
         return Ok(outcome);
     }
 
-    pub fn set_unit(
-        &mut self,
+    fn inspect_all(&self) -> ImmuxDBTcpClientResult<Outcome> {
+        let command = Command::InspectAll;
+        let mut stream = self.stream.borrow_mut();
+        write(&mut *stream, &command.marshal())?;
+        let buffer = read(&mut *stream)?;
+        let (outcome, _) = Outcome::parse(&buffer)?;
+
+        return Ok(outcome);
+    }
+
+    fn get_by_grouping(&self, grouping: &GroupingLabel) -> ImmuxDBTcpClientResult<Outcome> {
+        let condition = SelectCondition::UnconditionalMatch;
+        let command = Command::Select {
+            grouping: grouping.clone(),
+            condition,
+        };
+
+        let mut stream = self.stream.borrow_mut();
+        write(&mut *stream, &command.marshal())?;
+        let buffer = read(&mut *stream)?;
+        let (outcome, _) = Outcome::parse(&buffer)?;
+
+        return Ok(outcome);
+    }
+
+    fn set_unit(
+        &self,
         grouping: &GroupingLabel,
         unit_key: &UnitKey,
         unit_content: &UnitContent,
@@ -110,16 +158,17 @@ impl ImmuxDBTcpClient {
             content: unit_content.clone(),
         };
 
-        self.write(&command.marshal())?;
+        let mut stream = self.stream.borrow_mut();
+        write(&mut *stream, &command.marshal())?;
 
-        let buffer = self.read()?;
+        let buffer = read(&mut *stream)?;
         let (outcome, _) = Outcome::parse(&buffer)?;
 
         return Ok(outcome);
     }
 
-    pub fn transactional_set_unit(
-        &mut self,
+    fn transactional_set_unit(
+        &self,
         grouping: &GroupingLabel,
         unit_key: &UnitKey,
         unit_content: &UnitContent,
@@ -132,16 +181,17 @@ impl ImmuxDBTcpClient {
             transaction_id: transaction_id.clone(),
         };
 
-        self.write(&command.marshal())?;
+        let mut stream = self.stream.borrow_mut();
+        write(&mut *stream, &command.marshal())?;
 
-        let buffer = self.read()?;
+        let buffer = read(&mut *stream)?;
         let (outcome, _) = Outcome::parse(&buffer)?;
 
         return Ok(outcome);
     }
 
-    pub fn revert_one(
-        &mut self,
+    fn revert_one(
+        &self,
         grouping: &GroupingLabel,
         unit_key: &UnitKey,
         height: &ChainHeight,
@@ -152,16 +202,17 @@ impl ImmuxDBTcpClient {
             height: height.clone(),
         };
 
-        self.write(&command.marshal())?;
+        let mut stream = self.stream.borrow_mut();
+        write(&mut *stream, &command.marshal())?;
 
-        let buffer = self.read()?;
+        let buffer = read(&mut *stream)?;
         let (outcome, _) = Outcome::parse(&buffer)?;
 
         return Ok(outcome);
     }
 
-    pub fn transactional_revert_one(
-        &mut self,
+    fn transactional_revert_one(
+        &self,
         grouping: &GroupingLabel,
         unit_key: &UnitKey,
         height: &ChainHeight,
@@ -174,29 +225,31 @@ impl ImmuxDBTcpClient {
             transaction_id: transaction_id.clone(),
         };
 
-        self.write(&command.marshal())?;
+        let mut stream = self.stream.borrow_mut();
+        write(&mut *stream, &command.marshal())?;
 
-        let buffer = self.read()?;
+        let buffer = read(&mut *stream)?;
         let (outcome, _) = Outcome::parse(&buffer)?;
 
         return Ok(outcome);
     }
 
-    pub fn revert_all(&mut self, height: &ChainHeight) -> ImmuxDBTcpClientResult<Outcome> {
+    fn revert_all(&self, height: &ChainHeight) -> ImmuxDBTcpClientResult<Outcome> {
         let command = Command::RevertAll {
             height: height.clone(),
         };
 
-        self.write(&command.marshal())?;
+        let mut stream = self.stream.borrow_mut();
+        write(&mut *stream, &command.marshal())?;
 
-        let buffer = self.read()?;
+        let buffer = read(&mut *stream)?;
         let (outcome, _) = Outcome::parse(&buffer)?;
 
         return Ok(outcome);
     }
 
-    pub fn remove_one(
-        &mut self,
+    fn remove_one(
+        &self,
         grouping: &GroupingLabel,
         unit_key: &UnitKey,
     ) -> ImmuxDBTcpClientResult<Outcome> {
@@ -205,16 +258,17 @@ impl ImmuxDBTcpClient {
             key: unit_key.clone(),
         };
 
-        self.write(&command.marshal())?;
+        let mut stream = self.stream.borrow_mut();
+        write(&mut *stream, &command.marshal())?;
 
-        let buffer = self.read()?;
+        let buffer = read(&mut *stream)?;
         let (outcome, _) = Outcome::parse(&buffer)?;
 
         return Ok(outcome);
     }
 
-    pub fn transactional_remove_one(
-        &mut self,
+    fn transactional_remove_one(
+        &self,
         transaction_id: &TransactionId,
         grouping: &GroupingLabel,
         unit_key: &UnitKey,
@@ -225,77 +279,67 @@ impl ImmuxDBTcpClient {
             transaction_id: transaction_id.clone(),
         };
 
-        self.write(&command.marshal())?;
+        let mut stream = self.stream.borrow_mut();
+        write(&mut *stream, &command.marshal())?;
 
-        let buffer = self.read()?;
+        let buffer = read(&mut *stream)?;
         let (outcome, _) = Outcome::parse(&buffer)?;
 
         return Ok(outcome);
     }
 
-    pub fn remove_all(&mut self) -> ImmuxDBTcpClientResult<Outcome> {
+    fn remove_all(&self) -> ImmuxDBTcpClientResult<Outcome> {
         let command = Command::RemoveAll;
 
-        self.write(&command.marshal())?;
+        let mut stream = self.stream.borrow_mut();
+        write(&mut *stream, &command.marshal())?;
 
-        let buffer = self.read()?;
+        let buffer = read(&mut *stream)?;
         let (outcome, _) = Outcome::parse(&buffer)?;
 
         return Ok(outcome);
     }
 
-    pub fn create_transaction(&mut self) -> ImmuxDBTcpClientResult<Outcome> {
+    fn create_transaction(&self) -> ImmuxDBTcpClientResult<Outcome> {
         let command = Command::CreateTransaction;
 
-        self.write(&command.marshal())?;
+        let mut stream = self.stream.borrow_mut();
+        write(&mut *stream, &command.marshal())?;
 
-        let buffer = self.read()?;
+        let buffer = read(&mut *stream)?;
         let (outcome, _) = Outcome::parse(&buffer)?;
 
         return Ok(outcome);
     }
 
-    pub fn commit_transaction(
-        &mut self,
+    fn commit_transaction(
+        &self,
         transaction_id: &TransactionId,
     ) -> ImmuxDBTcpClientResult<Outcome> {
         let command = Command::TransactionCommit {
             transaction_id: transaction_id.clone(),
         };
 
-        self.write(&command.marshal())?;
+        let mut stream = self.stream.borrow_mut();
+        write(&mut *stream, &command.marshal())?;
 
-        let buffer = self.read()?;
+        let buffer = read(&mut *stream)?;
         let (outcome, _) = Outcome::parse(&buffer)?;
 
         return Ok(outcome);
     }
 
-    pub fn abort_transaction(
-        &mut self,
-        transaction_id: &TransactionId,
-    ) -> ImmuxDBTcpClientResult<Outcome> {
+    fn abort_transaction(&self, transaction_id: &TransactionId) -> ImmuxDBTcpClientResult<Outcome> {
         let command = Command::TransactionAbort {
             transaction_id: transaction_id.clone(),
         };
 
-        self.write(&command.marshal())?;
+        let mut stream = self.stream.borrow_mut();
+        write(&mut *stream, &command.marshal())?;
 
-        let buffer = self.read()?;
+        let buffer = read(&mut *stream)?;
         let (outcome, _) = Outcome::parse(&buffer)?;
 
         return Ok(outcome);
-    }
-
-    pub fn write(&mut self, buffer: &[u8]) -> ImmuxDBTcpClientResult<()> {
-        self.stream.write_all(buffer)?;
-        self.stream.flush()?;
-        return Ok(());
-    }
-
-    pub fn read(&mut self) -> ImmuxDBTcpClientResult<Vec<u8>> {
-        let mut buffer = [0; 1024 * 5];
-        self.stream.read(&mut buffer)?;
-        return Ok(buffer.to_vec());
     }
 }
