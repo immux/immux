@@ -102,7 +102,10 @@ pub fn run_db_servers(
 
     for handle in handles {
         match handle.join() {
-            Ok(thread_result) => server_results.push(thread_result),
+            Ok(thread_result) => {
+                assert!(thread_result.is_ok());
+                server_results.push(thread_result);
+            }
             Err(_error) => server_results.push(Err(ServerError::ThreadError)),
         }
     }

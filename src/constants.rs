@@ -46,6 +46,7 @@ pub const MISSING_KEY_MESSAGE: &str = "Key not existed";
 pub const MISSING_FILTER_MESSAGE: &str = "FILTER argument missing";
 
 pub const TEMP_LOG_FILE_PATH: &str = "/tmp";
+pub const DEFAULT_LOG_FILE_PATH: &str = "/var/immux/";
 pub const LOG_FILE_NAME: &str = "command_log";
 
 pub const MAX_KEY_LENGTH: usize = 8 * 1024;
