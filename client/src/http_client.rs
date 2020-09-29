@@ -8,6 +8,7 @@ use immuxsys::storage::executor::unit_content::UnitContent;
 use immuxsys::storage::executor::unit_key::UnitKey;
 use immuxsys::storage::transaction_manager::TransactionId;
 
+use crate::ImmuxDBClient;
 use reqwest::Client;
 use reqwest::Url;
 
@@ -23,8 +24,10 @@ impl ImmuxDBHttpClient {
             client: reqwest::Client::new(),
         });
     }
+}
 
-    pub fn get_by_key(&self, grouping: &GroupingLabel, unit_key: &UnitKey) -> HttpClientResult {
+impl ImmuxDBClient<HttpClientResult> for ImmuxDBHttpClient {
+    fn get_by_key(&self, grouping: &GroupingLabel, unit_key: &UnitKey) -> HttpClientResult {
         let url = format!(
             "http://{}/{}/{}",
             &self.host,
@@ -40,7 +43,7 @@ impl ImmuxDBHttpClient {
         }
     }
 
-    pub fn get_by_filter(&self, grouping: &GroupingLabel, filter: &Filter) -> HttpClientResult {
+    fn get_by_filter(&self, grouping: &GroupingLabel, filter: &Filter) -> HttpClientResult {
         let url_str = format!("http://{}/{}", &self.host, grouping.to_string());
 
         let url = Url::parse_with_params(&url_str, &[("filter", format!("{}", filter))]).unwrap();
@@ -54,7 +57,7 @@ impl ImmuxDBHttpClient {
         }
     }
 
-    pub fn transactional_get(
+    fn transactional_get(
         &self,
         grouping: &GroupingLabel,
         unit_key: &UnitKey,
@@ -78,7 +81,7 @@ impl ImmuxDBHttpClient {
         }
     }
 
-    pub fn inspect_one(&self, grouping: &GroupingLabel, unit_key: &UnitKey) -> HttpClientResult {
+    fn inspect_one(&self, grouping: &GroupingLabel, unit_key: &UnitKey) -> HttpClientResult {
         let url = format!(
             "http://{}/{}/{}/{}",
             &self.host,
@@ -96,7 +99,7 @@ impl ImmuxDBHttpClient {
         }
     }
 
-    pub fn inspect_all(&self) -> HttpClientResult {
+    fn inspect_all(&self) -> HttpClientResult {
         let url = format!("http://{}/{}", &self.host, Constants::URL_JOURNAL_KEY_WORD,);
 
         let mut response = self.client.get(&url).send()?;
@@ -108,7 +111,7 @@ impl ImmuxDBHttpClient {
         }
     }
 
-    pub fn get_by_grouping(&self, grouping: &GroupingLabel) -> HttpClientResult {
+    fn get_by_grouping(&self, grouping: &GroupingLabel) -> HttpClientResult {
         let url = format!("http://{}/{}", &self.host, grouping);
 
         let mut response = self.client.get(&url).send()?;
@@ -120,7 +123,7 @@ impl ImmuxDBHttpClient {
         }
     }
 
-    pub fn set_unit(
+    fn set_unit(
         &self,
         grouping: &GroupingLabel,
         unit_key: &UnitKey,
@@ -144,7 +147,7 @@ impl ImmuxDBHttpClient {
         }
     }
 
-    pub fn transactional_set_unit(
+    fn transactional_set_unit(
         &self,
         grouping: &GroupingLabel,
         unit_key: &UnitKey,
@@ -171,7 +174,7 @@ impl ImmuxDBHttpClient {
         }
     }
 
-    pub fn revert_one(
+    fn revert_one(
         &self,
         grouping: &GroupingLabel,
         unit_key: &UnitKey,
@@ -196,7 +199,7 @@ impl ImmuxDBHttpClient {
         }
     }
 
-    pub fn transactional_revert_one(
+    fn transactional_revert_one(
         &self,
         grouping: &GroupingLabel,
         unit_key: &UnitKey,
@@ -224,7 +227,7 @@ impl ImmuxDBHttpClient {
         }
     }
 
-    pub fn revert_all(&self, height: &ChainHeight) -> HttpClientResult {
+    fn revert_all(&self, height: &ChainHeight) -> HttpClientResult {
         let mut response = self
             .client
             .put(&format!(
@@ -242,7 +245,7 @@ impl ImmuxDBHttpClient {
         }
     }
 
-    pub fn remove_one(&self, grouping: &GroupingLabel, unit_key: &UnitKey) -> HttpClientResult {
+    fn remove_one(&self, grouping: &GroupingLabel, unit_key: &UnitKey) -> HttpClientResult {
         let mut response = self
             .client
             .delete(&format!(
@@ -260,7 +263,7 @@ impl ImmuxDBHttpClient {
         }
     }
 
-    pub fn transactional_remove_one(
+    fn transactional_remove_one(
         &self,
         transaction_id: &TransactionId,
         grouping: &GroupingLabel,
@@ -285,7 +288,7 @@ impl ImmuxDBHttpClient {
         }
     }
 
-    pub fn remove_all(&self) -> HttpClientResult {
+    fn remove_all(&self) -> HttpClientResult {
         let mut response = self
             .client
             .delete(&format!("http://{}/", &self.host))
@@ -298,7 +301,7 @@ impl ImmuxDBHttpClient {
         }
     }
 
-    pub fn create_transaction(&self) -> HttpClientResult {
+    fn create_transaction(&self) -> HttpClientResult {
         let mut response = self
             .client
             .post(&format!(
@@ -315,7 +318,7 @@ impl ImmuxDBHttpClient {
         }
     }
 
-    pub fn commit_transaction(&self, transaction_id: &TransactionId) -> HttpClientResult {
+    fn commit_transaction(&self, transaction_id: &TransactionId) -> HttpClientResult {
         let mut response = self
             .client
             .post(&format!(
@@ -334,7 +337,7 @@ impl ImmuxDBHttpClient {
         }
     }
 
-    pub fn abort_transaction(&self, transaction_id: &TransactionId) -> HttpClientResult {
+    fn abort_transaction(&self, transaction_id: &TransactionId) -> HttpClientResult {
         let mut response = self
             .client
             .post(&format!(

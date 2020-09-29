@@ -8,6 +8,7 @@ use std::time::Duration;
 use std::time::Instant;
 use std::{io, thread};
 
+use immuxsys::server::errors::ServerResult;
 use immuxsys::server::server::run_db_servers;
 use immuxsys::storage::executor::filter::{
     Filter, FilterOperands, FilterOperator, FilterUnit, LogicalOperator,
@@ -16,8 +17,8 @@ use immuxsys::storage::executor::grouping_label::GroupingLabel;
 use immuxsys::storage::executor::unit_content::UnitContent;
 use immuxsys::storage::executor::unit_key::UnitKey;
 use immuxsys_client::http_client::ImmuxDBHttpClient;
+use immuxsys_client::ImmuxDBClient;
 
-use immuxsys::server::errors::ServerResult;
 pub use serde::de::{Deserialize, DeserializeOwned};
 pub use serde::ser::Serialize;
 

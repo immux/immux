@@ -11,6 +11,7 @@ mod http_e2e_tests {
     use immuxsys::storage::executor::unit_key::UnitKey;
     use immuxsys::storage::transaction_manager::TransactionId;
     use immuxsys_client::http_client::ImmuxDBHttpClient;
+    use immuxsys_client::ImmuxDBClient;
     use immuxsys_dev_utils::data_models::{
         berka99::Account, berka99::Card, berka99::Client, berka99::Disp, berka99::District,
         berka99::Loan, berka99::Order, berka99::Trans, business::Business, census90::CensusEntry,

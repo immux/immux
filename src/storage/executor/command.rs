@@ -862,23 +862,114 @@ impl ToString for Command {
 
 #[cfg(test)]
 mod command_tests {
+    use crate::storage::chain_height::ChainHeight;
     use crate::storage::executor::command::{Command, SelectCondition};
+    use crate::storage::executor::filter::parse_filter_string;
     use crate::storage::executor::grouping_label::GroupingLabel;
+    use crate::storage::executor::unit_content::UnitContent;
     use crate::storage::executor::unit_key::UnitKey;
+    use crate::storage::transaction_manager::TransactionId;
+
+    #[test]
+    fn select_condition_reversibility() {
+        let unit_key = UnitKey::new(&[0x01, 0x02, 0x03]);
+        let transaction_id = TransactionId::new(1);
+        let filter = parse_filter_string(String::from("x>3")).unwrap();
+
+        let conditions = vec![
+            SelectCondition::Key(unit_key.clone(), None),
+            SelectCondition::Key(unit_key.clone(), Some(transaction_id)),
+            SelectCondition::UnconditionalMatch,
+            SelectCondition::Filter(filter),
+        ];
+
+        for condition in conditions.iter() {
+            let condition_bytes = condition.marshal();
+            let (actual_output, offset) = SelectCondition::parse(&condition_bytes).unwrap();
+            assert_eq!(condition, &actual_output);
+            assert_eq!(condition_bytes.len(), offset);
+        }
+    }
 
     #[test]
     fn command_reversibility() {
         let grouping = GroupingLabel::from("any_grouping");
         let unit_key = UnitKey::new(&[0x01, 0x02, 0x03]);
-        let condition = SelectCondition::Key(unit_key, None);
-        let expected_output = Command::Select {
-            grouping,
-            condition,
-        };
+        let transaction_id = TransactionId::new(1);
+        let filter = parse_filter_string(String::from("x>3")).unwrap();
+        let target_height = ChainHeight::new(1);
 
-        let command_bytes = &expected_output.marshal();
-        let (actual_output, _) = Command::parse(&command_bytes).unwrap();
+        let conditions = vec![
+            SelectCondition::Key(unit_key.clone(), None),
+            SelectCondition::Key(unit_key.clone(), Some(transaction_id)),
+            SelectCondition::UnconditionalMatch,
+            SelectCondition::Filter(filter),
+        ];
 
-        assert_eq!(expected_output, actual_output);
+        let select_commands: Vec<Command> = conditions
+            .iter()
+            .map(|condition| Command::Select {
+                grouping: grouping.clone(),
+                condition: condition.clone(),
+            })
+            .collect();
+
+        let mut commands = vec![
+            Command::InspectOne {
+                grouping: grouping.clone(),
+                key: unit_key.clone(),
+            },
+            Command::InspectAll,
+            Command::Insert {
+                grouping: grouping.clone(),
+                key: unit_key.clone(),
+                content: UnitContent::String(String::from("123")),
+            },
+            Command::RevertOne {
+                grouping: grouping.clone(),
+                key: unit_key.clone(),
+                height: target_height.clone(),
+            },
+            Command::RevertAll {
+                height: target_height.clone(),
+            },
+            Command::RemoveOne {
+                grouping: grouping.clone(),
+                key: unit_key.clone(),
+            },
+            Command::RemoveAll,
+            Command::TransactionalInsert {
+                transaction_id: transaction_id.clone(),
+                grouping: grouping.clone(),
+                key: unit_key.clone(),
+                content: UnitContent::String(String::from("123")),
+            },
+            Command::TransactionalRevertOne {
+                transaction_id: transaction_id.clone(),
+                grouping: grouping.clone(),
+                key: unit_key.clone(),
+                height: target_height.clone(),
+            },
+            Command::TransactionalRemoveOne {
+                transaction_id: transaction_id.clone(),
+                grouping: grouping.clone(),
+                key: unit_key.clone(),
+            },
+            Command::CreateTransaction,
+            Command::TransactionCommit {
+                transaction_id: transaction_id.clone(),
+            },
+            Command::TransactionAbort {
+                transaction_id: transaction_id.clone(),
+            },
+        ];
+
+        commands.extend_from_slice(&select_commands);
+
+        for command in commands.iter() {
+            let command_bytes = &command.marshal();
+            let (actual_output, _) = Command::parse(&command_bytes).unwrap();
+            assert_eq!(*command, actual_output);
+        }
     }
 }
