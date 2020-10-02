@@ -2,7 +2,6 @@
 mod tcp_e2e_tests {
     use std::collections::HashMap;
     use std::error::Error;
-    use std::thread;
 
     use immuxsys::constants as Constants;
     use immuxsys::storage::chain_height::ChainHeight;
@@ -20,17 +19,13 @@ mod tcp_e2e_tests {
     use immuxsys_dev_utils::data_models::census90::CensusEntry;
     use immuxsys_dev_utils::data_models::covid::Covid;
     use immuxsys_dev_utils::dev_utils::{
-        csv_to_json_table, get_filter, get_key_content_pairs, launch_db_server, notified_sleep,
-        UnitList,
+        csv_to_json_table, get_filter, get_key_content_pairs, launch_test_db_servers, UnitList,
     };
 
     #[test]
     fn tcp_e2e_grouping_get_set() {
         let port = 8000;
-        thread::spawn(move || {
-            launch_db_server("tcp_e2e_grouping_get_set", None, Some(port)).unwrap()
-        });
-        notified_sleep(5);
+        launch_test_db_servers("tcp_e2e_grouping_get_set", None, Some(port)).unwrap();
 
         let host = &format!("{}:{}", Constants::SERVER_END_POINT, port);
         let client = ImmuxDBTcpClient::new(host).unwrap();
@@ -52,10 +47,7 @@ mod tcp_e2e_tests {
     #[test]
     fn tcp_e2e_single_unit_get_set() {
         let port = 8001;
-        thread::spawn(move || {
-            launch_db_server("tcp_e2e_single_unit_get_set", None, Some(port)).unwrap()
-        });
-        notified_sleep(5);
+        launch_test_db_servers("tcp_e2e_single_unit_get_set", None, Some(port)).unwrap();
 
         let host = &format!("{}:{}", Constants::SERVER_END_POINT, port);
         let client = ImmuxDBTcpClient::new(host).unwrap();
@@ -79,8 +71,7 @@ mod tcp_e2e_tests {
     #[test]
     fn tcp_e2e_revert_one() {
         let port = 8002;
-        thread::spawn(move || launch_db_server("tcp_e2e_revert_one", None, Some(port)).unwrap());
-        notified_sleep(5);
+        launch_test_db_servers("tcp_e2e_revert_one", None, Some(port)).unwrap();
 
         let host = &format!("{}:{}", Constants::SERVER_END_POINT, port);
         let client = ImmuxDBTcpClient::new(host).unwrap();
@@ -121,10 +112,7 @@ mod tcp_e2e_tests {
     #[test]
     fn tcp_e2e_real_data_get_set() {
         let port = 8003;
-        thread::spawn(move || {
-            launch_db_server("tcp_e2e_real_data_get_set", None, Some(port)).unwrap()
-        });
-        notified_sleep(5);
+        launch_test_db_servers("tcp_e2e_real_data_get_set", None, Some(port)).unwrap();
 
         let host = &format!("{}:{}", Constants::SERVER_END_POINT, port);
         let client = ImmuxDBTcpClient::new(host).unwrap();
@@ -202,8 +190,7 @@ mod tcp_e2e_tests {
     #[test]
     fn tcp_e2e_remove_one() {
         let port = 8004;
-        thread::spawn(move || launch_db_server("tcp_e2e_remove_one", None, Some(port)).unwrap());
-        notified_sleep(5);
+        launch_test_db_servers("tcp_e2e_remove_one", None, Some(port)).unwrap();
 
         let host = &format!("{}:{}", Constants::SERVER_END_POINT, port);
         let client = ImmuxDBTcpClient::new(host).unwrap();
@@ -236,8 +223,7 @@ mod tcp_e2e_tests {
     #[test]
     fn tcp_e2e_revert_all() {
         let port = 8005;
-        thread::spawn(move || launch_db_server("tcp_e2e_revert_all", None, Some(port)).unwrap());
-        notified_sleep(5);
+        launch_test_db_servers("tcp_e2e_revert_all", None, Some(port)).unwrap();
 
         let host = &format!("{}:{}", Constants::SERVER_END_POINT, port);
         let client = ImmuxDBTcpClient::new(host).unwrap();
@@ -271,8 +257,7 @@ mod tcp_e2e_tests {
     #[test]
     fn tcp_e2e_remove_all() {
         let port = 8006;
-        thread::spawn(move || launch_db_server("tcp_e2e_remove_all", None, Some(port)).unwrap());
-        notified_sleep(5);
+        launch_test_db_servers("tcp_e2e_remove_all", None, Some(port)).unwrap();
 
         let host = &format!("{}:{}", Constants::SERVER_END_POINT, port);
         let client = ImmuxDBTcpClient::new(host).unwrap();
@@ -300,10 +285,7 @@ mod tcp_e2e_tests {
     #[test]
     fn tcp_e2e_atomicity_commit() {
         let port = 8007;
-        thread::spawn(move || {
-            launch_db_server("tcp_e2e_atomicity_commit", None, Some(port)).unwrap()
-        });
-        notified_sleep(5);
+        launch_test_db_servers("tcp_e2e_atomicity_commit", None, Some(port)).unwrap();
 
         let host = &format!("{}:{}", Constants::SERVER_END_POINT, port);
         let client = ImmuxDBTcpClient::new(host).unwrap();
@@ -340,10 +322,7 @@ mod tcp_e2e_tests {
     #[test]
     fn tcp_e2e_atomicity_abort() {
         let port = 8008;
-        thread::spawn(move || {
-            launch_db_server("tcp_e2e_atomicity_abort", None, Some(port)).unwrap()
-        });
-        notified_sleep(5);
+        launch_test_db_servers("tcp_e2e_atomicity_abort", None, Some(port)).unwrap();
 
         let host = &format!("{}:{}", Constants::SERVER_END_POINT, port);
         let client = ImmuxDBTcpClient::new(host).unwrap();
@@ -381,8 +360,7 @@ mod tcp_e2e_tests {
     #[test]
     fn tcp_e2e_set_isolation() {
         let port = 8009;
-        thread::spawn(move || launch_db_server("tcp_e2e_set_isolation", None, Some(port)).unwrap());
-        notified_sleep(5);
+        launch_test_db_servers("tcp_e2e_set_isolation", None, Some(port)).unwrap();
 
         let host = &format!("{}:{}", Constants::SERVER_END_POINT, port);
         let client = ImmuxDBTcpClient::new(host).unwrap();
@@ -430,10 +408,7 @@ mod tcp_e2e_tests {
     #[test]
     fn tcp_e2e_remove_one_isolation() {
         let port = 8010;
-        thread::spawn(move || {
-            launch_db_server("tcp_e2e_remove_one_isolation", None, Some(port)).unwrap()
-        });
-        notified_sleep(5);
+        launch_test_db_servers("tcp_e2e_remove_one_isolation", None, Some(port)).unwrap();
 
         let host = &format!("{}:{}", Constants::SERVER_END_POINT, port);
         let client = ImmuxDBTcpClient::new(host).unwrap();
@@ -481,10 +456,7 @@ mod tcp_e2e_tests {
     #[test]
     fn tcp_e2e_revert_one_isolation() {
         let port = 8011;
-        thread::spawn(move || {
-            launch_db_server("tcp_e2e_revert_one_isolation", None, Some(port)).unwrap()
-        });
-        notified_sleep(5);
+        launch_test_db_servers("tcp_e2e_revert_one_isolation", None, Some(port)).unwrap();
 
         let host = &format!("{}:{}", Constants::SERVER_END_POINT, port);
         let client = ImmuxDBTcpClient::new(host).unwrap();
@@ -538,10 +510,7 @@ mod tcp_e2e_tests {
     #[test]
     fn tcp_e2e_remove_all_isolation() {
         let port = 8012;
-        thread::spawn(move || {
-            launch_db_server("tcp_e2e_remove_all_isolation", None, Some(port)).unwrap()
-        });
-        notified_sleep(5);
+        launch_test_db_servers("tcp_e2e_remove_all_isolation", None, Some(port)).unwrap();
 
         let host = &format!("{}:{}", Constants::SERVER_END_POINT, port);
         let client = ImmuxDBTcpClient::new(host).unwrap();
@@ -579,10 +548,7 @@ mod tcp_e2e_tests {
     #[test]
     fn tcp_e2e_revert_all_isolation() {
         let port = 8013;
-        thread::spawn(move || {
-            launch_db_server("tcp_e2e_revert_all_isolation", None, Some(port)).unwrap()
-        });
-        notified_sleep(5);
+        launch_test_db_servers("tcp_e2e_revert_all_isolation", None, Some(port)).unwrap();
 
         let host = &format!("{}:{}", Constants::SERVER_END_POINT, port);
         let client = ImmuxDBTcpClient::new(host).unwrap();
@@ -624,15 +590,12 @@ mod tcp_e2e_tests {
     #[should_panic]
     fn tcp_e2e_transaction_not_alive_after_revert_all() {
         let port = 8014;
-        thread::spawn(move || {
-            launch_db_server(
-                "tcp_e2e_transaction_not_alive_after_revert_all",
-                None,
-                Some(port),
-            )
-            .unwrap()
-        });
-        notified_sleep(5);
+        launch_test_db_servers(
+            "tcp_e2e_transaction_not_alive_after_revert_all",
+            None,
+            Some(port),
+        )
+        .unwrap();
 
         let host = &format!("{}:{}", Constants::SERVER_END_POINT, port);
         let client = ImmuxDBTcpClient::new(host).unwrap();
@@ -664,10 +627,8 @@ mod tcp_e2e_tests {
     #[should_panic]
     fn tcp_e2e_unexpected_commit_transaction_id() {
         let port = 8016;
-        thread::spawn(move || {
-            launch_db_server("tcp_e2e_unexpected_commit_transaction_id", None, Some(port)).unwrap()
-        });
-        notified_sleep(5);
+        launch_test_db_servers("tcp_e2e_unexpected_commit_transaction_id", None, Some(port))
+            .unwrap();
 
         let host = &format!("{}:{}", Constants::SERVER_END_POINT, port);
         let client = ImmuxDBTcpClient::new(host).unwrap();
@@ -681,10 +642,8 @@ mod tcp_e2e_tests {
     #[should_panic]
     fn tcp_e2e_unexpected_abort_transaction_id() {
         let port = 8015;
-        thread::spawn(move || {
-            launch_db_server("tcp_e2e_unexpected_abort_transaction_id", None, Some(port)).unwrap()
-        });
-        notified_sleep(5);
+        launch_test_db_servers("tcp_e2e_unexpected_abort_transaction_id", None, Some(port))
+            .unwrap();
 
         let host = &format!("{}:{}", Constants::SERVER_END_POINT, port);
         let client = ImmuxDBTcpClient::new(host).unwrap();
@@ -697,10 +656,7 @@ mod tcp_e2e_tests {
     #[test]
     fn tcp_e2e_last_one_commit_wins() {
         let port = 8017;
-        thread::spawn(move || {
-            launch_db_server("tcp_e2e_last_one_commit_wins", None, Some(port)).unwrap()
-        });
-        notified_sleep(5);
+        launch_test_db_servers("tcp_e2e_last_one_commit_wins", None, Some(port)).unwrap();
 
         let host = &format!("{}:{}", Constants::SERVER_END_POINT, port);
         let client = ImmuxDBTcpClient::new(host).unwrap();
@@ -767,10 +723,7 @@ mod tcp_e2e_tests {
     #[test]
     fn tcp_e2e_read_inside_transaction() {
         let port = 8018;
-        thread::spawn(move || {
-            launch_db_server("tcp_e2e_read_inside_transaction", None, Some(port)).unwrap()
-        });
-        notified_sleep(5);
+        launch_test_db_servers("tcp_e2e_read_inside_transaction", None, Some(port)).unwrap();
 
         let host = &format!("{}:{}", Constants::SERVER_END_POINT, port);
         let client = ImmuxDBTcpClient::new(host).unwrap();
@@ -798,8 +751,7 @@ mod tcp_e2e_tests {
     #[test]
     fn tcp_e2e_dirty_read() {
         let port = 8019;
-        thread::spawn(move || launch_db_server("tcp_e2e_dirty_read", None, Some(port)).unwrap());
-        notified_sleep(5);
+        launch_test_db_servers("tcp_e2e_dirty_read", None, Some(port)).unwrap();
 
         let host = &format!("{}:{}", Constants::SERVER_END_POINT, port);
         let client = ImmuxDBTcpClient::new(host).unwrap();
@@ -927,8 +879,7 @@ mod tcp_e2e_tests {
         contents.extend_from_slice(&unsatisfied_content);
 
         let port = 8020;
-        thread::spawn(move || launch_db_server("tcp_e2e_filter_read", None, Some(port)).unwrap());
-        notified_sleep(5);
+        launch_test_db_servers("tcp_e2e_filter_read", None, Some(port)).unwrap();
 
         let host = &format!("{}:{}", Constants::SERVER_END_POINT, port);
         let client = ImmuxDBTcpClient::new(host).unwrap();

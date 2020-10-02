@@ -4,7 +4,7 @@ use immuxsys::storage::executor::unit_content::UnitContent;
 use immuxsys_client::http_client::ImmuxDBHttpClient;
 use immuxsys_dev_utils::data_models::census90::CensusEntry;
 use immuxsys_dev_utils::dev_utils::{
-    csv_to_json_table, e2e_verify_correctness, launch_db_server, measure_iteration, notified_sleep,
+    csv_to_json_table, e2e_verify_correctness, launch_test_db_servers, measure_iteration,
     read_usize_from_arguments, UnitList,
 };
 
@@ -20,8 +20,7 @@ fn main() {
         bench_name, row_limit, report_period
     );
 
-    launch_db_server("bench_remove_single_unit", Some(port), None).unwrap();
-    notified_sleep(5);
+    launch_test_db_servers("bench_remove_single_unit", Some(port), None).unwrap();
 
     let grouping = GroupingLabel::from("census90");
     let table = csv_to_json_table::<CensusEntry>(

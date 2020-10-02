@@ -69,6 +69,19 @@ pub fn u8_array_to_u64(data: &[u8; 8]) -> u64 {
         .into()
 }
 
+pub fn byte_slice_to_u64(data: &[u8]) -> u64 {
+    if data.len() >= 8 {
+        let p = data;
+        u8_array_to_u64(&[p[0], p[1], p[2], p[3], p[4], p[5], p[6], p[7]])
+    } else {
+        let mut p = [0u8; 8];
+        for (pos, i) in data.iter().enumerate() {
+            p[pos] = *i;
+        }
+        u8_array_to_u64(&[p[0], p[1], p[2], p[3], p[4], p[5], p[6], p[7]])
+    }
+}
+
 // u32
 
 pub fn u8_array_to_u32(data: &[u8; 4]) -> u32 {
@@ -77,6 +90,19 @@ pub fn u8_array_to_u32(data: &[u8; 4]) -> u32 {
         + ((data[2] as u32) << 16)
         + ((data[3] as u32) << 24))
         .into()
+}
+
+pub fn byte_slice_to_u32(data: &[u8]) -> u32 {
+    if data.len() >= 4 {
+        let p = data;
+        u8_array_to_u32(&[p[0], p[1], p[2], p[3]])
+    } else {
+        let mut p = [0u8; 4];
+        for (pos, i) in data.iter().enumerate() {
+            p[pos] = *i;
+        }
+        u8_array_to_u32(&[p[0], p[1], p[2], p[3]])
+    }
 }
 
 pub fn u32_to_u8_array(x: u32) -> [u8; 4] {
@@ -110,6 +136,19 @@ pub fn u8_array_to_u16(data: &[u8; 2]) -> u16 {
     (((data[0] as u16) << 0) + ((data[1] as u16) << 8)).into()
 }
 
+pub fn byte_slice_to_u16(data: &[u8]) -> u16 {
+    if data.len() >= 2 {
+        let p = data;
+        u8_array_to_u16(&[p[0], p[1]])
+    } else {
+        let mut p = [0u8; 2];
+        for (pos, i) in data.iter().enumerate() {
+            p[pos] = *i;
+        }
+        u8_array_to_u16(&[p[0], p[1]])
+    }
+}
+
 pub fn get_bit_u16(input: u16, digit: u8) -> bool {
     if digit < 16 {
         input & (1u16 << (digit as u16)) != 0
@@ -133,10 +172,29 @@ pub fn u16_to_u8_array(x: u16) -> [u8; 2] {
     [b0, b1]
 }
 
+// u8
+
+pub fn get_bit_u8(input: u8, digit: u8) -> bool {
+    if digit < 8 {
+        input & (1u8 << (digit as u8)) != 0
+    } else {
+        false
+    }
+}
+
+pub fn set_bit_u8(int: &mut u8, digit: u8, value: bool) {
+    if value {
+        *int |= 1u8 << (digit as u8);
+    } else {
+        *int &= !(1u8 << (digit as u8));
+    }
+}
+
 #[cfg(test)]
 mod int_utils_test {
     use crate::utils::ints::{
-        get_bit_u16, get_bit_u32, set_bit_u16, set_bit_u32, u128_to_u8_array, u16_to_u8_array,
+        byte_slice_to_u16, byte_slice_to_u32, byte_slice_to_u64, get_bit_u16, get_bit_u32,
+        get_bit_u8, set_bit_u16, set_bit_u32, set_bit_u8, u128_to_u8_array, u16_to_u8_array,
         u32_to_u8_array, u64_to_u8_array, u8_array_to_u128, u8_array_to_u16, u8_array_to_u32,
         u8_array_to_u64,
     };
@@ -206,10 +264,34 @@ mod int_utils_test {
     }
 
     #[test]
+    fn test_byte_slices_to_u64() {
+        // Normal
+        assert_eq!(0, byte_slice_to_u64(&[0, 0, 0, 0, 0, 0, 0, 0]));
+        assert_eq!(
+            std::u32::MAX as u64,
+            byte_slice_to_u64(&[255, 255, 255, 255, 0, 0, 0, 0])
+        );
+        assert_eq!(
+            std::u64::MAX,
+            byte_slice_to_u64(&[255, 255, 255, 255, 255, 255, 255, 255])
+        );
+
+        // Abnormal
+        assert_eq!(0, byte_slice_to_u64(&[]));
+        assert_eq!(42, byte_slice_to_u64(&[42]));
+        assert_eq!(0x100, byte_slice_to_u64(&[0, 1]));
+        assert_eq!(
+            std::u64::MAX,
+            byte_slice_to_u64(&[255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255])
+        );
+    }
+
+    #[test]
     fn spot_check_u64_array_reversibility() {
         let large_prime = 67280421310721;
         for i in (0..std::u64::MAX).step_by(large_prime) {
-            assert_eq!(u8_array_to_u64(&u64_to_u8_array(i)), i)
+            assert_eq!(u8_array_to_u64(&u64_to_u8_array(i)), i);
+            assert_eq!(byte_slice_to_u64(&u64_to_u8_array(i)), i);
         }
     }
 
@@ -227,6 +309,24 @@ mod int_utils_test {
         assert_eq!(0, u8_array_to_u32(&[0, 0, 0, 0]));
         assert_eq!(std::u16::MAX as u32, u8_array_to_u32(&[255, 255, 0, 0]));
         assert_eq!(std::u32::MAX, u8_array_to_u32(&[255, 255, 255, 255]));
+    }
+
+    #[test]
+    #[test]
+    fn test_byte_slices_to_u32() {
+        // Normal
+        assert_eq!(0, u8_array_to_u32(&[0, 0, 0, 0]));
+        assert_eq!(std::u16::MAX as u32, byte_slice_to_u32(&[255, 255, 0, 0]));
+        assert_eq!(std::u32::MAX, byte_slice_to_u32(&[255, 255, 255, 255]));
+
+        // Abnormal
+        assert_eq!(0, byte_slice_to_u32(&[]));
+        assert_eq!(42, byte_slice_to_u32(&[42]));
+        assert_eq!(0x100, byte_slice_to_u32(&[0, 1]));
+        assert_eq!(
+            std::u32::MAX,
+            byte_slice_to_u32(&[255, 255, 255, 255, 255, 255, 255])
+        );
     }
 
     #[test]
@@ -250,6 +350,18 @@ mod int_utils_test {
         assert_eq!(0, u8_array_to_u16(&[0, 0]));
         assert_eq!(std::u8::MAX as u16, u8_array_to_u16(&[255, 0]));
         assert_eq!(std::u16::MAX, u8_array_to_u16(&[255, 255]));
+    }
+
+    #[test]
+    fn test_byte_slice_to_u16() {
+        // Normal
+        assert_eq!(0, byte_slice_to_u16(&[0, 0]));
+        assert_eq!(std::u16::MAX as u16, byte_slice_to_u16(&[255, 255]));
+
+        // Malformed
+        assert_eq!(0, byte_slice_to_u16(&[]));
+        assert_eq!(42, byte_slice_to_u16(&[42]));
+        assert_eq!(std::u16::MAX, byte_slice_to_u16(&[255, 255, 1]));
     }
 
     #[test]
@@ -279,6 +391,15 @@ mod int_utils_test {
     }
 
     #[test]
+    fn test_get_bit_u8() {
+        for digit in 0..8 {
+            assert_eq!(get_bit_u8(0, digit), false);
+            assert_eq!(get_bit_u8(std::u8::MAX, digit), true);
+        }
+        assert_eq!(get_bit_u8(std::u8::MAX, 100), false);
+    }
+
+    #[test]
     fn test_set_bit_u32() {
         let mut data = 0u32;
 
@@ -304,6 +425,21 @@ mod int_utils_test {
 
         for i in 0..16 {
             set_bit_u16(&mut data, i, false);
+        }
+        assert_eq!(data, 0);
+    }
+
+    #[test]
+    fn test_set_bit_u8() {
+        let mut data = 0u8;
+
+        for i in 0..8 {
+            set_bit_u8(&mut data, i, true);
+        }
+        assert_eq!(data, std::u8::MAX);
+
+        for i in 0..8 {
+            set_bit_u8(&mut data, i, false);
         }
         assert_eq!(data, 0);
     }

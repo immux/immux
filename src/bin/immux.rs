@@ -1,18 +1,19 @@
-use std::path::PathBuf;
+use clap::{App, Arg, SubCommand};
 
 use immuxsys::constants as Constants;
 use immuxsys::storage::chain_height::ChainHeight;
-
-use clap::{App, Arg, SubCommand};
 use immuxsys::storage::executor::command::SelectCondition;
 use immuxsys::storage::executor::filter::parse_filter_string;
 use immuxsys::storage::executor::{
     errors::ExecutorResult, executor::Executor, grouping_label::GroupingLabel,
     unit_content::UnitContent, unit_key::UnitKey,
 };
+use immuxsys::storage::preferences::DBPreferences;
 use immuxsys::storage::transaction_manager::TransactionId;
 
 fn main() -> ExecutorResult<()> {
+    let pref = DBPreferences::default();
+
     let arg_matches = App::new(env!("CARGO_PKG_NAME"))
         .version(env!("CARGO_PKG_VERSION"))
         .author(env!("CARGO_PKG_AUTHORS"))
@@ -186,9 +187,7 @@ fn main() -> ExecutorResult<()> {
                 .value_of(Constants::ARGUMENT_NAME_FOR_VALUE)
                 .expect(Constants::MISSING_VALUE_ARGUMENT_MESSAGE);
 
-            let path = PathBuf::from(Constants::TEMP_LOG_FILE_PATH);
-
-            let mut executor = Executor::open(&path)?;
+            let mut executor = Executor::open(&pref)?;
 
             if let Some(transaction_id_str) =
                 arg_matches.value_of(Constants::ARGUMENT_NAME_FOR_TRANSACTION_ID)
@@ -214,8 +213,8 @@ fn main() -> ExecutorResult<()> {
                 .value_of(Constants::ARGUMENT_NAME_FOR_GROUPING)
                 .expect(Constants::MISSING_GROUPING_ARGUMENT_MESSAGE);
 
-            let path = PathBuf::from(Constants::TEMP_LOG_FILE_PATH);
-            let mut executor = Executor::open(&path)?;
+            let pref = DBPreferences::default_at_dir(Constants::TEMP_LOG_FILE_DIR);
+            let mut executor = Executor::open(&pref)?;
 
             if let Some(key_arg) = arg_matches.value_of(Constants::ARGUMENT_NAME_FOR_KEY) {
                 if let Some(transaction_id_str) =
@@ -244,8 +243,7 @@ fn main() -> ExecutorResult<()> {
                 .value_of(Constants::ARGUMENT_NAME_FOR_FILTER)
                 .expect(Constants::MISSING_FILTER_ARGUMENT_MESSAGE);
             {
-                let path = PathBuf::from(Constants::TEMP_LOG_FILE_PATH);
-                let mut executor = Executor::open(&path)?;
+                let mut executor = Executor::open(&pref)?;
                 let filter = parse_filter_string(filter_str.to_string())?;
 
                 let condition = SelectCondition::Filter(filter);
@@ -263,9 +261,7 @@ fn main() -> ExecutorResult<()> {
                 .value_of(Constants::ARGUMENT_NAME_FOR_HEIGHT)
                 .expect(Constants::MISSING_HEIGHT_ARGUMENT_MESSAGE);
 
-            let path = PathBuf::from(Constants::TEMP_LOG_FILE_PATH);
-
-            let mut executor = Executor::open(&path)?;
+            let mut executor = Executor::open(&pref)?;
             let height = height_arg.parse::<u64>()?;
 
             if let Some(transaction_id_str) =
@@ -292,9 +288,7 @@ fn main() -> ExecutorResult<()> {
                 .value_of(Constants::ARGUMENT_NAME_FOR_HEIGHT)
                 .expect(Constants::MISSING_HEIGHT_ARGUMENT_MESSAGE);
 
-            let path = PathBuf::from(Constants::TEMP_LOG_FILE_PATH);
-
-            let mut executor = Executor::open(&path)?;
+            let mut executor = Executor::open(&pref)?;
             let height = height_arg.parse::<u64>()?;
             executor.revert_all(&ChainHeight::new(height))
         }
@@ -306,9 +300,7 @@ fn main() -> ExecutorResult<()> {
                 .value_of(Constants::ARGUMENT_NAME_FOR_KEY)
                 .expect(Constants::MISSING_KEY_ARGUMENT_MESSAGE);
 
-            let path = PathBuf::from(Constants::TEMP_LOG_FILE_PATH);
-
-            let mut executor = Executor::open(&path)?;
+            let mut executor = Executor::open(&pref)?;
 
             if let Some(transaction_id_str) =
                 arg_matches.value_of(Constants::ARGUMENT_NAME_FOR_TRANSACTION_ID)
@@ -328,9 +320,7 @@ fn main() -> ExecutorResult<()> {
             }
         }
         (Constants::SUBCOMMAND_REMOVE_ALL, Some(_arg_matches)) => {
-            let path = PathBuf::from(Constants::TEMP_LOG_FILE_PATH);
-
-            let mut executor = Executor::open(&path)?;
+            let mut executor = Executor::open(&pref)?;
             executor.remove_all()
         }
         (Constants::SUBCOMMAND_INSPECT_ONE, Some(arg_matches)) => {
@@ -341,30 +331,23 @@ fn main() -> ExecutorResult<()> {
                 .value_of(Constants::ARGUMENT_NAME_FOR_KEY)
                 .expect(Constants::MISSING_KEY_ARGUMENT_MESSAGE);
             let unit_key = UnitKey::from(key_arg);
-            let path = PathBuf::from(Constants::TEMP_LOG_FILE_PATH);
-            let mut executor = Executor::open(&path)?;
+            let mut executor = Executor::open(&pref)?;
 
             executor.inspect_one(&GroupingLabel::from(grouping_arg), &unit_key)
         }
         (Constants::SUBCOMMAND_INSPECT_ALL, Some(_arg_matches)) => {
-            let path = PathBuf::from(Constants::TEMP_LOG_FILE_PATH);
-            let mut executor = Executor::open(&path)?;
+            let mut executor = Executor::open(&pref)?;
             executor.inspect_all()
         }
         (Constants::SUBCOMMAND_CREATE_TRANSACTION, Some(_arg_matches)) => {
-            let path = PathBuf::from(Constants::TEMP_LOG_FILE_PATH);
-
-            let mut executor = Executor::open(&path)?;
+            let mut executor = Executor::open(&pref)?;
             executor.start_transaction()
         }
         (Constants::SUBCOMMAND_COMMIT_TRANSACTION, Some(arg_matches)) => {
             let transaction_id_str = arg_matches
                 .value_of(Constants::ARGUMENT_NAME_FOR_TRANSACTION_ID)
                 .expect(Constants::MISSING_TRANSACTION_ID_ARGUMENT_MESSAGE);
-
-            let path = PathBuf::from(Constants::TEMP_LOG_FILE_PATH);
-
-            let mut executor = Executor::open(&path)?;
+            let mut executor = Executor::open(&pref)?;
             let transaction_id = transaction_id_str.parse::<u64>()?;
             executor.commit_transaction(TransactionId::new(transaction_id))
         }
@@ -373,9 +356,7 @@ fn main() -> ExecutorResult<()> {
                 .value_of(Constants::ARGUMENT_NAME_FOR_TRANSACTION_ID)
                 .expect(Constants::MISSING_TRANSACTION_ID_ARGUMENT_MESSAGE);
 
-            let path = PathBuf::from(Constants::TEMP_LOG_FILE_PATH);
-
-            let mut executor = Executor::open(&path)?;
+            let mut executor = Executor::open(&pref)?;
             let transaction_id = transaction_id_str.parse::<u64>()?;
             executor.abort_transaction(TransactionId::new(transaction_id))
         }

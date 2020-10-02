@@ -1,7 +1,6 @@
 use std::collections::HashMap;
 use std::io::{Read, Write};
 use std::net::TcpListener;
-use std::path::PathBuf;
 use std::sync::mpsc;
 use std::sync::mpsc::{Receiver, Sender};
 use std::thread;
@@ -20,6 +19,7 @@ use crate::storage::executor::unit_content::UnitContent;
 use crate::storage::executor::unit_key::UnitKey;
 use crate::storage::transaction_manager::TransactionId;
 
+use crate::storage::preferences::DBPreferences;
 use tiny_http::{Method, Request, Response, Server};
 use url::Url;
 
@@ -47,14 +47,14 @@ impl UrlInformation {
 }
 
 fn spawn_db_thread(
-    path: &PathBuf,
+    preferences: &DBPreferences,
     server_db_receiver: Receiver<AnnotatedCommand>,
     db_http_sender: Sender<Outcome>,
     db_tcp_sender: Sender<Outcome>,
 ) -> JoinHandle<ServerResult<()>> {
-    let path = path.clone();
+    let preferences = preferences.to_owned();
     thread::spawn(move || -> ServerResult<()> {
-        let mut executor = Executor::open(&path)?;
+        let mut executor = Executor::open(&preferences)?;
 
         loop {
             let message = server_db_receiver.recv()?;
@@ -74,27 +74,23 @@ fn spawn_db_thread(
     })
 }
 
-pub fn run_db_servers(
-    path: &PathBuf,
-    http_port: Option<u16>,
-    tcp_port: Option<u16>,
-) -> Vec<ServerResult<()>> {
+pub fn run_db_servers(prefs: &DBPreferences) -> Vec<ServerResult<()>> {
     let (server_db_sender, server_db_receiver) = mpsc::channel::<AnnotatedCommand>();
     let (db_http_sender, db_http_receiver) = mpsc::channel::<Outcome>();
     let (db_tcp_sender, db_tcp_receiver) = mpsc::channel::<Outcome>();
 
     let mut handles = vec![];
 
-    let db_handle = spawn_db_thread(&path, server_db_receiver, db_http_sender, db_tcp_sender);
+    let db_handle = spawn_db_thread(prefs, server_db_receiver, db_http_sender, db_tcp_sender);
     handles.push(db_handle);
 
-    if let Some(tcp_port) = tcp_port {
-        let tcp_handle = run_tcp_server(tcp_port, server_db_sender.clone(), db_tcp_receiver);
+    if let Some(port) = prefs.tcp_port {
+        let tcp_handle = run_tcp_server(port, server_db_sender.clone(), db_tcp_receiver);
         handles.push(tcp_handle);
     }
 
-    if let Some(http_port) = http_port {
-        let http_handle = run_http_server(http_port, server_db_sender, db_http_receiver);
+    if let Some(port) = prefs.http_port {
+        let http_handle = run_http_server(port, server_db_sender, db_http_receiver);
         handles.push(http_handle);
     }
 

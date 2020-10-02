@@ -1,7 +1,12 @@
+use crate::constants::{INSTRUCTION_PACK_MAGIC, INSTRUCTION_PACK_VERSION};
 use crate::storage::chain_height::ChainHeight;
+use crate::storage::ecc::{
+    ECCMode, ErrorCorrectionCodec, ErrorCorrectionError, IdentityCode, TripleRedundancyCode,
+};
 use crate::storage::kvkey::KVKey;
 use crate::storage::kvvalue::KVValue;
 use crate::storage::transaction_manager::TransactionId;
+use crate::utils::ints::{byte_slice_to_u32, u32_to_u8_array};
 use crate::utils::varint::{varint_decode, VarIntError};
 
 #[derive(Debug)]
@@ -10,11 +15,22 @@ pub enum InstructionError {
     KeyExceedsMaxLength,
     VarIntError(VarIntError),
     UnknownPrefix(u8),
+    PackTooShort(usize),
+    UnexpectedMagicNumber([u8; 4]),
+    UnexpectedPackVersion(u8),
+    ErrorCorrection(ErrorCorrectionError),
+    UnexpectedECCMode(u8),
 }
 
 impl From<VarIntError> for InstructionError {
     fn from(error: VarIntError) -> InstructionError {
         InstructionError::VarIntError(error)
+    }
+}
+
+impl From<ErrorCorrectionError> for InstructionError {
+    fn from(error: ErrorCorrectionError) -> InstructionError {
+        InstructionError::ErrorCorrection(error)
     }
 }
 
@@ -302,58 +318,209 @@ impl Instruction {
     }
 }
 
-#[test]
-fn parse_set_instruction() {
-    let key = KVKey::new(&[0x00, 0x01]);
-    let value = KVValue::new(&[0xff, 0xf2, 0xfe]);
-    let expected_instruction = Instruction::Set { key, value };
+#[cfg(test)]
+mod instruction_tests {
+    use crate::storage::chain_height::ChainHeight;
+    use crate::storage::instruction::Instruction;
+    use crate::storage::kvkey::KVKey;
+    use crate::storage::kvvalue::KVValue;
 
-    let instruction_bytes: Vec<u8> = expected_instruction.serialize();
-    let (actual_instruction, _) = Instruction::parse(&instruction_bytes).unwrap();
+    #[test]
+    fn parse_set_instruction() {
+        let key = KVKey::new(&[0x00, 0x01]);
+        let value = KVValue::new(&[0xff, 0xf2, 0xfe]);
+        let expected_instruction = Instruction::Set { key, value };
 
-    assert_eq!(expected_instruction, actual_instruction);
+        let instruction_bytes: Vec<u8> = expected_instruction.serialize();
+        let (actual_instruction, _) = Instruction::parse(&instruction_bytes).unwrap();
+
+        assert_eq!(expected_instruction, actual_instruction);
+    }
+
+    #[test]
+    fn serialize_revert_one_instruction() {
+        let key = KVKey::new(&[0x00, 0x01]);
+        let height = ChainHeight::new(32);
+        let expected_instruction = Instruction::RevertOne { key, height };
+
+        let instruction_bytes: Vec<u8> = expected_instruction.serialize();
+        let (actual_instruction, _) = Instruction::parse(&instruction_bytes).unwrap();
+
+        assert_eq!(expected_instruction, actual_instruction);
+    }
+
+    #[test]
+    fn serialize_revert_all_instruction() {
+        let height = ChainHeight::new(32);
+        let expected_instruction = Instruction::RevertAll { height };
+
+        let instruction_bytes: Vec<u8> = expected_instruction.serialize();
+        let (actual_instruction, _) = Instruction::parse(&instruction_bytes).unwrap();
+
+        assert_eq!(expected_instruction, actual_instruction);
+    }
+
+    #[test]
+    fn serialize_remove_instruction() {
+        let key = KVKey::new(&[0x00, 0x01]);
+        let expected_instruction = Instruction::RemoveOne { key };
+
+        let instruction_bytes: Vec<u8> = expected_instruction.serialize();
+        let (actual_instruction, _) = Instruction::parse(&instruction_bytes).unwrap();
+
+        assert_eq!(expected_instruction, actual_instruction);
+    }
+
+    #[test]
+    fn serialize_remove_all_instruction() {
+        let expected_instruction = Instruction::RemoveAll;
+
+        let instruction_bytes: Vec<u8> = expected_instruction.serialize();
+        let (actual_instruction, _) = Instruction::parse(&instruction_bytes).unwrap();
+
+        assert_eq!(expected_instruction, actual_instruction);
+    }
 }
 
-#[test]
-fn serialize_revert_one_instruction() {
-    let key = KVKey::new(&[0x00, 0x01]);
-    let height = ChainHeight::new(32);
-    let expected_instruction = Instruction::RevertOne { key, height };
+/**
+Structure of a instruction pack (serialized form for disk storage and transmitting on wire).
 
-    let instruction_bytes: Vec<u8> = expected_instruction.serialize();
-    let (actual_instruction, _) = Instruction::parse(&instruction_bytes).unwrap();
+Item       | bytes | Description
+-----------|-------|-------------------------------------------------------------------------------
+MAGIC      |   4   | Always B10CDA7A (block data), marking the beginning of an instruction pack
+VER        |   1   | Version of serialization format of the pack
+ECC width  |   4   | Width the the ECC section, including ECC mode byte
+ECC mode   |   1   | ECC mode was used to protect data, 1 for TMR, for example
+ECC main   |  vary | Main data of instruction, protected by ECC
 
-    assert_eq!(expected_instruction, actual_instruction);
+ECC main data (last part in the pack) can be decoded into raw instruction bytes by ECC decoders.
+Raw instruction bytes can be then parsed into Instructions in memory for use in Rust.
+
+Instruction pack are stored continuously on the instruction log file.
+**/
+
+const MAGIC_WIDTH: usize = 4;
+const VERSION_BYTE_POS: usize = 4;
+const ECC_WIDTH_POS: usize = 5;
+const ECC_WIDTH_LENGTH: usize = 4;
+const ECC_MODE_BYTE_POS: usize = 9;
+const ECC_DATA_BYTE_POS: usize = 10;
+
+pub fn pack_instruction(instruction: &Instruction, ecc_mode: ECCMode) -> Vec<u8> {
+    let instruction_bytes = instruction.serialize();
+    let mut pack_bytes = Vec::new();
+
+    pack_bytes.extend_from_slice(&INSTRUCTION_PACK_MAGIC);
+    pack_bytes.push(INSTRUCTION_PACK_VERSION);
+
+    let ecc_data_bytes = match ecc_mode {
+        ECCMode::Identity => IdentityCode::new().encode(&instruction_bytes),
+        ECCMode::TMR => TripleRedundancyCode::new().encode(&instruction_bytes),
+    };
+
+    let data_length = 1 /*ECC Mode byte*/ + ecc_data_bytes.len();
+    pack_bytes.extend_from_slice(&u32_to_u8_array(data_length as u32));
+    pack_bytes.push(ecc_mode as u8);
+    pack_bytes.extend(ecc_data_bytes);
+
+    return pack_bytes;
 }
 
-#[test]
-fn serialize_revert_all_instruction() {
-    let height = ChainHeight::new(32);
-    let expected_instruction = Instruction::RevertAll { height };
+pub fn unpack_instruction(pack_bytes: &[u8]) -> Result<(Instruction, usize), InstructionError> {
+    if pack_bytes.len() < ECC_MODE_BYTE_POS {
+        return Err(InstructionError::PackTooShort(pack_bytes.len()));
+    } else if pack_bytes[0..MAGIC_WIDTH] != INSTRUCTION_PACK_MAGIC {
+        return Err(InstructionError::UnexpectedMagicNumber([
+            pack_bytes[0],
+            pack_bytes[1],
+            pack_bytes[2],
+            pack_bytes[3],
+        ]));
+    } else if pack_bytes[VERSION_BYTE_POS] != INSTRUCTION_PACK_VERSION {
+        return Err(InstructionError::UnexpectedPackVersion(pack_bytes[4]));
+    } else {
+        let ecc_width_slice = &pack_bytes[ECC_WIDTH_POS..ECC_WIDTH_POS + ECC_WIDTH_LENGTH];
+        let ecc_data_width = byte_slice_to_u32(ecc_width_slice);
+        let expected_full_width = ECC_MODE_BYTE_POS + ecc_data_width as usize;
+        if expected_full_width > pack_bytes.len() {
+            return Err(InstructionError::PackTooShort(pack_bytes.len()));
+        } else {
+            let ecc_mode = pack_bytes[ECC_MODE_BYTE_POS];
+            let ecc_data_bytes = &pack_bytes[ECC_DATA_BYTE_POS..expected_full_width];
+            let raw_instruction_bytes = if ecc_mode == ECCMode::Identity as u8 {
+                IdentityCode::new().decode(ecc_data_bytes)?
+            } else if ecc_mode == ECCMode::TMR as u8 {
+                TripleRedundancyCode::new().decode(ecc_data_bytes)?
+            } else {
+                return Err(InstructionError::UnexpectedECCMode(ecc_mode));
+            };
+            let (instruction, _) = Instruction::parse(&raw_instruction_bytes)?;
 
-    let instruction_bytes: Vec<u8> = expected_instruction.serialize();
-    let (actual_instruction, _) = Instruction::parse(&instruction_bytes).unwrap();
-
-    assert_eq!(expected_instruction, actual_instruction);
+            return Ok((instruction, expected_full_width));
+        }
+    }
 }
 
-#[test]
-fn serialize_remove_instruction() {
-    let key = KVKey::new(&[0x00, 0x01]);
-    let expected_instruction = Instruction::RemoveOne { key };
+#[cfg(test)]
+mod instruction_packing_tests {
+    use crate::storage::ecc::ECCMode;
+    use crate::storage::instruction::{pack_instruction, unpack_instruction, Instruction};
+    use crate::storage::kvkey::KVKey;
+    use crate::storage::kvvalue::KVValue;
+    use crate::storage::transaction_manager::TransactionId;
 
-    let instruction_bytes: Vec<u8> = expected_instruction.serialize();
-    let (actual_instruction, _) = Instruction::parse(&instruction_bytes).unwrap();
+    #[test]
+    fn test_pack_set_instruction_no_ecc() {
+        let instruction = Instruction::Set {
+            key: KVKey::from("hello"),
+            value: KVValue::from("world"),
+        };
+        let correct_pack: Vec<u8> = vec![
+            0xB1, 0x0C, 0xDA, 0x7A, // Magic
+            0x01, // Version
+            0x0E, 0x00, 0x00, 0x00, // ECC Width
+            0x00, // ECC Mode
+            0x00, // prefix for Set
+            0x05, // key width
+            0x68, 0x65, 0x6c, 0x6c, 0x6f, // key: "hello"
+            0x05, // value width
+            0x77, 0x6f, 0x72, 0x6c, 0x64, // value: "world"
+        ];
 
-    assert_eq!(expected_instruction, actual_instruction);
-}
+        let packed = pack_instruction(&instruction, ECCMode::Identity);
+        assert_eq!(correct_pack, packed);
 
-#[test]
-fn serialize_remove_all_instruction() {
-    let expected_instruction = Instruction::RemoveAll;
+        let (unpacked, width) = unpack_instruction(&correct_pack).unwrap();
+        assert_eq!(unpacked, instruction);
+        assert_eq!(correct_pack.len(), width);
+    }
 
-    let instruction_bytes: Vec<u8> = expected_instruction.serialize();
-    let (actual_instruction, _) = Instruction::parse(&instruction_bytes).unwrap();
+    #[test]
+    fn test_pack_transaction_start_tmr() {
+        let instruction = Instruction::TransactionStart {
+            transaction_id: TransactionId::new(0x42),
+        };
+        let correct_pack: Vec<u8> = vec![
+            0xB1, 0x0C, 0xDA, 0x7A, // Magic
+            0x01, // Version
+            0x07, 0x00, 0x00, 0x00, // ECC Width
+            0x01, // ECC Mode
+            // Duplication 1
+            0x05, // prefix for TransactionStart
+            0x42, // transaction_id
+            // Duplication 2
+            0x05, // prefix for TransactionStart
+            0x42, // transaction_id
+            // Duplication 3
+            0x05, // prefix for TransactionStart
+            0x42, // transaction_id
+        ];
 
-    assert_eq!(expected_instruction, actual_instruction);
+        let packed = pack_instruction(&instruction, ECCMode::TMR);
+        assert_eq!(correct_pack, packed);
+
+        let (unpacked, width) = unpack_instruction(&correct_pack).unwrap();
+        assert_eq!(unpacked, instruction);
+        assert_eq!(correct_pack.len(), width);
+    }
 }

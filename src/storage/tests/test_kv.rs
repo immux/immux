@@ -15,20 +15,24 @@ mod kv_tests {
     use immuxsys::storage::executor::outcome::Outcome;
     use immuxsys::storage::executor::unit_content::UnitContent;
     use immuxsys::storage::executor::unit_key::UnitKey;
-    use immuxsys::storage::kv::{get_log_file_path, LogKeyValueStore};
+    use immuxsys::storage::kv::{get_main_log_full_path, LogKeyValueStore};
     use immuxsys::storage::kvkey::KVKey;
     use immuxsys::storage::kvvalue::KVValue;
+    use immuxsys::storage::preferences::DBPreferences;
     use immuxsys::storage::transaction_manager::TransactionId;
     use immuxsys::utils::ints::{u64_to_u8_array, u8_array_to_u64};
 
-    fn get_store_engine(path: &PathBuf) -> LogKeyValueStore {
-        let log_file_path = get_log_file_path(&path);
+    fn get_store_engine(test_data_dir: &str) -> LogKeyValueStore {
+        let test_dir_path = PathBuf::from(test_data_dir);
+        let log_file_path = get_main_log_full_path(&test_dir_path);
 
         if log_file_path.exists() {
             remove_file(log_file_path).unwrap();
         }
 
-        let store_engine = LogKeyValueStore::open(&path).unwrap();
+        let pref = DBPreferences::default_at_dir(test_data_dir);
+
+        let store_engine = LogKeyValueStore::open(&pref).unwrap();
 
         return store_engine;
     }
@@ -87,8 +91,7 @@ mod kv_tests {
 
     #[test]
     fn kv_set() {
-        let path = PathBuf::from("/tmp/test_set");
-        let mut store_engine = get_store_engine(&path);
+        let mut store_engine = get_store_engine("/tmp/test_set");
 
         let key = KVKey::new(&[0x00, 0x01, 0x03]);
         let expected_value = KVValue::new(&[0xff, 0xff, 0xff, 0xff]);
@@ -101,8 +104,7 @@ mod kv_tests {
 
     #[test]
     fn kv_revert_one() {
-        let path = PathBuf::from("/tmp/test_revert_one");
-        let mut store_engine = get_store_engine(&path);
+        let mut store_engine = get_store_engine("/tmp/test_revert_one");
         let target_height = ChainHeight::new(2);
 
         let key = KVKey::new(&[0x00, 0x01, 0x03]);
@@ -130,8 +132,7 @@ mod kv_tests {
 
     #[test]
     fn kv_revert_all() {
-        let path = PathBuf::from("/tmp/test_revert_all");
-        let mut store_engine = get_store_engine(&path);
+        let mut store_engine = get_store_engine("/tmp/test_revert_all");
         let target_height = ChainHeight::new(5);
 
         let key_value_pairs = vec![
@@ -166,8 +167,7 @@ mod kv_tests {
 
     #[test]
     fn kv_remove() {
-        let path = PathBuf::from("/tmp/test_remove");
-        let mut store_engine = get_store_engine(&path);
+        let mut store_engine = get_store_engine("/tmp/test_remove");
 
         let key = KVKey::new(&[0x00, 0x01, 0x03]);
         let expected_value = KVValue::new(&[0xff, 0xff, 0xff, 0xff]);
@@ -182,8 +182,7 @@ mod kv_tests {
 
     #[test]
     fn kv_remove_all() {
-        let path = PathBuf::from("/tmp/test_remove_all");
-        let mut store_engine = get_store_engine(&path);
+        let mut store_engine = get_store_engine("/tmp/test_remove_all");
 
         let key_value_pairs = vec![
             (KVKey::new(&[0xff]), KVValue::new(&[0x00])),
@@ -263,9 +262,9 @@ mod kv_tests {
         contents.extend_from_slice(&satisfied_contents);
         contents.extend_from_slice(&unsatisfied_contents);
 
-        let path = PathBuf::from("/tmp/test_content_satisfied_filter_unit");
+        let pref = DBPreferences::default_at_dir("/tmp/test_content_satisfied_filter_unit");
         let grouping = GroupingLabel::new("any_grouping".as_bytes());
-        let mut executor = Executor::open(&path).unwrap();
+        let mut executor = Executor::open(&pref).unwrap();
 
         for (index, content) in contents.iter().enumerate() {
             let unit_key = UnitKey::from(format!("{}", index).as_str());
@@ -315,8 +314,7 @@ mod kv_tests {
 
     #[test]
     fn kv_atomicity_commit() {
-        let path = PathBuf::from("/tmp/test_atomicity_commit");
-        let mut store_engine = get_store_engine(&path);
+        let mut store_engine = get_store_engine("/tmp/test_atomicity_commit");
 
         let key_value_paris = [
             (KVKey::from("a"), KVValue::from("1")),
@@ -343,8 +341,7 @@ mod kv_tests {
 
     #[test]
     fn kv_atomicity_abort() {
-        let path = PathBuf::from("/tmp/test_atomicity_abort");
-        let mut store_engine = get_store_engine(&path);
+        let mut store_engine = get_store_engine("/tmp/test_atomicity_abort");
 
         let key_value_paris = [
             (KVKey::from("1"), KVValue::from("a")),
@@ -370,8 +367,7 @@ mod kv_tests {
 
     #[test]
     fn kv_set_isolation() {
-        let path = PathBuf::from("/tmp/test_set_isolation");
-        let mut store_engine = get_store_engine(&path);
+        let mut store_engine = get_store_engine("/tmp/test_set_isolation");
 
         let key = KVKey::from("a");
         let value = KVValue::from("1");
@@ -416,8 +412,7 @@ mod kv_tests {
 
     #[test]
     fn kv_remove_one_isolation() {
-        let path = PathBuf::from("/tmp/test_remove_one_isolation");
-        let mut store_engine = get_store_engine(&path);
+        let mut store_engine = get_store_engine("/tmp/test_remove_one_isolation");
 
         let key_value_paris = [
             (KVKey::from("one"), KVValue::from("a")),
@@ -476,8 +471,7 @@ mod kv_tests {
 
     #[test]
     fn kv_revert_one_isolation() {
-        let path = PathBuf::from("/tmp/test_revert_one_isolation");
-        let mut store_engine = get_store_engine(&path);
+        let mut store_engine = get_store_engine("/tmp/test_revert_one_isolation");
 
         let key_value_paris = [
             (KVKey::from("one"), KVValue::from("a")),
@@ -542,8 +536,7 @@ mod kv_tests {
 
     #[test]
     fn kv_remove_all_isolation() {
-        let path = PathBuf::from("/tmp/test_remove_all_isolation");
-        let mut store_engine = get_store_engine(&path);
+        let mut store_engine = get_store_engine("/tmp/test_remove_all_isolation");
 
         let key_value_paris = [
             (KVKey::from("k1"), KVValue::from("a")),
@@ -602,8 +595,7 @@ mod kv_tests {
 
     #[test]
     fn kv_revert_all_isolation() {
-        let path = PathBuf::from("/tmp/test_revert_all_isolation");
-        let mut store_engine = get_store_engine(&path);
+        let mut store_engine = get_store_engine("/tmp/test_revert_all_isolation");
 
         let key_value_pairs = [
             (KVKey::from("k1"), KVValue::from("a")),
@@ -674,8 +666,7 @@ mod kv_tests {
 
     #[test]
     fn transaction_not_alive_after_revert_all() {
-        let path = PathBuf::from("/tmp/test_revert_all_transaction_not_alive");
-        let mut store_engine = get_store_engine(&path);
+        let mut store_engine = get_store_engine("/tmp/test_revert_all_transaction_not_alive");
 
         let key_value_pairs = [
             (KVKey::from("1"), KVValue::from("a")),
@@ -705,8 +696,7 @@ mod kv_tests {
     #[test]
     #[should_panic]
     fn unexpected_commit_transaction_id() {
-        let path = PathBuf::from("/tmp/test_unexpected_commit_transaction_id");
-        let mut store_engine = get_store_engine(&path);
+        let mut store_engine = get_store_engine("/tmp/test_unexpected_commit_transaction_id");
 
         let some_random_transaction_id = 100;
 
@@ -718,8 +708,7 @@ mod kv_tests {
     #[test]
     #[should_panic]
     fn unexpected_abort_transaction_id() {
-        let path = PathBuf::from("/tmp/test_unexpected_abort_transaction_id");
-        let mut store_engine = get_store_engine(&path);
+        let mut store_engine = get_store_engine("/tmp/test_unexpected_abort_transaction_id");
 
         let some_random_transaction_id = 10;
 
@@ -730,8 +719,7 @@ mod kv_tests {
 
     #[test]
     fn last_one_commit_wins() {
-        let path = PathBuf::from("/tmp/test_last_one_commit_wins");
-        let mut store_engine = get_store_engine(&path);
+        let mut store_engine = get_store_engine("/tmp/test_last_one_commit_wins");
 
         let shared_keys = [KVKey::from("a"), KVKey::from("b"), KVKey::from("c")];
 
@@ -781,8 +769,7 @@ mod kv_tests {
 
     #[test]
     fn read_inside_transaction() {
-        let path = PathBuf::from("/tmp/test_read_inside_transaction");
-        let mut store_engine = get_store_engine(&path);
+        let mut store_engine = get_store_engine("/tmp/test_read_inside_transaction");
 
         let key = KVKey::from("a");
         let value = KVValue::from("1");
@@ -804,8 +791,7 @@ mod kv_tests {
 
     #[test]
     fn dirty_read() {
-        let path = PathBuf::from("/tmp/test_dirty_read");
-        let mut store_engine = get_store_engine(&path);
+        let mut store_engine = get_store_engine("/tmp/test_dirty_read");
 
         let key = KVKey::from("a");
         let origin_value = KVValue::from("1");
@@ -846,8 +832,7 @@ mod kv_tests {
     #[test]
     #[ignore]
     fn repeatable_read() {
-        let path = PathBuf::from("/tmp/test_repeatable_read");
-        let mut store_engine = get_store_engine(&path);
+        let mut store_engine = get_store_engine("/tmp/test_repeatable_read");
 
         let account_1 = KVKey::from("account_1");
         let account_2 = KVKey::from("account_2");
@@ -894,8 +879,7 @@ mod kv_tests {
     #[test]
     #[ignore]
     fn lost_update() {
-        let path = PathBuf::from("/tmp/test_lost_update");
-        let mut store_engine = get_store_engine(&path);
+        let mut store_engine = get_store_engine("/tmp/test_lost_update");
 
         let account = KVKey::from("account");
         let original_value = KVValue::new(&u64_to_u8_array(500));
@@ -987,8 +971,7 @@ mod kv_tests {
     #[test]
     #[ignore]
     fn write_skew() {
-        let path = PathBuf::from("/tmp/test_write_skew");
-        let mut store_engine = get_store_engine(&path);
+        let mut store_engine = get_store_engine("/tmp/test_write_skew");
 
         let total_doctor_on_call = KVKey::from("total");
         let original_total_on_call_value = KVValue::new(&u64_to_u8_array(2));

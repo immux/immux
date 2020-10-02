@@ -1,35 +1,41 @@
-use crate::storage::instruction::Instruction;
+use crate::storage::instruction::{unpack_instruction, Instruction};
 
-pub struct InstructionIterator {
-    buffer: Vec<u8>,
+pub struct InstructionLogIterator {
+    log_bytes: Vec<u8>,
     index: usize,
 }
 
-impl From<Vec<u8>> for InstructionIterator {
+impl From<Vec<u8>> for InstructionLogIterator {
     fn from(buffer: Vec<u8>) -> Self {
-        return InstructionIterator { buffer, index: 0 };
+        return InstructionLogIterator {
+            log_bytes: buffer,
+            index: 0,
+        };
     }
 }
 
-impl Iterator for InstructionIterator {
+impl Iterator for InstructionLogIterator {
     type Item = (Instruction, usize);
 
     fn next(&mut self) -> Option<Self::Item> {
-        match Instruction::parse(&self.buffer[self.index..]) {
-            Ok((instruction, instruction_length)) => {
-                self.index += instruction_length;
-                return Some((instruction, instruction_length));
-            }
-            Err(_) => return None,
-        }
+        let index = self.index;
+        return if index >= self.log_bytes.len() {
+            None
+        } else {
+            let (instruction, bytes_consumed) =
+                unpack_instruction(&self.log_bytes[index..]).ok()?;
+            self.index += bytes_consumed;
+            Some((instruction, bytes_consumed))
+        };
     }
 }
 
 #[cfg(test)]
 mod instruction_iterator_tests {
     use crate::storage::chain_height::ChainHeight;
-    use crate::storage::instruction::Instruction;
-    use crate::storage::instruction_iterator::InstructionIterator;
+    use crate::storage::ecc::ECCMode;
+    use crate::storage::instruction::{pack_instruction, Instruction};
+    use crate::storage::instruction_iterator::InstructionLogIterator;
     use crate::storage::kvkey::KVKey;
     use crate::storage::kvvalue::KVValue;
 
@@ -55,26 +61,22 @@ mod instruction_iterator_tests {
         return instructions;
     }
 
-    fn serialize_instructions(instructions: &[Instruction]) -> Vec<u8> {
-        let mut buffer: Vec<u8> = Vec::new();
-        &instructions
-            .to_vec()
+    fn generate_instruction_log(instructions: &[Instruction]) -> Vec<u8> {
+        let pack: Vec<u8> = instructions
             .iter()
-            .fold(&mut buffer, |acc, instruction| {
-                let instruction_bytes: Vec<u8> = instruction.serialize();
-                acc.extend_from_slice(&instruction_bytes);
-                return acc;
-            });
+            .map(|instruction| pack_instruction(instruction, ECCMode::Identity))
+            .flatten()
+            .collect();
 
-        return buffer;
+        return pack;
     }
 
     #[test]
     fn iterate_iterator() {
         let instructions = get_instructions();
-        let buffer = serialize_instructions(&instructions);
+        let log = generate_instruction_log(&instructions);
 
-        let iterator = InstructionIterator::from(buffer);
+        let iterator = InstructionLogIterator::from(log);
 
         for (index, (actual_instruction, _)) in iterator.enumerate() {
             let expected_instruction = &instructions[index];
@@ -83,14 +85,14 @@ mod instruction_iterator_tests {
     }
 
     #[test]
-    fn iterate_with_broken_instruction() {
+    fn iterate_with_trailing_trash_bytes() {
         let instructions = get_instructions();
-        let mut buffer = serialize_instructions(&instructions);
+        let mut log = generate_instruction_log(&instructions);
 
-        let some_broken_bytes = [0xff, 0x00, 0xfa];
-        buffer.extend_from_slice(&some_broken_bytes);
+        let trailing_trash_bytes = [0xff, 0x00, 0xfa];
+        log.extend_from_slice(&trailing_trash_bytes);
 
-        let mut iterator = InstructionIterator::from(buffer);
+        let mut iterator = InstructionLogIterator::from(log);
 
         for expected_instruction in instructions {
             let (actual_instruction, _) = &iterator.next().unwrap();

@@ -7,7 +7,7 @@ use immuxsys_dev_utils::data_models::berka99::{
     Account, Card, Client, Disp, District, Loan, Order, Trans,
 };
 use immuxsys_dev_utils::dev_utils::{
-    csv_to_json_table, e2e_verify_correctness, launch_db_server, measure_iteration, notified_sleep,
+    csv_to_json_table, e2e_verify_correctness, launch_test_db_servers, measure_iteration,
     read_usize_from_arguments, UnitList,
 };
 
@@ -23,8 +23,7 @@ fn main() {
         bench_name, row_limit, report_period
     );
 
-    launch_db_server("bench_berka99", Some(port), None).unwrap();
-    notified_sleep(5);
+    launch_test_db_servers("bench_berka99", Some(port), None).unwrap();
 
     let paths = vec![
         "account", "card", "client", "disp", "district", "loan", "order", "trans",
