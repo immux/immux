@@ -45,8 +45,9 @@ pub const MISSING_FILTER_ARGUMENT_MESSAGE: &str = "FILTER argument missing";
 pub const MISSING_KEY_MESSAGE: &str = "Key not existed";
 pub const MISSING_FILTER_MESSAGE: &str = "FILTER argument missing";
 
-pub const TEMP_LOG_FILE_PATH: &str = "/tmp";
-pub const LOG_FILE_NAME: &str = "command_log";
+pub const TEMP_LOG_FILE_DIR: &str = "/tmp";
+pub const MAIN_LOG_FILENAME: &str = "instruction_log.imm";
+pub const MAIN_LOG_DEFAULT_DIR_UNIX: &str = "/var/immux";
 
 pub const MAX_KEY_LENGTH: usize = 8 * 1024;
 
@@ -70,3 +71,6 @@ pub const FILTER_NOT_EQUAL: &str = "!=";
 pub const FILTER_LESS: &str = "<";
 pub const FILTER_GREATER: &str = ">";
 pub const FILTER_EQUAL: &str = "==";
+
+pub const INSTRUCTION_PACK_MAGIC: [u8; 4] = [0xB1, 0x0C, 0xDA, 0x7A];
+pub const INSTRUCTION_PACK_VERSION: u8 = 0x01;

@@ -1,4 +1,5 @@
 pub mod chain_height;
+pub mod ecc;
 pub mod errors;
 pub mod executor;
 pub mod instruction;
@@ -9,4 +10,5 @@ pub mod kvvalue;
 pub mod log_pointer;
 pub mod log_reader;
 pub mod log_writer;
+pub mod preferences;
 pub mod transaction_manager;

@@ -8,6 +8,9 @@ use std::time::Duration;
 use std::time::Instant;
 use std::{io, thread};
 
+pub use serde::de::{Deserialize, DeserializeOwned};
+pub use serde::ser::Serialize;
+
 use immuxsys::server::errors::ServerResult;
 use immuxsys::server::server::run_db_servers;
 use immuxsys::storage::executor::filter::{
@@ -16,11 +19,10 @@ use immuxsys::storage::executor::filter::{
 use immuxsys::storage::executor::grouping_label::GroupingLabel;
 use immuxsys::storage::executor::unit_content::UnitContent;
 use immuxsys::storage::executor::unit_key::UnitKey;
+use immuxsys::storage::preferences::DBPreferences;
+
 use immuxsys_client::http_client::ImmuxDBHttpClient;
 use immuxsys_client::ImmuxDBClient;
-
-pub use serde::de::{Deserialize, DeserializeOwned};
-pub use serde::ser::Serialize;
 
 pub type UnitList = Vec<(UnitKey, UnitContent)>;
 
@@ -32,21 +34,28 @@ pub fn reset_db_dir(path: &str) -> io::Result<()> {
     return Ok(());
 }
 
-pub fn launch_db_server(
+pub fn launch_test_db_servers(
     project_name: &str,
     http_port: Option<u16>,
     tcp_port: Option<u16>,
-) -> ServerResult<Vec<ServerResult<()>>> {
+) -> ServerResult<()> {
     let data_root = format!("/tmp/{}/", project_name);
     reset_db_dir(&data_root)?;
 
-    let path = PathBuf::from(data_root);
-    let server_results = run_db_servers(&path, http_port, tcp_port);
+    let args: Vec<String> = std::env::args().collect();
 
-    return Ok(server_results);
+    let mut preferences = DBPreferences::from_cli_args(&args);
+    preferences.log_dir = PathBuf::from(data_root);
+    preferences.http_port = http_port;
+    preferences.tcp_port = tcp_port;
+
+    thread::spawn(move || run_db_servers(&preferences));
+    notified_sleep(5);
+
+    return Ok(());
 }
 
-pub fn notified_sleep(sec: u16) -> () {
+fn notified_sleep(sec: u16) -> () {
     println!("Waiting {}s...", sec);
     thread::sleep(Duration::from_secs(sec as u64));
 }

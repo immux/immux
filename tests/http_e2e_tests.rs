@@ -2,7 +2,6 @@
 mod http_e2e_tests {
     use std::collections::HashMap;
     use std::error::Error;
-    use std::thread;
 
     use immuxsys::constants as Constants;
     use immuxsys::storage::chain_height::ChainHeight;
@@ -19,16 +18,13 @@ mod http_e2e_tests {
     };
     use immuxsys_dev_utils::dev_utils::{
         csv_to_json_table, e2e_verify_correctness, get_filter, get_key_content_pairs,
-        launch_db_server, notified_sleep, UnitList,
+        launch_test_db_servers, UnitList,
     };
 
     #[test]
     fn http_e2e_grouping_get_set() {
         let port = 20030;
-        thread::spawn(move || {
-            launch_db_server("http_e2e_grouping_get_set", Some(port), None).unwrap()
-        });
-        notified_sleep(5);
+        launch_test_db_servers("http_e2e_grouping_get_set", Some(port), None).unwrap();
 
         let host = &format!("{}:{}", Constants::SERVER_END_POINT, port);
         let client = ImmuxDBHttpClient::new(host).unwrap();
@@ -105,10 +101,7 @@ mod http_e2e_tests {
     #[test]
     fn http_e2e_wrong_grouping() {
         let port = 20031;
-        thread::spawn(move || {
-            launch_db_server("http_e2e_wrong_grouping", Some(port), None).unwrap()
-        });
-        notified_sleep(5);
+        launch_test_db_servers("http_e2e_wrong_grouping", Some(port), None).unwrap();
 
         let host = &format!("{}:{}", Constants::SERVER_END_POINT, port);
         let client = ImmuxDBHttpClient::new(host).unwrap();
@@ -136,10 +129,7 @@ mod http_e2e_tests {
     #[test]
     fn http_e2e_real_data_get_set() {
         let port = 20022;
-        thread::spawn(move || {
-            launch_db_server("http_e2e_real_data_get_set", Some(port), None).unwrap()
-        });
-        notified_sleep(5);
+        launch_test_db_servers("http_e2e_real_data_get_set", Some(port), None).unwrap();
 
         let host = &format!("{}:{}", Constants::SERVER_END_POINT, port);
         let client = ImmuxDBHttpClient::new(host).unwrap();
@@ -215,10 +205,7 @@ mod http_e2e_tests {
     #[test]
     fn http_e2e_single_unit_get_set() {
         let port = 10083;
-        thread::spawn(move || {
-            launch_db_server("http_e2e_single_unit_get_set", Some(port), None).unwrap()
-        });
-        notified_sleep(5);
+        launch_test_db_servers("http_e2e_single_unit_get_set", Some(port), None).unwrap();
 
         let host = &format!("{}:{}", Constants::SERVER_END_POINT, port);
         let client = ImmuxDBHttpClient::new(host).unwrap();
@@ -246,8 +233,7 @@ mod http_e2e_tests {
     #[test]
     fn http_e2e_revert_one() {
         let port = 10084;
-        thread::spawn(move || launch_db_server("http_e2e_revert_one", Some(port), None).unwrap());
-        notified_sleep(5);
+        launch_test_db_servers("http_e2e_revert_one", Some(port), None).unwrap();
 
         let host = &format!("{}:{}", Constants::SERVER_END_POINT, port);
         let client = ImmuxDBHttpClient::new(host).unwrap();
@@ -294,8 +280,7 @@ mod http_e2e_tests {
     #[test]
     fn http_e2e_remove_one() {
         let port = 10085;
-        thread::spawn(move || launch_db_server("http_e2e_remove_one", Some(port), None).unwrap());
-        notified_sleep(5);
+        launch_test_db_servers("http_e2e_remove_one", Some(port), None).unwrap();
 
         let host = &format!("{}:{}", Constants::SERVER_END_POINT, port);
         let client = ImmuxDBHttpClient::new(host).unwrap();
@@ -337,8 +322,7 @@ mod http_e2e_tests {
     #[test]
     fn http_e2e_revert_all() {
         let port = 10086;
-        thread::spawn(move || launch_db_server("http_e2e_revert_all", Some(port), None).unwrap());
-        notified_sleep(5);
+        launch_test_db_servers("http_e2e_revert_all", Some(port), None).unwrap();
 
         let host = &format!("{}:{}", Constants::SERVER_END_POINT, port);
         let client = ImmuxDBHttpClient::new(host).unwrap();
@@ -377,8 +361,7 @@ mod http_e2e_tests {
     #[test]
     fn http_e2e_remove_all() {
         let port = 10087;
-        thread::spawn(move || launch_db_server("http_e2e_remove_all", Some(port), None).unwrap());
-        notified_sleep(5);
+        launch_test_db_servers("http_e2e_remove_all", Some(port), None).unwrap();
 
         let host = &format!("{}:{}", Constants::SERVER_END_POINT, port);
         let client = ImmuxDBHttpClient::new(host).unwrap();
@@ -406,10 +389,7 @@ mod http_e2e_tests {
     #[test]
     fn http_e2e_atomicity_commit() {
         let port = 10088;
-        thread::spawn(move || {
-            launch_db_server("http_e2e_atomicity_commit", Some(port), None).unwrap()
-        });
-        notified_sleep(5);
+        launch_test_db_servers("http_e2e_atomicity_commit", Some(port), None).unwrap();
 
         let host = &format!("{}:{}", Constants::SERVER_END_POINT, port);
         let client = ImmuxDBHttpClient::new(host).unwrap();
@@ -447,10 +427,7 @@ mod http_e2e_tests {
     #[test]
     fn http_e2e_atomicity_abort() {
         let port = 10089;
-        thread::spawn(move || {
-            launch_db_server("http_e2e_atomicity_abort", Some(port), None).unwrap()
-        });
-        notified_sleep(5);
+        launch_test_db_servers("http_e2e_atomicity_abort", Some(port), None).unwrap();
 
         let host = &format!("{}:{}", Constants::SERVER_END_POINT, port);
         let client = ImmuxDBHttpClient::new(host).unwrap();
@@ -487,10 +464,7 @@ mod http_e2e_tests {
     #[test]
     fn http_e2e_set_isolation() {
         let port = 10090;
-        thread::spawn(move || {
-            launch_db_server("http_e2e_set_isolation", Some(port), None).unwrap()
-        });
-        notified_sleep(5);
+        launch_test_db_servers("http_e2e_set_isolation", Some(port), None).unwrap();
 
         let host = &format!("{}:{}", Constants::SERVER_END_POINT, port);
         let client = ImmuxDBHttpClient::new(host).unwrap();
@@ -549,10 +523,7 @@ mod http_e2e_tests {
     #[test]
     fn http_e2e_remove_one_isolation() {
         let port = 10091;
-        thread::spawn(move || {
-            launch_db_server("http_e2e_remove_one_isolation", Some(port), None).unwrap()
-        });
-        notified_sleep(5);
+        launch_test_db_servers("http_e2e_remove_one_isolation", Some(port), None).unwrap();
 
         let host = &format!("{}:{}", Constants::SERVER_END_POINT, port);
         let client = ImmuxDBHttpClient::new(host).unwrap();
@@ -615,10 +586,7 @@ mod http_e2e_tests {
     #[test]
     fn http_e2e_revert_one_isolation() {
         let port = 10092;
-        thread::spawn(move || {
-            launch_db_server("http_e2e_revert_one_isolation", Some(port), None).unwrap()
-        });
-        notified_sleep(5);
+        launch_test_db_servers("http_e2e_revert_one_isolation", Some(port), None).unwrap();
 
         let host = &format!("{}:{}", Constants::SERVER_END_POINT, port);
         let client = ImmuxDBHttpClient::new(host).unwrap();
@@ -677,10 +645,7 @@ mod http_e2e_tests {
     #[test]
     fn http_e2e_remove_all_isolation() {
         let port = 10093;
-        thread::spawn(move || {
-            launch_db_server("http_e2e_remove_all_isolation", Some(port), None).unwrap()
-        });
-        notified_sleep(5);
+        launch_test_db_servers("http_e2e_remove_all_isolation", Some(port), None).unwrap();
 
         let host = &format!("{}:{}", Constants::SERVER_END_POINT, port);
         let client = ImmuxDBHttpClient::new(host).unwrap();
@@ -717,10 +682,7 @@ mod http_e2e_tests {
     #[test]
     fn http_e2e_revert_all_isolation() {
         let port = 10094;
-        thread::spawn(move || {
-            launch_db_server("http_e2e_revert_all_isolation", Some(port), None).unwrap()
-        });
-        notified_sleep(5);
+        launch_test_db_servers("http_e2e_revert_all_isolation", Some(port), None).unwrap();
 
         let host = &format!("{}:{}", Constants::SERVER_END_POINT, port);
         let client = ImmuxDBHttpClient::new(host).unwrap();
@@ -772,15 +734,12 @@ mod http_e2e_tests {
     #[test]
     fn http_e2e_transaction_not_alive_after_revert_all() {
         let port = 10095;
-        thread::spawn(move || {
-            launch_db_server(
-                "http_e2e_transaction_not_alive_after_revert_all",
-                Some(port),
-                None,
-            )
-            .unwrap()
-        });
-        notified_sleep(5);
+        launch_test_db_servers(
+            "http_e2e_transaction_not_alive_after_revert_all",
+            Some(port),
+            None,
+        )
+        .unwrap();
 
         let host = &format!("{}:{}", Constants::SERVER_END_POINT, port);
         let client = ImmuxDBHttpClient::new(host).unwrap();
@@ -810,15 +769,12 @@ mod http_e2e_tests {
     #[test]
     fn http_e2e_unexpected_commit_transaction_id() {
         let port = 10096;
-        thread::spawn(move || {
-            launch_db_server(
-                "http_e2e_unexpected_commit_transaction_id",
-                Some(port),
-                None,
-            )
-            .unwrap()
-        });
-        notified_sleep(5);
+        launch_test_db_servers(
+            "http_e2e_unexpected_commit_transaction_id",
+            Some(port),
+            None,
+        )
+        .unwrap();
 
         let host = &format!("{}:{}", Constants::SERVER_END_POINT, port);
         let client = ImmuxDBHttpClient::new(host).unwrap();
@@ -832,10 +788,8 @@ mod http_e2e_tests {
     #[test]
     fn http_e2e_unexpected_abort_transaction_id() {
         let port = 10097;
-        thread::spawn(move || {
-            launch_db_server("http_e2e_unexpected_abort_transaction_id", Some(port), None).unwrap()
-        });
-        notified_sleep(5);
+        launch_test_db_servers("http_e2e_unexpected_abort_transaction_id", Some(port), None)
+            .unwrap();
 
         let host = &format!("{}:{}", Constants::SERVER_END_POINT, port);
         let client = ImmuxDBHttpClient::new(host).unwrap();
@@ -849,10 +803,7 @@ mod http_e2e_tests {
     #[test]
     fn http_e2e_last_one_commit_wins() {
         let port = 10098;
-        thread::spawn(move || {
-            launch_db_server("http_e2e_last_one_commit_wins", Some(port), None).unwrap()
-        });
-        notified_sleep(5);
+        launch_test_db_servers("http_e2e_last_one_commit_wins", Some(port), None).unwrap();
 
         let host = &format!("{}:{}", Constants::SERVER_END_POINT, port);
         let client = ImmuxDBHttpClient::new(host).unwrap();
@@ -925,10 +876,7 @@ mod http_e2e_tests {
     #[test]
     fn http_e2e_read_inside_transaction() {
         let port = 10099;
-        thread::spawn(move || {
-            launch_db_server("http_e2e_read_inside_transaction", Some(port), None).unwrap()
-        });
-        notified_sleep(5);
+        launch_test_db_servers("http_e2e_read_inside_transaction", Some(port), None).unwrap();
 
         let host = &format!("{}:{}", Constants::SERVER_END_POINT, port);
         let client = ImmuxDBHttpClient::new(host).unwrap();
@@ -962,8 +910,7 @@ mod http_e2e_tests {
     #[test]
     fn http_e2e_dirty_read() {
         let port = 10100;
-        thread::spawn(move || launch_db_server("http_e2e_dirty_read", Some(port), None).unwrap());
-        notified_sleep(5);
+        launch_test_db_servers("http_e2e_dirty_read", Some(port), None).unwrap();
 
         let host = &format!("{}:{}", Constants::SERVER_END_POINT, port);
         let client = ImmuxDBHttpClient::new(host).unwrap();
@@ -1114,8 +1061,7 @@ mod http_e2e_tests {
         contents.extend_from_slice(&unsatisfied_content);
 
         let port = 10011;
-        thread::spawn(move || launch_db_server("http_e2e_filter_read", Some(port), None));
-        notified_sleep(5);
+        launch_test_db_servers("http_e2e_filter_read", Some(port), None).unwrap();
 
         let host = &format!("{}:{}", Constants::SERVER_END_POINT, port);
         let client = ImmuxDBHttpClient::new(host).unwrap();

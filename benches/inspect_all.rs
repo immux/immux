@@ -5,7 +5,7 @@ use immuxsys::storage::executor::grouping_label::GroupingLabel;
 use immuxsys_client::http_client::ImmuxDBHttpClient;
 use immuxsys_dev_utils::data_models::census90::CensusEntry;
 use immuxsys_dev_utils::dev_utils::{
-    csv_to_json_table_with_size, launch_db_server, measure_single_operation, notified_sleep,
+    csv_to_json_table_with_size, launch_test_db_servers, measure_single_operation,
 };
 
 #[derive(Clone)]
@@ -36,10 +36,8 @@ fn main() {
     for (index, bench_spec) in bench_specs.iter().enumerate() {
         let project_name = format!("{}_{}", bench_name, index);
         let bench_spec = bench_spec.clone();
-        launch_db_server(&project_name, Some(bench_spec.port), None).unwrap();
+        launch_test_db_servers(&project_name, Some(bench_spec.port), None).unwrap();
     }
-
-    notified_sleep(5);
 
     let mut children_thread = vec![];
 

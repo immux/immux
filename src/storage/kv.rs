@@ -11,6 +11,7 @@ use crate::storage::kvvalue::KVValue;
 use crate::storage::log_pointer::LogPointer;
 use crate::storage::log_reader::LogReader;
 use crate::storage::log_writer::LogWriter;
+use crate::storage::preferences::DBPreferences;
 use crate::storage::transaction_manager::{TransactionId, TransactionManager};
 
 pub struct LogKeyValueStore {
@@ -22,12 +23,12 @@ pub struct LogKeyValueStore {
 }
 
 impl LogKeyValueStore {
-    pub fn open(data_dir: &PathBuf) -> KVResult<LogKeyValueStore> {
-        create_dir_all(&data_dir)?;
+    pub fn open(preferences: &DBPreferences) -> KVResult<LogKeyValueStore> {
+        create_dir_all(&preferences.log_dir)?;
 
-        let log_file_path = get_log_file_path(&data_dir);
+        let log_file_path = get_main_log_full_path(&preferences.log_dir);
 
-        let writer = LogWriter::new(&log_file_path)?;
+        let writer = LogWriter::new(&log_file_path, preferences.ecc_mode)?;
 
         let mut reader = LogReader::new(&log_file_path)?;
         let (key_pointer_map, current_height, transaction_manager) =
@@ -605,8 +606,6 @@ fn update_key_pointer_map(
     }
 }
 
-pub fn get_log_file_path(dir: &PathBuf) -> PathBuf {
-    let log_file_name = format!("{}.log", Constants::LOG_FILE_NAME);
-    let log_path = dir.join(Path::new(&log_file_name));
-    return log_path;
+pub fn get_main_log_full_path(data_dir: &PathBuf) -> PathBuf {
+    return data_dir.join(Path::new(&Constants::MAIN_LOG_FILENAME));
 }

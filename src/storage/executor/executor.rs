@@ -1,5 +1,4 @@
 use std::convert::TryFrom;
-use std::path::PathBuf;
 
 use crate::storage::chain_height::ChainHeight;
 use crate::storage::executor::command::{Command, CommandError, SelectCondition};
@@ -12,6 +11,7 @@ use crate::storage::executor::unit_key::UnitKey;
 use crate::storage::kv::LogKeyValueStore;
 use crate::storage::kvkey::KVKey;
 use crate::storage::kvvalue::KVValue;
+use crate::storage::preferences::DBPreferences;
 use crate::storage::transaction_manager::TransactionId;
 
 pub struct Executor {
@@ -19,8 +19,8 @@ pub struct Executor {
 }
 
 impl Executor {
-    pub fn open(path: &PathBuf) -> ExecutorResult<Executor> {
-        let store_engine = LogKeyValueStore::open(path)?;
+    pub fn open(preferences: &DBPreferences) -> ExecutorResult<Executor> {
+        let store_engine = LogKeyValueStore::open(preferences)?;
         let executor = Executor { store_engine };
         return Ok(executor);
     }
