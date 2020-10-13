@@ -3,6 +3,7 @@ use std::error::Error;
 use immuxsys::constants as Constants;
 use immuxsys::storage::executor::grouping_label::GroupingLabel;
 use immuxsys_client::http_client::ImmuxDBHttpClient;
+use immuxsys_client::ImmuxDBClient;
 use immuxsys_dev_utils::data_models::covid::Covid;
 use immuxsys_dev_utils::dev_utils::{
     csv_to_json_table, e2e_verify_correctness, launch_test_db_servers, measure_iteration,

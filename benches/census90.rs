@@ -3,6 +3,7 @@ use std::error::Error;
 use immuxsys::constants as Constants;
 use immuxsys::storage::executor::grouping_label::GroupingLabel;
 use immuxsys_client::http_client::ImmuxDBHttpClient;
+use immuxsys_client::ImmuxDBClient;
 use immuxsys_dev_utils::data_models::census90::CensusEntry;
 use immuxsys_dev_utils::dev_utils::{
     csv_to_json_table, e2e_verify_correctness, launch_test_db_servers, measure_iteration,
@@ -35,7 +36,6 @@ fn main() {
 
     let host = &format!("{}:{}", Constants::SERVER_END_POINT, port);
     let client = ImmuxDBHttpClient::new(host).unwrap();
-
     let insert = || -> Result<Vec<(f64, f64)>, Box<dyn Error>> {
         measure_iteration(
             &table,

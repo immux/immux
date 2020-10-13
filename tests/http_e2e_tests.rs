@@ -22,6 +22,50 @@ mod http_e2e_tests {
     };
 
     #[test]
+    fn http_e2e_get_groupings() {
+        let port = 20000;
+        launch_test_db_servers("http_e2e_get_groupings", Some(port), None).unwrap();
+
+        let host = &format!("{}:{}", Constants::SERVER_END_POINT, port);
+        let client = ImmuxDBHttpClient::new(host).unwrap();
+
+        let expected_groupings = vec![
+            GroupingLabel::from("grouping1"),
+            GroupingLabel::from("grouping2"),
+            GroupingLabel::from("grouping3"),
+            GroupingLabel::from("grouping4"),
+            GroupingLabel::from("grouping5"),
+            GroupingLabel::from("grouping6"),
+        ];
+
+        let random_key = UnitKey::from("random key");
+        let random_content = UnitContent::String(String::from("hello world"));
+
+        for grouping in expected_groupings.iter() {
+            client
+                .set_unit(&grouping, &random_key, &random_content)
+                .unwrap();
+        }
+
+        let (_, groupings_str) = client.get_all_groupings().unwrap();
+        let groupings: Vec<&str> = groupings_str.split("\r\n").collect();
+        let actual_groupings: Vec<GroupingLabel> = groupings
+            .iter()
+            .map(|grouping_str| GroupingLabel::from(*grouping_str))
+            .collect();
+
+        for grouping in actual_groupings.iter() {
+            assert!(expected_groupings.contains(grouping));
+        }
+
+        for grouping in expected_groupings.iter() {
+            assert!(actual_groupings.contains(grouping));
+        }
+
+        assert_eq!(actual_groupings.len(), expected_groupings.len());
+    }
+
+    #[test]
     fn http_e2e_grouping_get_set() {
         let port = 20030;
         launch_test_db_servers("http_e2e_grouping_get_set", Some(port), None).unwrap();

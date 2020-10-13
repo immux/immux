@@ -23,6 +23,51 @@ mod tcp_e2e_tests {
     };
 
     #[test]
+    fn tcp_e2e_get_groupings() {
+        let port = 7999;
+        launch_test_db_servers("tcp_e2e_get_groupings", None, Some(port)).unwrap();
+
+        let host = &format!("{}:{}", Constants::SERVER_END_POINT, port);
+        let client = ImmuxDBTcpClient::new(host).unwrap();
+
+        let expected_groupings = vec![
+            GroupingLabel::from("grouping1"),
+            GroupingLabel::from("grouping2"),
+            GroupingLabel::from("grouping3"),
+            GroupingLabel::from("grouping4"),
+            GroupingLabel::from("grouping5"),
+            GroupingLabel::from("grouping6"),
+        ];
+
+        let random_key = UnitKey::from("random key");
+        let random_content = UnitContent::String(String::from("hello world"));
+
+        for grouping in expected_groupings.iter() {
+            let outcome = client
+                .set_unit(&grouping, &random_key, &random_content)
+                .unwrap();
+            assert_eq!(outcome, Outcome::InsertSuccess);
+        }
+
+        let outcome = client.get_all_groupings().unwrap();
+
+        match outcome {
+            Outcome::GetAllGroupingsSuccess(actual_groupings) => {
+                for grouping in actual_groupings.iter() {
+                    assert!(expected_groupings.contains(grouping));
+                }
+
+                for grouping in expected_groupings.iter() {
+                    assert!(actual_groupings.contains(grouping));
+                }
+
+                assert_eq!(actual_groupings.len(), expected_groupings.len());
+            }
+            _ => panic!("tcp_e2e_get_groupings failed"),
+        }
+    }
+
+    #[test]
     fn tcp_e2e_grouping_get_set() {
         let port = 8000;
         launch_test_db_servers("tcp_e2e_grouping_get_set", None, Some(port)).unwrap();

@@ -43,13 +43,9 @@ impl Executor {
         }
     }
 
-    pub fn get(
-        &mut self,
-        target_grouping: &GroupingLabel,
-        condition: &SelectCondition,
-    ) -> ExecutorResult<Outcome> {
+    pub fn get(&mut self, condition: &SelectCondition) -> ExecutorResult<Outcome> {
         match condition {
-            SelectCondition::UnconditionalMatch => {
+            SelectCondition::UnconditionalMatch(target_grouping) => {
                 let kvs = self.store_engine.get_all_current()?;
                 let result: Vec<UnitContent> = kvs
                     .iter()
@@ -67,7 +63,7 @@ impl Executor {
                     .collect();
                 return Ok(Outcome::Select(result));
             }
-            SelectCondition::Filter(filter) => {
+            SelectCondition::Filter(target_grouping, filter) => {
                 let kvs = self.store_engine.get_all_current()?;
                 let result: Vec<UnitContent> = kvs
                     .iter()
@@ -90,7 +86,7 @@ impl Executor {
                     .collect();
                 return Ok(Outcome::Select(result));
             }
-            SelectCondition::Key(key, transaction_id) => {
+            SelectCondition::Key(target_grouping, key, transaction_id) => {
                 let kv_key = KVKey::from_grouping_and_unit_key(&target_grouping, &key);
                 match self.store_engine.get(&kv_key, *transaction_id)? {
                     None => Ok(Outcome::Select(vec![])),
@@ -99,6 +95,18 @@ impl Executor {
                         return Ok(Outcome::Select(vec![content]));
                     }
                 }
+            }
+            SelectCondition::AllGrouping => {
+                let kvs = self.store_engine.get_all_current()?;
+                let mut result = vec![];
+
+                for (key, _value) in kvs.iter() {
+                    let (grouping, _unit_key) = KVKey::parse(&key.as_bytes())?;
+                    if !result.contains(&grouping) {
+                        result.push(grouping);
+                    }
+                }
+                return Ok(Outcome::GetAllGroupingsSuccess(result));
             }
         }
     }
