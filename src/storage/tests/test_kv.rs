@@ -280,9 +280,9 @@ mod kv_tests {
                 UnitContent::Map(map)
             },
         ];
-
+        let grouping = GroupingLabel::new("any_grouping".as_bytes());
         let filter = get_filter();
-        let condition = SelectCondition::Filter(filter);
+        let condition = SelectCondition::Filter(grouping.clone(), filter);
 
         let mut contents = vec![];
         contents.extend_from_slice(&satisfied_contents);
@@ -294,7 +294,6 @@ mod kv_tests {
 
         let pref = DBPreferences::default_at_dir("/tmp/test_content_satisfied_filter_unit");
         let grouping = GroupingLabel::new("any_grouping".as_bytes());
-
         let mut executor = Executor::open(&pref).unwrap();
 
         for (index, content) in contents.iter().enumerate() {
@@ -302,7 +301,7 @@ mod kv_tests {
             executor.set(&grouping, &unit_key, &content, None).unwrap();
         }
 
-        let outcome = executor.get(&grouping, &condition).unwrap();
+        let outcome = executor.get(&condition).unwrap();
 
         match outcome {
             Outcome::Select(output) => {

@@ -222,17 +222,23 @@ fn main() -> ExecutorResult<()> {
                 {
                     let transaction_id = transaction_id_str.parse::<u64>()?;
                     let condition = SelectCondition::Key(
+                        GroupingLabel::from(grouping_arg),
                         UnitKey::from(key_arg),
                         Some(TransactionId::new(transaction_id)),
                     );
-                    executor.get(&GroupingLabel::from(grouping_arg), &condition)
+                    executor.get(&condition)
                 } else {
-                    let condition = SelectCondition::Key(UnitKey::from(key_arg), None);
-                    executor.get(&GroupingLabel::from(grouping_arg), &condition)
+                    let condition = SelectCondition::Key(
+                        GroupingLabel::from(grouping_arg),
+                        UnitKey::from(key_arg),
+                        None,
+                    );
+                    executor.get(&condition)
                 }
             } else {
-                let condition = SelectCondition::UnconditionalMatch;
-                executor.get(&GroupingLabel::from(grouping_arg), &condition)
+                let condition =
+                    SelectCondition::UnconditionalMatch(GroupingLabel::from(grouping_arg));
+                executor.get(&condition)
             }
         }
         (Constants::SUBCOMMAND_FILTER, Some(arg_matches)) => {
@@ -246,8 +252,8 @@ fn main() -> ExecutorResult<()> {
                 let mut executor = Executor::open(&pref)?;
                 let filter = parse_filter_string(filter_str.to_string())?;
 
-                let condition = SelectCondition::Filter(filter);
-                executor.get(&GroupingLabel::from(grouping_arg), &condition)
+                let condition = SelectCondition::Filter(GroupingLabel::from(grouping_arg), filter);
+                executor.get(&condition)
             }
         }
         (Constants::SUBCOMMAND_REVERT_ONE, Some(arg_matches)) => {

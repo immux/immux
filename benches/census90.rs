@@ -36,7 +36,6 @@ fn main() {
 
     let host = &format!("{}:{}", Constants::SERVER_END_POINT, port);
     let client = ImmuxDBHttpClient::new(host).unwrap();
-
     let insert = || -> Result<Vec<(f64, f64)>, Box<dyn Error>> {
         measure_iteration(
             &table,

@@ -27,6 +27,18 @@ impl ImmuxDBHttpClient {
 }
 
 impl ImmuxDBClient<HttpClientResult> for ImmuxDBHttpClient {
+    fn get_all_groupings(&self) -> HttpClientResult {
+        let url = format!("http://{}/{}", &self.host, Constants::URL_GROUPING_KEY_WORD,);
+
+        let mut response = self.client.get(&url).send()?;
+        let status_code = response.status();
+
+        match response.text() {
+            Ok(text) => Ok((status_code, text)),
+            Err(error) => Err(ImmuxDBHttpClientError::Reqwest(error.into())),
+        }
+    }
+
     fn get_by_key(&self, grouping: &GroupingLabel, unit_key: &UnitKey) -> HttpClientResult {
         let url = format!(
             "http://{}/{}/{}",
