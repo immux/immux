@@ -23,6 +23,7 @@ GET /grouping/id/.journal ("inspect_one")
 GET /.journal ("inspect all")
 GET /grouping?filter=xx&lt=xxx&gtxxx
 GET /grouping (get all in grouping)
+GET /.grouping(get all the groupings)
 
 PUT /grouping/id {data} ("set")
 PUT /grouping/id?height={height} ("revert one")
