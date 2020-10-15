@@ -23,6 +23,61 @@ mod tcp_e2e_tests {
     };
 
     #[test]
+    fn tcp_e2e_remove_groupings() {
+        let port = 7998;
+        launch_test_db_servers("tcp_e2e_remove_groupings", None, Some(port)).unwrap();
+
+        let host = &format!("{}:{}", Constants::SERVER_END_POINT, port);
+        let client = ImmuxDBTcpClient::new(host).unwrap();
+
+        let expected_groupings = vec![
+            GroupingLabel::from("grouping1"),
+            GroupingLabel::from("grouping2"),
+            GroupingLabel::from("grouping3"),
+            GroupingLabel::from("grouping4"),
+            GroupingLabel::from("grouping5"),
+            GroupingLabel::from("grouping6"),
+        ];
+
+        let random_key = UnitKey::from("some random key");
+        let random_content = UnitContent::String(String::from("some random value"));
+
+        for grouping in expected_groupings.iter() {
+            let outcome = client
+                .set_unit(&grouping, &random_key, &random_content)
+                .unwrap();
+            assert_eq!(outcome, Outcome::InsertSuccess);
+        }
+
+        let target_groupings = vec![
+            expected_groupings[0].clone(),
+            expected_groupings[1].clone(),
+            expected_groupings[2].clone(),
+        ];
+        let outcome = client.remove_groupings(&target_groupings).unwrap();
+        assert_eq!(outcome, Outcome::DeleteGroupingSuccess);
+
+        for grouping in target_groupings.iter() {
+            let outcome = client.get_by_key(grouping, &random_key).unwrap();
+            assert_eq!(outcome, Outcome::Select(vec![]));
+        }
+
+        let outcome = client.get_all_groupings().unwrap();
+        match outcome {
+            Outcome::GetAllGroupingsSuccess(actual_groupings) => {
+                for grouping in actual_groupings.iter() {
+                    assert!(expected_groupings.contains(grouping));
+                }
+
+                for grouping in target_groupings.iter() {
+                    assert!(!actual_groupings.contains(grouping));
+                }
+            }
+            _ => panic!("tcp_e2e_remove_groupings failed"),
+        }
+    }
+
+    #[test]
     fn tcp_e2e_get_groupings() {
         let port = 7999;
         launch_test_db_servers("tcp_e2e_get_groupings", None, Some(port)).unwrap();

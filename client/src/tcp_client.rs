@@ -54,6 +54,19 @@ impl ImmuxDBClient<ImmuxDBTcpClientResult<Outcome>> for ImmuxDBTcpClient {
         return Ok(outcome);
     }
 
+    fn remove_groupings(&self, groupings: &[GroupingLabel]) -> ImmuxDBTcpClientResult<Outcome> {
+        let command = Command::RemoveGroupings {
+            groupings: groupings.to_vec(),
+        };
+
+        let mut stream = self.stream.borrow_mut();
+        write(&mut *stream, &command.marshal())?;
+        let buffer = read(&mut *stream)?;
+        let (outcome, _) = Outcome::parse(&buffer)?;
+
+        return Ok(outcome);
+    }
+
     fn get_by_key(
         &self,
         grouping: &GroupingLabel,

@@ -135,6 +135,11 @@ impl LogKeyValueStore {
         }
     }
 
+    pub fn get_current_keys(&mut self) -> KVResult<Vec<KVKey>> {
+        let keys: Vec<KVKey> = self.key_pointer_map.keys().map(|key| key.clone()).collect();
+        return Ok(keys);
+    }
+
     pub fn get_all_current(&mut self) -> KVResult<Vec<(KVKey, KVValue)>> {
         let mut result = vec![];
 

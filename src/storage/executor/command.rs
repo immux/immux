@@ -9,6 +9,7 @@ use crate::storage::executor::unit_key::{UnitKey, UnitKeyError};
 use crate::storage::instruction::Instruction;
 use crate::storage::transaction_manager::TransactionId;
 use crate::utils::ints::{u64_to_u8_array, u8_array_to_u64};
+use crate::utils::varint::{varint_decode, varint_encode, VarIntError};
 
 #[derive(Debug)]
 pub enum CommandError {
@@ -17,6 +18,7 @@ pub enum CommandError {
     InvalidPrefix,
     SelectConditionErr(SelectConditionError),
     UnitKeyError(UnitKeyError),
+    VarIntError(VarIntError),
 }
 
 impl From<GroupingLabelError> for CommandError {
@@ -40,6 +42,12 @@ impl From<UnitContentError> for CommandError {
 impl From<SelectConditionError> for CommandError {
     fn from(error: SelectConditionError) -> CommandError {
         CommandError::SelectConditionErr(error)
+    }
+}
+
+impl From<VarIntError> for CommandError {
+    fn from(error: VarIntError) -> CommandError {
+        CommandError::VarIntError(error)
     }
 }
 
@@ -227,6 +235,9 @@ pub enum Command {
         key: UnitKey,
     },
     RemoveAll,
+    RemoveGroupings {
+        groupings: Vec<GroupingLabel>,
+    },
     CreateTransaction,
     TransactionalInsert {
         grouping: GroupingLabel,
@@ -263,6 +274,7 @@ pub enum CommandPrefix {
     RevertAll = 0x06,
     RemoveOne = 0x07,
     RemoveAll = 0x08,
+    RemoveGroupings = 0x09,
 
     TransactionalInsert = 0x54,
     TransactionalRevertOne = 0x55,
@@ -376,6 +388,20 @@ impl Command {
             return Ok((command, position));
         } else if prefix == CommandPrefix::RemoveAll as u8 {
             let command = Command::RemoveAll;
+            return Ok((command, position));
+        } else if prefix == CommandPrefix::RemoveGroupings as u8 {
+            let (num_of_groupings, offset) = varint_decode(&data[position..])?;
+            position += offset;
+
+            let mut groupings = vec![];
+            for _ in 0..num_of_groupings {
+                let (grouping, offset) = GroupingLabel::parse(&data[position..])?;
+                position += offset;
+
+                groupings.push(grouping);
+            }
+
+            let command = Command::RemoveGroupings { groupings };
             return Ok((command, position));
         } else if prefix == CommandPrefix::CreateTransaction as u8 {
             let command = Command::CreateTransaction;
@@ -601,6 +627,24 @@ impl Command {
             Command::RemoveAll => {
                 let prefix = CommandPrefix::RemoveAll as u8;
                 let result = vec![prefix];
+                return result;
+            }
+            Command::RemoveGroupings { groupings } => {
+                let prefix = CommandPrefix::RemoveGroupings as u8;
+                let groupings_bytes: Vec<Vec<u8>> = groupings
+                    .iter()
+                    .map(|grouping| grouping.marshal())
+                    .collect();
+
+                let mut result = vec![prefix];
+
+                let num_of_groupings = groupings.len();
+                let number_varint = varint_encode(num_of_groupings as u64);
+                result.extend_from_slice(&number_varint);
+
+                for grouping_bytes in groupings_bytes.iter() {
+                    result.extend_from_slice(grouping_bytes);
+                }
                 return result;
             }
             Command::CreateTransaction => {
@@ -845,6 +889,7 @@ impl ToString for Command {
                 format!("Command RemoveOne, grouping: {:?}, key: {:?}", grouping.to_string(), key.to_string())
             }
             Command::RemoveAll => format!("Command RemoveAll"),
+            Command::RemoveGroupings {groupings} => format!("Command RemoveGroupings {:?}", groupings),
             Command::CreateTransaction => format!("Command CreateTransaction"),
             Command::TransactionalInsert {
                 grouping,

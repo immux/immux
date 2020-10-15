@@ -2,7 +2,7 @@ use std::convert::TryFrom;
 
 use crate::storage::chain_height::ChainHeight;
 use crate::storage::executor::command::{Command, CommandError, SelectCondition};
-use crate::storage::executor::errors::ExecutorResult;
+use crate::storage::executor::errors::{ExecutorError, ExecutorResult};
 use crate::storage::executor::filter::content_satisfied_filter;
 use crate::storage::executor::grouping_label::GroupingLabel;
 use crate::storage::executor::outcome::Outcome;
@@ -108,6 +108,25 @@ impl Executor {
                 }
                 return Ok(Outcome::GetAllGroupingsSuccess(result));
             }
+        }
+    }
+
+    pub fn remove_groupings(&mut self, groupings: &[GroupingLabel]) -> ExecutorResult<Outcome> {
+        let outcome = self.start_transaction()?;
+
+        match outcome {
+            Outcome::CreateTransaction(transaction_id) => {
+                let current_keys = self.store_engine.get_current_keys()?;
+                for key in current_keys {
+                    let (grouping, _unit_key) = KVKey::parse(&key.as_bytes())?;
+                    if groupings.contains(&grouping) {
+                        self.store_engine.remove_one(&key, Some(transaction_id))?;
+                    }
+                }
+                self.commit_transaction(transaction_id)?;
+                return Ok(Outcome::DeleteGroupingSuccess);
+            }
+            _ => Err(ExecutorError::UnexpectedOutcome),
         }
     }
 

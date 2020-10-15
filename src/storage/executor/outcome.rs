@@ -52,6 +52,7 @@ pub enum OutcomePrefix {
     RemoveOneSuccess = 0x17,
     RemoveAllSuccess = 0x18,
     GetAllGroupingsSuccess = 0x19,
+    DeleteGroupingsSuccess = 0x20,
 
     TransactionalInsertSuccess = 0x64,
     TransactionalRevertOneSuccess = 0x65,
@@ -79,6 +80,7 @@ pub enum Outcome {
     TransactionCommitSuccess,
     TransactionAbortSuccess,
     GetAllGroupingsSuccess(Vec<GroupingLabel>),
+    DeleteGroupingSuccess,
 }
 
 impl Outcome {
@@ -156,6 +158,7 @@ impl Outcome {
                 }
                 return result;
             }
+            Outcome::DeleteGroupingSuccess => vec![OutcomePrefix::DeleteGroupingsSuccess as u8],
         }
     }
     pub fn parse(data: &[u8]) -> Result<(Self, usize), OutcomeError> {
@@ -271,6 +274,8 @@ impl Outcome {
             }
 
             return Ok((Outcome::GetAllGroupingsSuccess(result), position));
+        } else if prefix == OutcomePrefix::DeleteGroupingsSuccess as u8 {
+            return Ok((Outcome::DeleteGroupingSuccess, position));
         } else {
             return Err(OutcomeError::UnexpectedPrefix);
         }
@@ -323,6 +328,7 @@ impl fmt::Display for Outcome {
                     .collect();
                 output_vec.join("\r\n")
             }
+            Outcome::DeleteGroupingSuccess => String::from("Delete Groupings Success"),
         };
         write!(f, "{}", string)
     }
@@ -493,6 +499,8 @@ mod outcome_tests {
             Outcome::TransactionalRemoveOneSuccess,
             Outcome::TransactionCommitSuccess,
             Outcome::TransactionAbortSuccess,
+            Outcome::GetAllGroupingsSuccess(vec![GroupingLabel::from("123")]),
+            Outcome::DeleteGroupingSuccess,
         ];
 
         for outcome in outcomes.iter() {

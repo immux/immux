@@ -236,6 +236,10 @@ fn handle_command(command: Command, executor: &mut Executor) -> ServerResult<Out
             let outcome = executor.remove_all()?;
             return Ok(outcome);
         }
+        Command::RemoveGroupings { groupings } => {
+            let outcome = executor.remove_groupings(&groupings)?;
+            return Ok(outcome);
+        }
         Command::RevertOne {
             grouping,
             key,
@@ -541,6 +545,15 @@ fn parse_http_request(request: &mut Request) -> ServerResult<Command> {
                     grouping,
                     key: unit_key,
                 };
+                return Ok(command);
+            } else if segments.len() >= 2 && segments[1] == Constants::URL_GROUPING_KEY_WORD {
+                let groupings_strs: Vec<&str> = incoming_body.split("\r\n").collect();
+                let groupings: Vec<GroupingLabel> = groupings_strs
+                    .iter()
+                    .map(|grouping_str| GroupingLabel::from(*grouping_str))
+                    .collect();
+
+                let command = Command::RemoveGroupings { groupings };
                 return Ok(command);
             } else {
                 let command = Command::RemoveAll;

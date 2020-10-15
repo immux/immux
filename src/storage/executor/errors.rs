@@ -15,6 +15,7 @@ pub enum ExecutorError {
     CommandError(CommandError),
     FilterError(FilterError),
     KVKeyError(KVKeyError),
+    UnexpectedOutcome,
 }
 
 impl From<KVError> for ExecutorError {
