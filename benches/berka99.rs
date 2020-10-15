@@ -3,6 +3,7 @@ use std::error::Error;
 use immuxsys::constants as Constants;
 use immuxsys::storage::executor::grouping_label::GroupingLabel;
 use immuxsys_client::http_client::ImmuxDBHttpClient;
+use immuxsys_client::ImmuxDBClient;
 use immuxsys_dev_utils::data_models::berka99::{
     Account, Card, Client, Disp, District, Loan, Order, Trans,
 };
