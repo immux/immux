@@ -2,6 +2,7 @@ use std::env;
 use std::path::PathBuf;
 
 use crate::constants as Constants;
+use crate::constants::{MAIN_LOG_DIR_ENV, MAIN_LOG_DIR_HOME_SUBDIR};
 use crate::storage::ecc::ECCMode;
 
 const CLI_ARG_DATA_DIR: &str = "--data-dir=";
@@ -69,7 +70,7 @@ impl DBPreferences {
 fn get_home() -> Option<String> {
     return if let Ok(home) = env::var("HOME") {
         Some(home)
-    } else if let Ok(home) = env::var("FOLDERID_Profile") {
+    } else if let Ok(home) = env::var("USERPROFILE") {
         Some(home)
     } else {
         None
@@ -77,12 +78,12 @@ fn get_home() -> Option<String> {
 }
 
 fn get_log_dir() -> PathBuf {
-    return if let Ok(dir) = env::var("IMMUX_LOG") {
+    return if let Ok(dir) = env::var(MAIN_LOG_DIR_ENV) {
         PathBuf::from(dir)
     } else {
         let home = get_home();
         if let Some(home) = home {
-            PathBuf::from(home).join("immux_log")
+            PathBuf::from(home).join(MAIN_LOG_DIR_HOME_SUBDIR)
         } else if env::consts::OS == "windows" {
             PathBuf::from(Constants::MAIN_LOG_FALLBACK_DIR_WINDOWS)
         } else {
