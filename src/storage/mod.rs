@@ -9,6 +9,7 @@ pub mod kvkey;
 pub mod kvvalue;
 pub mod log_pointer;
 pub mod log_reader;
+pub mod log_version;
 pub mod log_writer;
 pub mod preferences;
 pub mod transaction_manager;

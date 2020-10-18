@@ -22,13 +22,17 @@ mod kv_tests {
     use immuxsys::storage::transaction_manager::TransactionId;
     use immuxsys::utils::ints::{u64_to_u8_array, u8_array_to_u64};
 
-    fn get_store_engine(test_data_dir: &str) -> LogKeyValueStore {
-        let test_dir_path = PathBuf::from(test_data_dir);
+    fn reset_dir_path(log_dir_str: &str) {
+        let test_dir_path = PathBuf::from(log_dir_str);
         let log_file_path = get_main_log_full_path(&test_dir_path);
 
         if log_file_path.exists() {
             remove_file(log_file_path).unwrap();
         }
+    }
+
+    fn get_store_engine(test_data_dir: &str) -> LogKeyValueStore {
+        reset_dir_path(test_data_dir);
 
         let pref = DBPreferences::default_at_dir(test_data_dir);
 
@@ -87,6 +91,28 @@ mod kv_tests {
         };
 
         return filter;
+    }
+
+    #[test]
+    fn kv_open() {
+        let key = KVKey::new(&[0x00, 0x01, 0x03]);
+        let expected_value = KVValue::new(&[0xff, 0xff, 0xff, 0xff]);
+        let data_dir = "/tmp/kv_open";
+        {
+            let mut store_engine = get_store_engine(data_dir);
+            store_engine.set(&key, &expected_value, None).unwrap();
+            let actual_value = store_engine.get(&key, None).unwrap().unwrap();
+
+            assert_eq!(actual_value, expected_value);
+        }
+
+        {
+            let pref = DBPreferences::default_at_dir(data_dir);
+            let mut store_engine = LogKeyValueStore::open(&pref).unwrap();
+            let actual_value = store_engine.get(&key, None).unwrap().unwrap();
+
+            assert_eq!(actual_value, expected_value);
+        }
     }
 
     #[test]
@@ -262,8 +288,13 @@ mod kv_tests {
         contents.extend_from_slice(&satisfied_contents);
         contents.extend_from_slice(&unsatisfied_contents);
 
+        let log_dir_str = "/tmp/test_content_satisfied_filter_unit";
+
+        reset_dir_path(log_dir_str);
+
         let pref = DBPreferences::default_at_dir("/tmp/test_content_satisfied_filter_unit");
         let grouping = GroupingLabel::new("any_grouping".as_bytes());
+
         let mut executor = Executor::open(&pref).unwrap();
 
         for (index, content) in contents.iter().enumerate() {

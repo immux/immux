@@ -1,10 +1,11 @@
 use std::fs::{File, OpenOptions};
 use std::io::{BufWriter, Result, Seek, SeekFrom, Write};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use crate::storage::ecc::ECCMode;
 use crate::storage::instruction::{pack_instruction, Instruction};
 use crate::storage::log_pointer::LogPointer;
+use crate::storage::log_version::LogVersion;
 
 pub struct LogWriter {
     buf_writer: BufWriter<File>,
@@ -13,19 +14,32 @@ pub struct LogWriter {
 }
 
 impl LogWriter {
-    pub fn new(file_path: &PathBuf, ecc_mode: ECCMode) -> Result<Self> {
-        let file = OpenOptions::new()
-            .create(true)
-            .append(true)
-            .open(file_path)?;
-        let mut buf_writer = BufWriter::new(file);
-        let initial_pos = buf_writer.seek(SeekFrom::Current(0))?;
+    pub fn new(file_path: &PathBuf, ecc_mode: ECCMode, db_version: LogVersion) -> Result<Self> {
+        if !Path::new(file_path).exists() {
+            let file = File::create(file_path)?;
+            let mut buf_writer = BufWriter::new(file);
+            let db_version_bytes = db_version.marshal();
+            buf_writer.write(&db_version_bytes)?;
+            buf_writer.flush()?;
 
-        Ok(LogWriter {
-            buf_writer,
-            ecc_mode,
-            pos: initial_pos,
-        })
+            let initial_pos = buf_writer.seek(SeekFrom::Current(0))?;
+
+            Ok(LogWriter {
+                buf_writer,
+                ecc_mode,
+                pos: initial_pos,
+            })
+        } else {
+            let file = OpenOptions::new().append(true).open(file_path)?;
+            let mut buf_writer = BufWriter::new(file);
+            let initial_pos = buf_writer.seek(SeekFrom::Current(0))?;
+
+            Ok(LogWriter {
+                buf_writer,
+                ecc_mode,
+                pos: initial_pos,
+            })
+        }
     }
 
     pub fn append_instruction(&mut self, instruction: &Instruction) -> Result<LogPointer> {
