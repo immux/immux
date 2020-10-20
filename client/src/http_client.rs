@@ -40,22 +40,15 @@ impl ImmuxDBClient<HttpClientResult> for ImmuxDBHttpClient {
     }
 
     fn remove_groupings(&self, groupings: &[GroupingLabel]) -> HttpClientResult {
-        if groupings.is_empty() {
-            return Err(ImmuxDBHttpClientError::Everything);
-        }
-
         let url = format!("http://{}/{}", &self.host, Constants::URL_GROUPING_KEY_WORD,);
-        let groupings =
-            groupings[1..]
-                .iter()
-                .fold(format!("{}", groupings[0]), |mut acc, grouping| {
-                    acc.push_str("\r\n");
-                    let grouping_str = format!("{}", grouping);
-                    acc.push_str(&grouping_str);
-                    return acc;
-                });
+        let grouping_names = groupings
+            .iter()
+            .map(|g| g.to_string())
+            .collect::<Vec<String>>()
+            .join("\r\n");
 
-        let mut response = self.client.delete(&url).body(groupings).send()?;
+
+        let mut response = self.client.delete(&url).body(grouping_names).send()?;
         let status_code = response.status();
 
         match response.text() {

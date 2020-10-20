@@ -390,14 +390,16 @@ impl Command {
             let command = Command::RemoveAll;
             return Ok((command, position));
         } else if prefix == CommandPrefix::RemoveGroupings as u8 {
-            let (num_of_groupings, offset) = varint_decode(&data[position..])?;
+            let (total_length, offset) = varint_decode(&data[position..])?;
             position += offset;
 
+            let mut parsed_length = 0;
             let mut groupings = vec![];
-            for _ in 0..num_of_groupings {
+
+            while parsed_length < total_length as usize {
                 let (grouping, offset) = GroupingLabel::parse(&data[position..])?;
                 position += offset;
-
+                parsed_length += offset;
                 groupings.push(grouping);
             }
 
@@ -638,13 +640,13 @@ impl Command {
 
                 let mut result = vec![prefix];
 
-                let num_of_groupings = groupings.len();
-                let number_varint = varint_encode(num_of_groupings as u64);
-                result.extend_from_slice(&number_varint);
+                let serialized_bytes = groupings_bytes.into_iter().flatten().collect::<Vec<u8>>();
 
-                for grouping_bytes in groupings_bytes.iter() {
-                    result.extend_from_slice(grouping_bytes);
-                }
+                let total_length = serialized_bytes.len();
+                let number_varint = varint_encode(total_length as u64);
+                result.extend_from_slice(&number_varint);
+                result.extend_from_slice(&serialized_bytes);
+
                 return result;
             }
             Command::CreateTransaction => {

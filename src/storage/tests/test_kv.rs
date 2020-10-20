@@ -293,6 +293,7 @@ mod kv_tests {
         reset_dir_path(log_dir_str);
 
         let pref = DBPreferences::default_at_dir("/tmp/test_content_satisfied_filter_unit");
+
         let grouping = GroupingLabel::new("any_grouping".as_bytes());
         let mut executor = Executor::open(&pref).unwrap();
 

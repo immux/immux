@@ -6,7 +6,6 @@ use std::fmt::Formatter;
 
 #[derive(Debug)]
 pub enum ImmuxDBHttpClientError {
-    Everything,
     Reqwest(reqwest::Error),
 }
 
