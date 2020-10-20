@@ -1,5 +1,4 @@
 use std::cmp::Ordering;
-use std::convert::TryFrom;
 use std::fmt::Formatter;
 use std::num::ParseIntError;
 
@@ -30,14 +29,8 @@ impl LogVersion {
             Ok((LogVersion::new(data[0], data[1], data[2]), 3))
         }
     }
-}
 
-impl TryFrom<&str> for LogVersion {
-    type Error = LogVersionError;
-
-    fn try_from(str: &str) -> Result<Self, Self::Error> {
-        let items: Vec<&str> = str.split(".").collect();
-
+    pub fn try_from(items: &[&str]) -> Result<Self, LogVersionError> {
         if items.len() < 3 {
             Err(LogVersionError::InvalidString)
         } else {
@@ -68,11 +61,11 @@ impl PartialOrd for LogVersion {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         if self.major == other.major && self.minor == other.minor && self.revise == other.revise {
             return Some(Ordering::Equal);
-        } else if self.major == other.major && self.minor > other.minor {
-            return Some(Ordering::Greater);
-        } else if self.major == other.major
-            && self.minor == other.minor
-            && self.revise > other.revise
+        } else if (self.major > other.major)
+            || (self.major == other.major && self.minor > other.minor)
+            || (self.major == other.major
+                && self.minor == other.minor
+                && self.revise > other.revise)
         {
             return Some(Ordering::Greater);
         } else {
@@ -98,6 +91,7 @@ pub enum LogVersionError {
     LogVersionParsingError,
     InvalidString,
     ParseIntError(ParseIntError),
+    UnexpectedLogVersion,
 }
 
 impl From<ParseIntError> for LogVersionError {

@@ -2,11 +2,12 @@ use std::fs::{File, OpenOptions};
 use std::io::{BufReader, Read, Result, Seek, SeekFrom};
 use std::path::PathBuf;
 
-use crate::storage::errors::KVResult;
+use crate::storage::errors::{KVError, KVResult};
 use crate::storage::instruction::{unpack_instruction, Instruction};
 use crate::storage::instruction_iterator::InstructionLogIterator;
 use crate::storage::log_pointer::LogPointer;
 use crate::storage::log_version::LogVersion;
+use crate::storage::log_version::LogVersionError::UnexpectedLogVersion;
 
 pub struct LogReader {
     buf_reader: BufReader<File>,
@@ -39,7 +40,9 @@ impl LogReader {
 
         let (target_log_version, offset) = LogVersion::parse(&buffer)?;
 
-        assert!(self.log_version >= target_log_version);
+        if self.log_version < target_log_version {
+            return Err(KVError::LogVersionError(UnexpectedLogVersion));
+        }
 
         let iterator = InstructionLogIterator::from(buffer[offset..].to_vec());
         return Ok((iterator, offset));

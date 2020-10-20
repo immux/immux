@@ -10,6 +10,7 @@ use crate::storage::kvkey::KVKey;
 use crate::storage::kvvalue::KVValue;
 use crate::storage::log_pointer::LogPointer;
 use crate::storage::log_reader::LogReader;
+use crate::storage::log_version::LogVersion;
 use crate::storage::log_writer::LogWriter;
 use crate::storage::preferences::DBPreferences;
 use crate::storage::transaction_manager::{TransactionId, TransactionManager};
@@ -28,8 +29,16 @@ impl LogKeyValueStore {
 
         let log_file_path = get_main_log_full_path(&preferences.log_dir);
 
-        let writer = LogWriter::new(&log_file_path, preferences.ecc_mode, preferences.db_version)?;
-        let mut reader = LogReader::new(&log_file_path, preferences.db_version)?;
+        let db_version_major_str = env!("CARGO_PKG_VERSION_MAJOR");
+        let db_version_minor_str = env!("CARGO_PKG_VERSION_MINOR");
+        let db_version_revise_str = env!("CARGO_PKG_VERSION_PATCH");
+
+        let db_version = vec![db_version_major_str, db_version_minor_str, db_version_revise_str];
+
+        let db_version = LogVersion::try_from(&db_version)?;
+
+        let writer = LogWriter::new(&log_file_path, preferences.ecc_mode, db_version)?;
+        let mut reader = LogReader::new(&log_file_path, db_version)?;
         let (key_pointer_map, current_height, transaction_manager) =
             load_key_pointer_map(&mut reader, None)?;
 

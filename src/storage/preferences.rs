@@ -1,9 +1,7 @@
-use std::convert::TryFrom;
 use std::path::PathBuf;
 
 use crate::constants as Constants;
 use crate::storage::ecc::ECCMode;
-use crate::storage::log_version::LogVersion;
 
 const CLI_ARG_DATA_DIR: &str = "--data-dir=";
 const CLI_ARG_ECC_MODE: &str = "--ecc-mode=";
@@ -16,7 +14,6 @@ pub struct DBPreferences {
     pub ecc_mode: ECCMode,
     pub http_port: Option<u16>,
     pub tcp_port: Option<u16>,
-    pub db_version: LogVersion,
 }
 
 impl DBPreferences {
@@ -56,18 +53,11 @@ impl DBPreferences {
 
 impl Default for DBPreferences {
     fn default() -> Self {
-        let version_str = env!("CARGO_PKG_VERSION");
-        let db_version = match LogVersion::try_from(version_str) {
-            Ok(version) => version,
-            Err(_err) => LogVersion::new(0, 0, 0),
-        };
-
         return Self {
             log_dir: PathBuf::from(Constants::MAIN_LOG_DEFAULT_DIR_UNIX),
             ecc_mode: ECCMode::Identity,
             http_port: Some(Constants::HTTP_SERVER_DEFAULT_PORT),
             tcp_port: Some(Constants::TCP_SERVER_DEFAULT_PORT),
-            db_version,
         };
     }
 }
