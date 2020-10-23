@@ -23,6 +23,7 @@ GET /grouping/id/.journal ("inspect_one")
 GET /.journal ("inspect all")
 GET /grouping?filter=xx&lt=xxx&gtxxx
 GET /grouping (get all in grouping)
+GET /.groupings (get all the grouping)
 
 PUT /grouping/id {data} ("set")
 PUT /grouping/id?height={height} ("revert one")
@@ -33,6 +34,7 @@ PUT /?height={height} ("revert all")
 DELETE /grouping/id ("remove one")
 DELETE /.transactions/tid/grouping/unit_id ("remove one" with transaction)
 DELETE / ("remove all")
+DELETE /.groupings {list of groupings} (delete all in these groupings)
 
 POST /.transactions ("create_transaction")
 POST /.transactions/tid?commit ("commit_transaction")
