@@ -63,6 +63,7 @@ pub const ABORT_TRANSACTION_KEY_WORD: &str = "abort";
 
 pub const URL_TRANSACTIONS_KEY_WORD: &str = ".transactions";
 pub const URL_JOURNAL_KEY_WORD: &str = ".journal";
+pub const URL_GROUPING_KEY_WORD: &str = ".groupings";
 
 pub const FILTER_KEY_WORD: &str = "filter";
 pub const FILTER_GREATER_OR_EQUAL: &str = ">=";

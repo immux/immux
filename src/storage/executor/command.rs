@@ -9,6 +9,7 @@ use crate::storage::executor::unit_key::{UnitKey, UnitKeyError};
 use crate::storage::instruction::Instruction;
 use crate::storage::transaction_manager::TransactionId;
 use crate::utils::ints::{u64_to_u8_array, u8_array_to_u64};
+use crate::utils::varint::{varint_decode, varint_encode, VarIntError};
 
 #[derive(Debug)]
 pub enum CommandError {
@@ -17,6 +18,7 @@ pub enum CommandError {
     InvalidPrefix,
     SelectConditionErr(SelectConditionError),
     UnitKeyError(UnitKeyError),
+    VarIntError(VarIntError),
 }
 
 impl From<GroupingLabelError> for CommandError {
@@ -43,11 +45,18 @@ impl From<SelectConditionError> for CommandError {
     }
 }
 
+impl From<VarIntError> for CommandError {
+    fn from(error: VarIntError) -> CommandError {
+        CommandError::VarIntError(error)
+    }
+}
+
 #[derive(Debug, PartialEq, Clone)]
 pub enum SelectCondition {
-    Key(UnitKey, Option<TransactionId>),
-    UnconditionalMatch,
-    Filter(Filter),
+    Key(GroupingLabel, UnitKey, Option<TransactionId>),
+    UnconditionalMatch(GroupingLabel),
+    Filter(GroupingLabel, Filter),
+    AllGrouping,
 }
 
 #[derive(Debug)]
@@ -56,6 +65,7 @@ pub enum SelectConditionPrefix {
     KeyWithoutTransactionId = 0x01,
     UnconditionalMatch = 0x02,
     Filter = 0x03,
+    AllGrouping = 0x04,
 }
 
 #[derive(Debug)]
@@ -64,6 +74,7 @@ pub enum SelectConditionError {
     UnitKeyError(UnitKeyError),
     FromUtf8Error(FromUtf8Error),
     ParseFilterStringError(FilterError),
+    GroupingError(GroupingLabelError),
 }
 
 impl From<FromUtf8Error> for SelectConditionError {
@@ -84,6 +95,12 @@ impl From<UnitKeyError> for SelectConditionError {
     }
 }
 
+impl From<GroupingLabelError> for SelectConditionError {
+    fn from(error: GroupingLabelError) -> SelectConditionError {
+        return SelectConditionError::GroupingError(error);
+    }
+}
+
 impl SelectCondition {
     pub fn parse(data: &[u8]) -> Result<(Self, usize), SelectConditionError> {
         let mut position = 0;
@@ -93,6 +110,9 @@ impl SelectCondition {
         if prefix == SelectConditionPrefix::KeyWithTransactionId as u8
             || prefix == SelectConditionPrefix::KeyWithoutTransactionId as u8
         {
+            let (grouping, offset) = GroupingLabel::parse(&data[position..])?;
+            position += offset;
+
             let transaction_id = {
                 if prefix == SelectConditionPrefix::KeyWithoutTransactionId as u8 {
                     None
@@ -115,44 +135,73 @@ impl SelectCondition {
             let (unit_key, offset) = UnitKey::parse(&data[position..])?;
             position += offset;
 
-            return Ok((SelectCondition::Key(unit_key, transaction_id), position));
+            return Ok((
+                SelectCondition::Key(grouping, unit_key, transaction_id),
+                position,
+            ));
         } else if prefix == SelectConditionPrefix::UnconditionalMatch as u8 {
-            return Ok((SelectCondition::UnconditionalMatch, position));
+            let (grouping, offset) = GroupingLabel::parse(&data[position..])?;
+            position += offset;
+            return Ok((SelectCondition::UnconditionalMatch(grouping), position));
         } else if prefix == SelectConditionPrefix::Filter as u8 {
+            let (grouping, offset) = GroupingLabel::parse(&data[position..])?;
+            position += offset;
             let (filter, offset) = Filter::parse(&data[position..])?;
             position += offset;
-            return Ok((SelectCondition::Filter(filter), position));
+            return Ok((SelectCondition::Filter(grouping, filter), position));
+        } else if prefix == SelectConditionPrefix::AllGrouping as u8 {
+            return Ok((SelectCondition::AllGrouping, position));
         } else {
             return Err(SelectConditionError::InvalidPrefix);
         }
     }
     pub fn marshal(&self) -> Vec<u8> {
         match self {
-            SelectCondition::UnconditionalMatch => {
-                return vec![SelectConditionPrefix::UnconditionalMatch as u8]
+            SelectCondition::UnconditionalMatch(grouping) => {
+                let mut marshaled = vec![];
+                marshaled.push(SelectConditionPrefix::UnconditionalMatch as u8);
+                let grouping_bytes = grouping.marshal();
+                marshaled.extend_from_slice(&grouping_bytes);
+                return marshaled;
             }
-            SelectCondition::Key(key, transaction_id) => {
-                let mut result = vec![];
+            SelectCondition::Key(grouping, key, transaction_id) => {
+                let mut marshaled = vec![];
 
                 if let Some(transaction_id) = transaction_id {
-                    result.push(SelectConditionPrefix::KeyWithTransactionId as u8);
+                    marshaled.push(SelectConditionPrefix::KeyWithTransactionId as u8);
+
+                    let grouping_bytes = grouping.marshal();
+                    marshaled.extend_from_slice(&grouping_bytes);
+
                     let transaction_id_bytes = u64_to_u8_array(transaction_id.as_u64());
-                    result.extend_from_slice(&transaction_id_bytes);
+                    marshaled.extend_from_slice(&transaction_id_bytes);
                 } else {
-                    result.push(SelectConditionPrefix::KeyWithoutTransactionId as u8);
+                    marshaled.push(SelectConditionPrefix::KeyWithoutTransactionId as u8);
+                    let grouping_bytes = grouping.marshal();
+                    marshaled.extend_from_slice(&grouping_bytes);
                 }
 
                 let key_bytes = key.marshal();
-                result.extend_from_slice(&key_bytes);
+                marshaled.extend_from_slice(&key_bytes);
 
-                return result;
+                return marshaled;
             }
-            SelectCondition::Filter(filter) => {
-                let mut result = vec![];
-                result.push(SelectConditionPrefix::Filter as u8);
+            SelectCondition::Filter(grouping, filter) => {
+                let mut marshaled = vec![];
+                marshaled.push(SelectConditionPrefix::Filter as u8);
+
+                let grouping_bytes = grouping.marshal();
+                marshaled.extend_from_slice(&grouping_bytes);
+
                 let filter_bytes = filter.marshal();
-                result.extend_from_slice(&filter_bytes);
-                return result;
+                marshaled.extend_from_slice(&filter_bytes);
+
+                return marshaled;
+            }
+            SelectCondition::AllGrouping => {
+                let mut marshaled = vec![];
+                marshaled.push(SelectConditionPrefix::AllGrouping as u8);
+                return marshaled;
             }
         }
     }
@@ -161,7 +210,6 @@ impl SelectCondition {
 #[derive(Debug, PartialEq, Clone)]
 pub enum Command {
     Select {
-        grouping: GroupingLabel,
         condition: SelectCondition,
     },
     InspectOne {
@@ -187,6 +235,9 @@ pub enum Command {
         key: UnitKey,
     },
     RemoveAll,
+    RemoveGroupings {
+        groupings: Vec<GroupingLabel>,
+    },
     CreateTransaction,
     TransactionalInsert {
         grouping: GroupingLabel,
@@ -223,6 +274,7 @@ pub enum CommandPrefix {
     RevertAll = 0x06,
     RemoveOne = 0x07,
     RemoveAll = 0x08,
+    RemoveGroupings = 0x09,
 
     TransactionalInsert = 0x54,
     TransactionalRevertOne = 0x55,
@@ -240,15 +292,10 @@ impl Command {
         position += 1;
 
         if prefix == CommandPrefix::Select as u8 {
-            let (grouping, offset) = GroupingLabel::parse(&data[position..])?;
-            position += offset;
             let (condition, offset) = SelectCondition::parse(&data[position..])?;
             position += offset;
 
-            let command = Command::Select {
-                grouping,
-                condition,
-            };
+            let command = Command::Select { condition };
             return Ok((command, position));
         } else if prefix == CommandPrefix::InspectOne as u8 {
             let (grouping, offset) = GroupingLabel::parse(&data[position..])?;
@@ -341,6 +388,22 @@ impl Command {
             return Ok((command, position));
         } else if prefix == CommandPrefix::RemoveAll as u8 {
             let command = Command::RemoveAll;
+            return Ok((command, position));
+        } else if prefix == CommandPrefix::RemoveGroupings as u8 {
+            let (total_length, offset) = varint_decode(&data[position..])?;
+            position += offset;
+
+            let mut parsed_length = 0;
+            let mut groupings = vec![];
+
+            while parsed_length < total_length as usize {
+                let (grouping, offset) = GroupingLabel::parse(&data[position..])?;
+                position += offset;
+                parsed_length += offset;
+                groupings.push(grouping);
+            }
+
+            let command = Command::RemoveGroupings { groupings };
             return Ok((command, position));
         } else if prefix == CommandPrefix::CreateTransaction as u8 {
             let command = Command::CreateTransaction;
@@ -501,17 +564,12 @@ impl Command {
                 result.extend_from_slice(&content_bytes);
                 return result;
             }
-            Command::Select {
-                grouping,
-                condition,
-            } => {
+            Command::Select { condition } => {
                 let prefix = CommandPrefix::Select as u8;
-                let grouping_bytes = grouping.marshal();
                 let condition_bytes = condition.marshal();
 
                 let mut result = vec![];
                 result.push(prefix);
-                result.extend_from_slice(&grouping_bytes);
                 result.extend_from_slice(&condition_bytes);
                 return result;
             }
@@ -571,6 +629,24 @@ impl Command {
             Command::RemoveAll => {
                 let prefix = CommandPrefix::RemoveAll as u8;
                 let result = vec![prefix];
+                return result;
+            }
+            Command::RemoveGroupings { groupings } => {
+                let prefix = CommandPrefix::RemoveGroupings as u8;
+                let groupings_bytes: Vec<Vec<u8>> = groupings
+                    .iter()
+                    .map(|grouping| grouping.marshal())
+                    .collect();
+
+                let mut result = vec![prefix];
+
+                let serialized_bytes = groupings_bytes.into_iter().flatten().collect::<Vec<u8>>();
+
+                let total_length = serialized_bytes.len();
+                let number_varint = varint_encode(total_length as u64);
+                result.extend_from_slice(&number_varint);
+                result.extend_from_slice(&serialized_bytes);
+
                 return result;
             }
             Command::CreateTransaction => {
@@ -770,11 +846,10 @@ impl ToString for Command {
     fn to_string(&self) -> String {
         match self {
             Command::Select {
-                grouping,
                 condition,
             } => {
                 match condition {
-                    SelectCondition::Key(key, transaction_id) => {
+                    SelectCondition::Key(grouping, key, transaction_id) => {
                         return format!(
                             "Command Select, grouping: {:?}, key: {:?}, transaction_id: {:?}",
                             grouping.to_string(),
@@ -782,12 +857,15 @@ impl ToString for Command {
                             transaction_id,
                         );
                     }
-                    SelectCondition::UnconditionalMatch => {
+                    SelectCondition::UnconditionalMatch(grouping) => {
                         return format!("Command Select, UnconditionalMatch on grouping {:?}", grouping.to_string());
                     },
-                    SelectCondition::Filter(filters) => {
-                        return format!("{}", filters);
+                    SelectCondition::Filter(grouping, filters) => {
+                        return format!("grouping {}, filter {}", grouping, filters);
                     },
+                    SelectCondition::AllGrouping => {
+                        return format!("List all grouping");
+                    }
                 }
             },
             Command::InspectOne { grouping, key } => {
@@ -813,6 +891,7 @@ impl ToString for Command {
                 format!("Command RemoveOne, grouping: {:?}, key: {:?}", grouping.to_string(), key.to_string())
             }
             Command::RemoveAll => format!("Command RemoveAll"),
+            Command::RemoveGroupings {groupings} => format!("Command RemoveGroupings {:?}", groupings),
             Command::CreateTransaction => format!("Command CreateTransaction"),
             Command::TransactionalInsert {
                 grouping,
@@ -875,12 +954,14 @@ mod command_tests {
         let unit_key = UnitKey::new(&[0x01, 0x02, 0x03]);
         let transaction_id = TransactionId::new(1);
         let filter = parse_filter_string(String::from("x>3")).unwrap();
+        let grouping = GroupingLabel::from("any_grouping");
 
         let conditions = vec![
-            SelectCondition::Key(unit_key.clone(), None),
-            SelectCondition::Key(unit_key.clone(), Some(transaction_id)),
-            SelectCondition::UnconditionalMatch,
-            SelectCondition::Filter(filter),
+            SelectCondition::Key(grouping.clone(), unit_key.clone(), None),
+            SelectCondition::Key(grouping.clone(), unit_key.clone(), Some(transaction_id)),
+            SelectCondition::UnconditionalMatch(grouping.clone()),
+            SelectCondition::Filter(grouping.clone(), filter),
+            SelectCondition::AllGrouping,
         ];
 
         for condition in conditions.iter() {
@@ -900,16 +981,16 @@ mod command_tests {
         let target_height = ChainHeight::new(1);
 
         let conditions = vec![
-            SelectCondition::Key(unit_key.clone(), None),
-            SelectCondition::Key(unit_key.clone(), Some(transaction_id)),
-            SelectCondition::UnconditionalMatch,
-            SelectCondition::Filter(filter),
+            SelectCondition::Key(grouping.clone(), unit_key.clone(), None),
+            SelectCondition::Key(grouping.clone(), unit_key.clone(), Some(transaction_id)),
+            SelectCondition::UnconditionalMatch(grouping.clone()),
+            SelectCondition::Filter(grouping.clone(), filter),
+            SelectCondition::AllGrouping,
         ];
 
         let select_commands: Vec<Command> = conditions
             .iter()
             .map(|condition| Command::Select {
-                grouping: grouping.clone(),
                 condition: condition.clone(),
             })
             .collect();

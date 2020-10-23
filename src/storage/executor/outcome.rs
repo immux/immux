@@ -2,6 +2,7 @@ use std::fmt;
 
 use crate::storage::chain_height::ChainHeight;
 use crate::storage::executor::command::{Command, CommandError};
+use crate::storage::executor::grouping_label::{GroupingLabel, GroupingLabelError};
 use crate::storage::executor::unit_content::{UnitContent, UnitContentError};
 use crate::storage::transaction_manager::TransactionId;
 use crate::utils::ints::{u64_to_u8_array, u8_array_to_u64};
@@ -13,6 +14,7 @@ pub enum OutcomeError {
     VarIntError(VarIntError),
     UnitContentError(UnitContentError),
     CommandError(CommandError),
+    GroupingLabelError(GroupingLabelError),
 }
 
 impl From<VarIntError> for OutcomeError {
@@ -33,6 +35,12 @@ impl From<CommandError> for OutcomeError {
     }
 }
 
+impl From<GroupingLabelError> for OutcomeError {
+    fn from(error: GroupingLabelError) -> OutcomeError {
+        OutcomeError::GroupingLabelError(error)
+    }
+}
+
 #[derive(Debug)]
 pub enum OutcomePrefix {
     SelectSuccess = 0x11,
@@ -43,6 +51,8 @@ pub enum OutcomePrefix {
     RevertAllSuccess = 0x16,
     RemoveOneSuccess = 0x17,
     RemoveAllSuccess = 0x18,
+    GetAllGroupingsSuccess = 0x19,
+    DeleteGroupingsSuccess = 0x20,
 
     TransactionalInsertSuccess = 0x64,
     TransactionalRevertOneSuccess = 0x65,
@@ -69,6 +79,8 @@ pub enum Outcome {
     TransactionalRemoveOneSuccess,
     TransactionCommitSuccess,
     TransactionAbortSuccess,
+    GetAllGroupingsSuccess(Vec<GroupingLabel>),
+    DeleteGroupingSuccess,
 }
 
 impl Outcome {
@@ -135,6 +147,18 @@ impl Outcome {
                 vec![OutcomePrefix::TransactionCommitSuccess as u8]
             }
             Outcome::TransactionAbortSuccess => vec![OutcomePrefix::TransactionAbortSuccess as u8],
+            Outcome::GetAllGroupingsSuccess(groupings) => {
+                let mut result = vec![OutcomePrefix::GetAllGroupingsSuccess as u8];
+                let total_items = groupings.len();
+                let total_items_bytes = varint_encode(total_items as u64);
+                result.extend_from_slice(&total_items_bytes);
+                for grouping in groupings {
+                    let grouping_bytes = grouping.marshal();
+                    result.extend_from_slice(&grouping_bytes);
+                }
+                return result;
+            }
+            Outcome::DeleteGroupingSuccess => vec![OutcomePrefix::DeleteGroupingsSuccess as u8],
         }
     }
     pub fn parse(data: &[u8]) -> Result<(Self, usize), OutcomeError> {
@@ -238,6 +262,20 @@ impl Outcome {
             return Ok((Outcome::TransactionCommitSuccess, position));
         } else if prefix == OutcomePrefix::TransactionAbortSuccess as u8 {
             return Ok((Outcome::TransactionAbortSuccess, position));
+        } else if prefix == OutcomePrefix::GetAllGroupingsSuccess as u8 {
+            let (total_number_items, offset) = varint_decode(&data[position..])?;
+            position += offset;
+
+            let mut result = vec![];
+            for _ in 0..total_number_items {
+                let (grouping, offset) = GroupingLabel::parse(&data[position..])?;
+                position += offset;
+                result.push(grouping);
+            }
+
+            return Ok((Outcome::GetAllGroupingsSuccess(result), position));
+        } else if prefix == OutcomePrefix::DeleteGroupingsSuccess as u8 {
+            return Ok((Outcome::DeleteGroupingSuccess, position));
         } else {
             return Err(OutcomeError::UnexpectedPrefix);
         }
@@ -283,6 +321,14 @@ impl fmt::Display for Outcome {
             }
             Outcome::TransactionCommitSuccess => String::from("Transaction Commit Success"),
             Outcome::TransactionAbortSuccess => String::from("Transaction Abort Success"),
+            Outcome::GetAllGroupingsSuccess(groupings) => {
+                let output_vec: Vec<String> = groupings
+                    .into_iter()
+                    .map(|grouping| grouping.to_string())
+                    .collect();
+                output_vec.join("\r\n")
+            }
+            Outcome::DeleteGroupingSuccess => String::from("Delete Groupings Success"),
         };
         write!(f, "{}", string)
     }
@@ -453,6 +499,8 @@ mod outcome_tests {
             Outcome::TransactionalRemoveOneSuccess,
             Outcome::TransactionCommitSuccess,
             Outcome::TransactionAbortSuccess,
+            Outcome::GetAllGroupingsSuccess(vec![GroupingLabel::from("123")]),
+            Outcome::DeleteGroupingSuccess,
         ];
 
         for outcome in outcomes.iter() {

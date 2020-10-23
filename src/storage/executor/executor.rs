@@ -2,7 +2,7 @@ use std::convert::TryFrom;
 
 use crate::storage::chain_height::ChainHeight;
 use crate::storage::executor::command::{Command, CommandError, SelectCondition};
-use crate::storage::executor::errors::ExecutorResult;
+use crate::storage::executor::errors::{ExecutorError, ExecutorResult};
 use crate::storage::executor::filter::content_satisfied_filter;
 use crate::storage::executor::grouping_label::GroupingLabel;
 use crate::storage::executor::outcome::Outcome;
@@ -43,13 +43,9 @@ impl Executor {
         }
     }
 
-    pub fn get(
-        &mut self,
-        target_grouping: &GroupingLabel,
-        condition: &SelectCondition,
-    ) -> ExecutorResult<Outcome> {
+    pub fn get(&mut self, condition: &SelectCondition) -> ExecutorResult<Outcome> {
         match condition {
-            SelectCondition::UnconditionalMatch => {
+            SelectCondition::UnconditionalMatch(target_grouping) => {
                 let kvs = self.store_engine.get_all_current()?;
                 let result: Vec<UnitContent> = kvs
                     .iter()
@@ -67,7 +63,7 @@ impl Executor {
                     .collect();
                 return Ok(Outcome::Select(result));
             }
-            SelectCondition::Filter(filter) => {
+            SelectCondition::Filter(target_grouping, filter) => {
                 let kvs = self.store_engine.get_all_current()?;
                 let result: Vec<UnitContent> = kvs
                     .iter()
@@ -90,7 +86,7 @@ impl Executor {
                     .collect();
                 return Ok(Outcome::Select(result));
             }
-            SelectCondition::Key(key, transaction_id) => {
+            SelectCondition::Key(target_grouping, key, transaction_id) => {
                 let kv_key = KVKey::from_grouping_and_unit_key(&target_grouping, &key);
                 match self.store_engine.get(&kv_key, *transaction_id)? {
                     None => Ok(Outcome::Select(vec![])),
@@ -100,6 +96,37 @@ impl Executor {
                     }
                 }
             }
+            SelectCondition::AllGrouping => {
+                let kvs = self.store_engine.get_all_current()?;
+                let mut result = vec![];
+
+                for (key, _value) in kvs.iter() {
+                    let (grouping, _unit_key) = KVKey::parse(&key.as_bytes())?;
+                    if !result.contains(&grouping) {
+                        result.push(grouping);
+                    }
+                }
+                return Ok(Outcome::GetAllGroupingsSuccess(result));
+            }
+        }
+    }
+
+    pub fn remove_groupings(&mut self, groupings: &[GroupingLabel]) -> ExecutorResult<Outcome> {
+        let outcome = self.start_transaction()?;
+
+        match outcome {
+            Outcome::CreateTransaction(transaction_id) => {
+                let current_keys = self.store_engine.get_current_keys()?;
+                for key in current_keys {
+                    let (grouping, _unit_key) = KVKey::parse(&key.as_bytes())?;
+                    if groupings.contains(&grouping) {
+                        self.store_engine.remove_one(&key, Some(transaction_id))?;
+                    }
+                }
+                self.commit_transaction(transaction_id)?;
+                return Ok(Outcome::DeleteGroupingSuccess);
+            }
+            _ => Err(ExecutorError::UnexpectedOutcome),
         }
     }
 

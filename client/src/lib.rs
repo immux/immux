@@ -70,4 +70,8 @@ pub trait ImmuxDBClient<T> {
     fn commit_transaction(&self, transaction_id: &TransactionId) -> T;
 
     fn abort_transaction(&self, transaction_id: &TransactionId) -> T;
+
+    fn get_all_groupings(&self) -> T;
+
+    fn remove_groupings(&self, groupings: &[GroupingLabel]) -> T;
 }

@@ -42,16 +42,38 @@ impl ImmuxDBTcpClient {
 }
 
 impl ImmuxDBClient<ImmuxDBTcpClientResult<Outcome>> for ImmuxDBTcpClient {
+    fn get_all_groupings(&self) -> ImmuxDBTcpClientResult<Outcome> {
+        let condition = SelectCondition::AllGrouping;
+        let command = Command::Select { condition };
+
+        let mut stream = self.stream.borrow_mut();
+        write(&mut *stream, &command.marshal())?;
+        let buffer = read(&mut *stream)?;
+        let (outcome, _) = Outcome::parse(&buffer)?;
+
+        return Ok(outcome);
+    }
+
+    fn remove_groupings(&self, groupings: &[GroupingLabel]) -> ImmuxDBTcpClientResult<Outcome> {
+        let command = Command::RemoveGroupings {
+            groupings: groupings.to_vec(),
+        };
+
+        let mut stream = self.stream.borrow_mut();
+        write(&mut *stream, &command.marshal())?;
+        let buffer = read(&mut *stream)?;
+        let (outcome, _) = Outcome::parse(&buffer)?;
+
+        return Ok(outcome);
+    }
+
     fn get_by_key(
         &self,
         grouping: &GroupingLabel,
         unit_key: &UnitKey,
     ) -> ImmuxDBTcpClientResult<Outcome> {
-        let condition = SelectCondition::Key(unit_key.clone(), None);
-        let command = Command::Select {
-            grouping: grouping.clone(),
-            condition,
-        };
+        let condition = SelectCondition::Key(grouping.clone(), unit_key.clone(), None);
+        let command = Command::Select { condition };
 
         let mut stream = self.stream.borrow_mut();
         write(&mut *stream, &command.marshal())?;
@@ -66,11 +88,8 @@ impl ImmuxDBClient<ImmuxDBTcpClientResult<Outcome>> for ImmuxDBTcpClient {
         grouping: &GroupingLabel,
         filter: &Filter,
     ) -> ImmuxDBTcpClientResult<Outcome> {
-        let condition = SelectCondition::Filter(filter.clone());
-        let command = Command::Select {
-            grouping: grouping.clone(),
-            condition,
-        };
+        let condition = SelectCondition::Filter(grouping.clone(), filter.clone());
+        let command = Command::Select { condition };
 
         let mut stream = self.stream.borrow_mut();
         write(&mut *stream, &command.marshal())?;
@@ -87,11 +106,12 @@ impl ImmuxDBClient<ImmuxDBTcpClientResult<Outcome>> for ImmuxDBTcpClient {
         unit_key: &UnitKey,
         transaction_id: &TransactionId,
     ) -> ImmuxDBTcpClientResult<Outcome> {
-        let condition = SelectCondition::Key(unit_key.clone(), Some(transaction_id.clone()));
-        let command = Command::Select {
-            grouping: grouping.clone(),
-            condition,
-        };
+        let condition = SelectCondition::Key(
+            grouping.clone(),
+            unit_key.clone(),
+            Some(transaction_id.clone()),
+        );
+        let command = Command::Select { condition };
 
         let mut stream = self.stream.borrow_mut();
         write(&mut *stream, &command.marshal())?;
@@ -132,11 +152,8 @@ impl ImmuxDBClient<ImmuxDBTcpClientResult<Outcome>> for ImmuxDBTcpClient {
     }
 
     fn get_by_grouping(&self, grouping: &GroupingLabel) -> ImmuxDBTcpClientResult<Outcome> {
-        let condition = SelectCondition::UnconditionalMatch;
-        let command = Command::Select {
-            grouping: grouping.clone(),
-            condition,
-        };
+        let condition = SelectCondition::UnconditionalMatch(grouping.clone());
+        let command = Command::Select { condition };
 
         let mut stream = self.stream.borrow_mut();
         write(&mut *stream, &command.marshal())?;
