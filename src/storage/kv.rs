@@ -10,6 +10,7 @@ use crate::storage::kvkey::KVKey;
 use crate::storage::kvvalue::KVValue;
 use crate::storage::log_pointer::LogPointer;
 use crate::storage::log_reader::LogReader;
+use crate::storage::log_version::LogVersion;
 use crate::storage::log_writer::LogWriter;
 use crate::storage::preferences::DBPreferences;
 use crate::storage::transaction_manager::{TransactionId, TransactionManager};
@@ -28,9 +29,16 @@ impl LogKeyValueStore {
 
         let log_file_path = get_main_log_full_path(&preferences.log_dir);
 
-        let writer = LogWriter::new(&log_file_path, preferences.ecc_mode)?;
+        let db_version_major_str = env!("CARGO_PKG_VERSION_MAJOR");
+        let db_version_minor_str = env!("CARGO_PKG_VERSION_MINOR");
+        let db_version_revise_str = env!("CARGO_PKG_VERSION_PATCH");
 
-        let mut reader = LogReader::new(&log_file_path)?;
+        let db_version = vec![db_version_major_str, db_version_minor_str, db_version_revise_str];
+
+        let db_version = LogVersion::try_from(&db_version)?;
+
+        let writer = LogWriter::new(&log_file_path, preferences.ecc_mode, db_version)?;
+        let mut reader = LogReader::new(&log_file_path, db_version)?;
         let (key_pointer_map, current_height, transaction_manager) =
             load_key_pointer_map(&mut reader, None)?;
 
@@ -212,6 +220,7 @@ impl LogKeyValueStore {
 
         self.current_height.increment()?;
         let (new_key_pointer_map, _, _) = load_key_pointer_map(&mut self.reader, Some(height))?;
+
         self.key_pointer_map = new_key_pointer_map;
         self.transaction_manager = TransactionManager::new();
 
@@ -269,7 +278,7 @@ impl LogKeyValueStore {
     }
 
     pub fn inspect_all(&mut self) -> KVResult<Vec<(Instruction, ChainHeight)>> {
-        let instruction_iterator = self.reader.read_all()?;
+        let (instruction_iterator, _) = self.reader.read_all()?;
 
         let instructions_with_height = instruction_iterator
             .enumerate()
@@ -279,7 +288,7 @@ impl LogKeyValueStore {
     }
 
     pub fn inspect_one(&mut self, target_key: &KVKey) -> KVResult<Vec<(Instruction, ChainHeight)>> {
-        let instruction_iterator = self.reader.read_all()?;
+        let (instruction_iterator, _) = self.reader.read_all()?;
 
         let mut appeared_key = HashSet::new();
         let result = instruction_iterator
@@ -387,7 +396,7 @@ fn get_revert_value(
     key: &KVKey,
     height: &ChainHeight,
 ) -> KVResult<Option<KVValue>> {
-    let instruction_iterator = reader.read_all()?;
+    let (instruction_iterator, _) = reader.read_all()?;
 
     let instructions: Vec<Instruction> = instruction_iterator
         .map(|(instruction, _)| instruction)
@@ -450,8 +459,8 @@ fn load_key_pointer_map(
     ChainHeight,
     TransactionManager,
 )> {
-    let instruction_iterator = reader.read_all()?;
-    let mut current_position = 0;
+    let (instruction_iterator, header_offset) = reader.read_all()?;
+    let mut current_position = header_offset as u64;
     let mut height = ChainHeight::new(0);
     let mut key_pointer_map: HashMap<KVKey, HashMap<Option<TransactionId>, LogPointer>> =
         HashMap::new();

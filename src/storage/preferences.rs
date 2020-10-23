@@ -17,20 +17,6 @@ pub struct DBPreferences {
 }
 
 impl DBPreferences {
-    pub fn new(
-        log_dir: &str,
-        ecc_mode: ECCMode,
-        http_port: Option<u16>,
-        tcp_port: Option<u16>,
-    ) -> Self {
-        Self {
-            log_dir: PathBuf::from(log_dir),
-            ecc_mode,
-            http_port,
-            tcp_port,
-        }
-    }
-
     // Same as default(), except dir is changed
     pub fn default_at_dir(log_dir: &str) -> Self {
         let mut prefs = Self::default();
