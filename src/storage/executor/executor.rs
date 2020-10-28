@@ -3,7 +3,6 @@ use std::convert::TryFrom;
 use crate::storage::chain_height::ChainHeight;
 use crate::storage::executor::command::{Command, CommandError, SelectCondition};
 use crate::storage::executor::errors::{ExecutorError, ExecutorResult};
-use crate::storage::executor::filter::content_satisfied_filter;
 use crate::storage::executor::grouping_label::GroupingLabel;
 use crate::storage::executor::outcome::Outcome;
 use crate::storage::executor::unit_content::UnitContent;
@@ -63,7 +62,7 @@ impl Executor {
                     .collect();
                 return Ok(Outcome::Select(result));
             }
-            SelectCondition::Filter(target_grouping, filter) => {
+            SelectCondition::Predicate(target_grouping, predicate) => {
                 let kvs = self.store_engine.get_all_current()?;
                 let result: Vec<UnitContent> = kvs
                     .iter()
@@ -73,7 +72,7 @@ impl Executor {
                                 match UnitContent::parse(value.as_bytes()) {
                                     Err(_error) => return None,
                                     Ok((content, _)) => {
-                                        if content_satisfied_filter(&content, &filter) {
+                                        if predicate.check(&content) {
                                             return Some(content);
                                         }
                                         return None;

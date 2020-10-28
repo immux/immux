@@ -3,7 +3,7 @@ use std::num::ParseIntError;
 
 use crate::storage::errors::KVError;
 use crate::storage::executor::command::CommandError;
-use crate::storage::executor::filter::FilterError;
+use crate::storage::executor::predicate::PredicateError;
 use crate::storage::executor::unit_content::UnitContentError;
 use crate::storage::kvkey::KVKeyError;
 
@@ -13,7 +13,7 @@ pub enum ExecutorError {
     UnitContentError(UnitContentError),
     ParseIntError(ParseIntError),
     CommandError(CommandError),
-    FilterError(FilterError),
+    PredicateError(PredicateError),
     KVKeyError(KVKeyError),
     UnexpectedOutcome,
 }
@@ -48,9 +48,9 @@ impl From<CommandError> for ExecutorError {
     }
 }
 
-impl From<FilterError> for ExecutorError {
-    fn from(err: FilterError) -> ExecutorError {
-        ExecutorError::FilterError(err)
+impl From<PredicateError> for ExecutorError {
+    fn from(err: PredicateError) -> ExecutorError {
+        ExecutorError::PredicateError(err)
     }
 }
 

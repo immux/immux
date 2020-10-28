@@ -1,6 +1,6 @@
 use immuxsys::storage::chain_height::ChainHeight;
-use immuxsys::storage::executor::filter::Filter;
 use immuxsys::storage::executor::grouping_label::GroupingLabel;
+use immuxsys::storage::executor::predicate::Predicate;
 use immuxsys::storage::executor::unit_content::UnitContent;
 use immuxsys::storage::executor::unit_key::UnitKey;
 use immuxsys::storage::transaction_manager::TransactionId;
@@ -12,7 +12,7 @@ pub mod tcp_client;
 pub trait ImmuxDBClient<T> {
     fn get_by_key(&self, grouping: &GroupingLabel, unit_key: &UnitKey) -> T;
 
-    fn get_by_filter(&self, grouping: &GroupingLabel, filter: &Filter) -> T;
+    fn get_by_predicate(&self, grouping: &GroupingLabel, predicate: &Predicate) -> T;
 
     fn transactional_get(
         &self,

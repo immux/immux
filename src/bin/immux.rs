@@ -3,7 +3,7 @@ use clap::{App, Arg, SubCommand};
 use immuxsys::constants as Constants;
 use immuxsys::storage::chain_height::ChainHeight;
 use immuxsys::storage::executor::command::SelectCondition;
-use immuxsys::storage::executor::filter::parse_filter_string;
+use immuxsys::storage::executor::predicate::Predicate;
 use immuxsys::storage::executor::{
     errors::ExecutorResult, executor::Executor, grouping_label::GroupingLabel,
     unit_content::UnitContent, unit_key::UnitKey,
@@ -250,9 +250,10 @@ fn main() -> ExecutorResult<()> {
                 .expect(Constants::MISSING_FILTER_ARGUMENT_MESSAGE);
             {
                 let mut executor = Executor::open(&pref)?;
-                let filter = parse_filter_string(filter_str.to_string())?;
+                let predicate = Predicate::parse_str(filter_str)?;
+                let grouping = GroupingLabel::from(grouping_arg);
 
-                let condition = SelectCondition::Filter(GroupingLabel::from(grouping_arg), filter);
+                let condition = SelectCondition::Predicate(grouping, predicate);
                 executor.get(&condition)
             }
         }

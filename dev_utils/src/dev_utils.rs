@@ -13,14 +13,14 @@ pub use serde::ser::Serialize;
 
 use immuxsys::server::errors::ServerResult;
 use immuxsys::server::server::run_db_servers;
-use immuxsys::storage::executor::filter::{
-    Filter, FilterOperands, FilterOperator, FilterUnit, LogicalOperator,
-};
 use immuxsys::storage::executor::grouping_label::GroupingLabel;
 use immuxsys::storage::executor::unit_content::UnitContent;
 use immuxsys::storage::executor::unit_key::UnitKey;
 use immuxsys::storage::preferences::DBPreferences;
 
+use immuxsys::storage::executor::predicate::{
+    CompoundPredicate, FieldPath, Predicate, PrimitivePredicate,
+};
 use immuxsys_client::http_client::ImmuxDBHttpClient;
 use immuxsys_client::ImmuxDBClient;
 
@@ -251,54 +251,111 @@ pub fn get_key_content_pairs() -> UnitList {
     .to_vec()
 }
 
-pub fn get_filter() -> Filter {
-    let mut filter_units = Vec::new();
-    let mut logical_operators = Vec::new();
+pub fn get_phone_mode_test_predicates() -> Predicate {
+    // "I want cheap, small, and Apple phones."
+    // this.price <= 500 && this.size <= 6.0 && this.brand == "Apple
+    Predicate::Compound(CompoundPredicate::And(vec![
+        Predicate::Primitive(PrimitivePredicate::LessThanOrEqual(
+            FieldPath::from(vec![String::from("price")]),
+            UnitContent::Float64(500.0),
+        )),
+        Predicate::Primitive(PrimitivePredicate::LessThanOrEqual(
+            FieldPath::from(vec![String::from("size")]),
+            UnitContent::Float64(6.0),
+        )),
+        Predicate::Primitive(PrimitivePredicate::Equal(
+            FieldPath::from(vec![String::from("brand")]),
+            UnitContent::String(String::from("Apple")),
+        )),
+    ]))
+}
 
-    let filter_units_vec = vec![
-        FilterUnit {
-            operator: FilterOperator::GreaterOrEqual,
-            operands: FilterOperands {
-                map_key: String::from("price"),
-                unit_content: UnitContent::Float64(1200.0),
-            },
+// This is paired with get_key_content_pairs
+pub fn get_phone_model_fixture() -> (Vec<UnitContent>, Vec<UnitContent>) {
+    let expected_satisfied_contents = vec![
+        {
+            let mut map = HashMap::new();
+            map.insert(
+                String::from("model"),
+                UnitContent::String(String::from("iPhone 23 Mini")),
+            );
+            map.insert(
+                String::from("brand"),
+                UnitContent::String(String::from("Apple")),
+            );
+            map.insert(String::from("size"), UnitContent::Float64(5.5));
+            map.insert(String::from("price"), UnitContent::Float64(400.0));
+            map.insert(String::from("newest"), UnitContent::Bool(true));
+
+            UnitContent::Map(map)
         },
-        FilterUnit {
-            operator: FilterOperator::LessOrEqual,
-            operands: FilterOperands {
-                map_key: String::from("size"),
-                unit_content: UnitContent::Float64(13.0),
-            },
-        },
-        FilterUnit {
-            operator: FilterOperator::Equal,
-            operands: FilterOperands {
-                map_key: String::from("used"),
-                unit_content: UnitContent::Bool(true),
-            },
-        },
-        FilterUnit {
-            operator: FilterOperator::Equal,
-            operands: FilterOperands {
-                map_key: String::from("name"),
-                unit_content: UnitContent::String(String::from("Apple")),
-            },
+        {
+            let mut map = HashMap::new();
+            map.insert(
+                String::from("model"),
+                UnitContent::String(String::from("iPhone 5")),
+            );
+            map.insert(
+                String::from("brand"),
+                UnitContent::String(String::from("Apple")),
+            );
+            map.insert(String::from("size"), UnitContent::Float64(5.0));
+            map.insert(String::from("price"), UnitContent::Float64(100.0));
+            map.insert(String::from("newest"), UnitContent::Bool(false));
+
+            UnitContent::Map(map)
         },
     ];
 
-    let logical_operators_vec = vec![
-        LogicalOperator::And,
-        LogicalOperator::Or,
-        LogicalOperator::Or,
+    let unsatisfied_content = vec![
+        {
+            let mut map = HashMap::new();
+            map.insert(
+                String::from("model"),
+                UnitContent::String(String::from("Shiny new Moto")),
+            );
+            map.insert(
+                String::from("brand"),
+                UnitContent::String(String::from("Moto")),
+            );
+            map.insert(String::from("price"), UnitContent::Float64(100.0));
+            map.insert(String::from("newest"), UnitContent::Bool(true));
+            map.insert(String::from("size"), UnitContent::Float64(7.0));
+
+            UnitContent::Map(map)
+        },
+        {
+            let mut map = HashMap::new();
+            map.insert(
+                String::from("model"),
+                UnitContent::String(String::from("iPad")),
+            );
+            map.insert(
+                String::from("brand"),
+                UnitContent::String(String::from("Apple")),
+            );
+            map.insert(String::from("size"), UnitContent::Float64(10.0));
+            map.insert(String::from("price"), UnitContent::Float64(800.0));
+            map.insert(String::from("newest"), UnitContent::Bool(true));
+
+            UnitContent::Map(map)
+        },
+        {
+            let mut map = HashMap::new();
+            map.insert(
+                String::from("model"),
+                UnitContent::String(String::from("Old iPhone MAX Pro")),
+            );
+            map.insert(
+                String::from("brand"),
+                UnitContent::String(String::from("Apple")),
+            );
+            map.insert(String::from("price"), UnitContent::Float64(400.0));
+            map.insert(String::from("newest"), UnitContent::Bool(false));
+            map.insert(String::from("size"), UnitContent::Float64(7.5));
+
+            UnitContent::Map(map)
+        },
     ];
-
-    filter_units.extend(filter_units_vec);
-    logical_operators.extend(logical_operators_vec);
-
-    let filter = Filter {
-        filter_units,
-        logical_operators,
-    };
-
-    return filter;
+    (expected_satisfied_contents, unsatisfied_content)
 }

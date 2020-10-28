@@ -1,16 +1,17 @@
+use reqwest::Client;
+use reqwest::Url;
+
 use crate::errors::{HttpClientResult, ImmuxDBHttpClientError};
+use crate::ImmuxDBClient;
 
 use immuxsys::constants as Constants;
+use immuxsys::constants::PREDICATE_URL_KEY;
 use immuxsys::storage::chain_height::ChainHeight;
-use immuxsys::storage::executor::filter::Filter;
 use immuxsys::storage::executor::grouping_label::GroupingLabel;
+use immuxsys::storage::executor::predicate::Predicate;
 use immuxsys::storage::executor::unit_content::UnitContent;
 use immuxsys::storage::executor::unit_key::UnitKey;
 use immuxsys::storage::transaction_manager::TransactionId;
-
-use crate::ImmuxDBClient;
-use reqwest::Client;
-use reqwest::Url;
 
 pub struct ImmuxDBHttpClient {
     host: String,
@@ -47,7 +48,6 @@ impl ImmuxDBClient<HttpClientResult> for ImmuxDBHttpClient {
             .collect::<Vec<String>>()
             .join("\r\n");
 
-
         let mut response = self.client.delete(&url).body(grouping_names).send()?;
         let status_code = response.status();
 
@@ -73,10 +73,16 @@ impl ImmuxDBClient<HttpClientResult> for ImmuxDBHttpClient {
         }
     }
 
-    fn get_by_filter(&self, grouping: &GroupingLabel, filter: &Filter) -> HttpClientResult {
+    fn get_by_predicate(
+        &self,
+        grouping: &GroupingLabel,
+        predicate: &Predicate,
+    ) -> HttpClientResult {
         let url_str = format!("http://{}/{}", &self.host, grouping.to_string());
 
-        let url = Url::parse_with_params(&url_str, &[("filter", format!("{}", filter))]).unwrap();
+        let url = Url::parse_with_params(&url_str, &[(PREDICATE_URL_KEY, predicate.to_string())])
+            .unwrap();
+        println!("Get: {}", url);
 
         let mut response = self.client.get(url).send()?;
         let status_code = response.status();

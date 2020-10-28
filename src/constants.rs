@@ -65,13 +65,9 @@ pub const URL_TRANSACTIONS_KEY_WORD: &str = ".transactions";
 pub const URL_JOURNAL_KEY_WORD: &str = ".journal";
 pub const URL_GROUPING_KEY_WORD: &str = ".groupings";
 
-pub const FILTER_KEY_WORD: &str = "filter";
-pub const FILTER_GREATER_OR_EQUAL: &str = ">=";
-pub const FILTER_LESS_OR_EQUAL: &str = "<=";
-pub const FILTER_NOT_EQUAL: &str = "!=";
-pub const FILTER_LESS: &str = "<";
-pub const FILTER_GREATER: &str = ">";
-pub const FILTER_EQUAL: &str = "==";
+// Specifies predicate parameter in URL, e.g. localhost/group/?predicate=this.price<1000
+pub const PREDICATE_URL_KEY: &str = "predicate";
 
 pub const INSTRUCTION_PACK_MAGIC: [u8; 4] = [0xB1, 0x0C, 0xDA, 0x7A];
 pub const INSTRUCTION_PACK_VERSION: u8 = 0x01;
+pub const FIELD_PATH_SELF_TOKEN: &str = "this";
