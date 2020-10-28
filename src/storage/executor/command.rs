@@ -2,8 +2,8 @@ use std::convert::TryFrom;
 use std::string::FromUtf8Error;
 
 use crate::storage::chain_height::ChainHeight;
-use crate::storage::executor::filter::{Filter, FilterError};
 use crate::storage::executor::grouping_label::{GroupingLabel, GroupingLabelError};
+use crate::storage::executor::predicate::{Predicate, PredicateError};
 use crate::storage::executor::unit_content::{UnitContent, UnitContentError};
 use crate::storage::executor::unit_key::{UnitKey, UnitKeyError};
 use crate::storage::instruction::Instruction;
@@ -55,7 +55,7 @@ impl From<VarIntError> for CommandError {
 pub enum SelectCondition {
     Key(GroupingLabel, UnitKey, Option<TransactionId>),
     UnconditionalMatch(GroupingLabel),
-    Filter(GroupingLabel, Filter),
+    Predicate(GroupingLabel, Predicate),
     AllGrouping,
 }
 
@@ -64,7 +64,7 @@ pub enum SelectConditionPrefix {
     KeyWithTransactionId = 0x00,
     KeyWithoutTransactionId = 0x01,
     UnconditionalMatch = 0x02,
-    Filter = 0x03,
+    Predicate = 0x03,
     AllGrouping = 0x04,
 }
 
@@ -73,7 +73,7 @@ pub enum SelectConditionError {
     InvalidPrefix,
     UnitKeyError(UnitKeyError),
     FromUtf8Error(FromUtf8Error),
-    ParseFilterStringError(FilterError),
+    PredicateError(PredicateError),
     GroupingError(GroupingLabelError),
 }
 
@@ -83,9 +83,9 @@ impl From<FromUtf8Error> for SelectConditionError {
     }
 }
 
-impl From<FilterError> for SelectConditionError {
-    fn from(error: FilterError) -> SelectConditionError {
-        return SelectConditionError::ParseFilterStringError(error);
+impl From<PredicateError> for SelectConditionError {
+    fn from(error: PredicateError) -> SelectConditionError {
+        return SelectConditionError::PredicateError(error);
     }
 }
 
@@ -143,12 +143,12 @@ impl SelectCondition {
             let (grouping, offset) = GroupingLabel::parse(&data[position..])?;
             position += offset;
             return Ok((SelectCondition::UnconditionalMatch(grouping), position));
-        } else if prefix == SelectConditionPrefix::Filter as u8 {
+        } else if prefix == SelectConditionPrefix::Predicate as u8 {
             let (grouping, offset) = GroupingLabel::parse(&data[position..])?;
             position += offset;
-            let (filter, offset) = Filter::parse(&data[position..])?;
+            let (predicate, offset) = Predicate::parse(&data[position..])?;
             position += offset;
-            return Ok((SelectCondition::Filter(grouping, filter), position));
+            return Ok((SelectCondition::Predicate(grouping, predicate), position));
         } else if prefix == SelectConditionPrefix::AllGrouping as u8 {
             return Ok((SelectCondition::AllGrouping, position));
         } else {
@@ -158,10 +158,8 @@ impl SelectCondition {
     pub fn marshal(&self) -> Vec<u8> {
         match self {
             SelectCondition::UnconditionalMatch(grouping) => {
-                let mut marshaled = vec![];
-                marshaled.push(SelectConditionPrefix::UnconditionalMatch as u8);
-                let grouping_bytes = grouping.marshal();
-                marshaled.extend_from_slice(&grouping_bytes);
+                let mut marshaled = vec![SelectConditionPrefix::UnconditionalMatch as u8];
+                marshaled.extend(grouping.marshal());
                 return marshaled;
             }
             SelectCondition::Key(grouping, key, transaction_id) => {
@@ -186,22 +184,14 @@ impl SelectCondition {
 
                 return marshaled;
             }
-            SelectCondition::Filter(grouping, filter) => {
-                let mut marshaled = vec![];
-                marshaled.push(SelectConditionPrefix::Filter as u8);
-
-                let grouping_bytes = grouping.marshal();
-                marshaled.extend_from_slice(&grouping_bytes);
-
-                let filter_bytes = filter.marshal();
-                marshaled.extend_from_slice(&filter_bytes);
-
-                return marshaled;
+            SelectCondition::Predicate(grouping, predicate) => {
+                let mut result = vec![SelectConditionPrefix::Predicate as u8];
+                result.extend(grouping.marshal());
+                result.extend(predicate.serialize());
+                return result;
             }
             SelectCondition::AllGrouping => {
-                let mut marshaled = vec![];
-                marshaled.push(SelectConditionPrefix::AllGrouping as u8);
-                return marshaled;
+                return vec![SelectConditionPrefix::AllGrouping as u8];
             }
         }
     }
@@ -860,8 +850,8 @@ impl ToString for Command {
                     SelectCondition::UnconditionalMatch(grouping) => {
                         return format!("Command Select, UnconditionalMatch on grouping {:?}", grouping.to_string());
                     },
-                    SelectCondition::Filter(grouping, filters) => {
-                        return format!("grouping {}, filter {}", grouping, filters);
+                    SelectCondition::Predicate(grouping, predicate) => {
+                        return format!("grouping {}, predicate {}", grouping, predicate);
                     },
                     SelectCondition::AllGrouping => {
                         return format!("List all grouping");
@@ -943,8 +933,8 @@ impl ToString for Command {
 mod command_tests {
     use crate::storage::chain_height::ChainHeight;
     use crate::storage::executor::command::{Command, SelectCondition};
-    use crate::storage::executor::filter::parse_filter_string;
     use crate::storage::executor::grouping_label::GroupingLabel;
+    use crate::storage::executor::predicate::Predicate;
     use crate::storage::executor::unit_content::UnitContent;
     use crate::storage::executor::unit_key::UnitKey;
     use crate::storage::transaction_manager::TransactionId;
@@ -953,14 +943,14 @@ mod command_tests {
     fn select_condition_reversibility() {
         let unit_key = UnitKey::new(&[0x01, 0x02, 0x03]);
         let transaction_id = TransactionId::new(1);
-        let filter = parse_filter_string(String::from("x>3")).unwrap();
-        let grouping = GroupingLabel::from("any_grouping");
+        let predicate = Predicate::parse_str("this>3").unwrap();
+        let grouping = GroupingLabel::from("grouping");
 
         let conditions = vec![
             SelectCondition::Key(grouping.clone(), unit_key.clone(), None),
             SelectCondition::Key(grouping.clone(), unit_key.clone(), Some(transaction_id)),
             SelectCondition::UnconditionalMatch(grouping.clone()),
-            SelectCondition::Filter(grouping.clone(), filter),
+            SelectCondition::Predicate(grouping.clone(), predicate),
             SelectCondition::AllGrouping,
         ];
 
@@ -977,14 +967,14 @@ mod command_tests {
         let grouping = GroupingLabel::from("any_grouping");
         let unit_key = UnitKey::new(&[0x01, 0x02, 0x03]);
         let transaction_id = TransactionId::new(1);
-        let filter = parse_filter_string(String::from("x>3")).unwrap();
+        let predicate = Predicate::parse_str("x>3").unwrap();
         let target_height = ChainHeight::new(1);
 
         let conditions = vec![
             SelectCondition::Key(grouping.clone(), unit_key.clone(), None),
             SelectCondition::Key(grouping.clone(), unit_key.clone(), Some(transaction_id)),
             SelectCondition::UnconditionalMatch(grouping.clone()),
-            SelectCondition::Filter(grouping.clone(), filter),
+            SelectCondition::Predicate(grouping.clone(), predicate),
             SelectCondition::AllGrouping,
         ];
 
