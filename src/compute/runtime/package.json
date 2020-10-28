@@ -1,0 +1,32 @@
+{
+  "name": "runtime",
+  "version": "1.0.0",
+  "description": "",
+  "scripts": {
+    "test": "mocha ./test",
+    "start-ts": "tsc && NODE_ENV=development node ./dist/src/start.js ",
+    "dev": "./node_modules/nodemon/bin/nodemon.js"
+  },
+  "dependencies": {
+    "@types/koa": "^2.0.43",
+    "@types/koa-bodyparser": "^4.2.0",
+    "@types/koa-router": "^7.0.27",
+    "@types/lodash": "^4.14.162",
+    "@types/node": "^14.14.5",
+    "@types/request": "^2.47.0",
+    "chai": "^4.1.2",
+    "graceful": "^1.0.1",
+    "koa": "^2.4.1",
+    "koa-bodyparser": "^4.2.0",
+    "koa-router": "^7.3.0",
+    "lodash": "^4.17.20",
+    "mocha": "^5.0.0",
+    "nodemon": "^1.14.11",
+    "request": "^2.83.0",
+    "server-destroy": "^1.0.1"
+  },
+  "devDependencies": {
+    "ts-node": "^9.0.0",
+    "typescript": "^4.0.5"
+  }
+}
