@@ -2,6 +2,8 @@ import { PREFIX } from '@/constants';
 import { Ora } from 'ora';
 
 import { getAccessTicket, getPublicPem } from '@/services/rsa';
+import { uploadFile } from '@/services/api';
+
 import ora = require('ora');
 import chalk from 'chalk';
 import _ from 'lodash';
@@ -26,7 +28,7 @@ export class Uploader {
 
   async init() {
     await this.getPublicPem();
-    await this.getTicket();
+    // await this.getTicket();
   }
 
   async exec() {
@@ -36,10 +38,9 @@ export class Uploader {
 
     await this.init();
 
-    // todo: upload file
-    // await this.uploadFiles();
+    await this.uploadFiles();
 
-    this.spinner.info(`${PREFIX} File transfer task completed`);
+    this.spinner.info(`${PREFIX} File task completed`);
   }
 
   async getPublicPem() {
@@ -70,5 +71,12 @@ export class Uploader {
     );
   }
 
-  async uploadFiles() {}
+  async uploadFiles() {
+    await uploadFile();
+    
+    this.spinner.succeed(
+      `${PREFIX} Successfully uploaded files`
+    );
+
+  }
 }
