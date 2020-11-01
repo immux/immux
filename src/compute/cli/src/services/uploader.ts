@@ -33,7 +33,9 @@ export class Uploader {
 
   async exec() {
     this.spinner.info(
-      `${PREFIX} The system has started and the current working directory is ${chalk.gray(this.cwd)}`
+      `${PREFIX} The system has started and the current working directory is ${chalk.gray(
+        this.cwd
+      )}`
     );
 
     await this.init();
@@ -51,7 +53,9 @@ export class Uploader {
     this.email = email;
     this.publicPem = publicPem;
 
-    this.spinner.succeed(`${PREFIX} Successfully obtain the public key certificate`);
+    this.spinner.succeed(
+      `${PREFIX} Successfully obtain the public key certificate`
+    );
   }
 
   async getTicket() {
@@ -65,18 +69,15 @@ export class Uploader {
     this.ticket = ticket;
 
     this.spinner.succeed(
-      `${PREFIX} ${chalk.greenBright(account.name)} Successfully exchanged ${chalk.gray(
-        'Access ticket'
-      )}`
+      `${PREFIX} ${chalk.greenBright(
+        account.name
+      )} Successfully exchanged ${chalk.gray('Access ticket')}`
     );
   }
 
   async uploadFiles() {
     await uploadFile();
-    
-    this.spinner.succeed(
-      `${PREFIX} Successfully uploaded files`
-    );
 
+    this.spinner.succeed(`${PREFIX} Successfully uploaded files`);
   }
 }

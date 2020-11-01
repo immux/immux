@@ -1,5 +1,5 @@
 function info(ctx, db) {
-    return { name: 'immux', type: 'cool' }
+  return { name: "immux", type: "cool" };
 }
-  
-module.exports = info
+
+module.exports = info;

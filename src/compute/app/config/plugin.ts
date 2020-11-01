@@ -1,6 +1,6 @@
 export default {
-    // plugin: {
-    //     enable: true,
-    //     package: 'plugin'
-    // }
-}
+  // plugin: {
+  //     enable: true,
+  //     package: 'plugin'
+  // }
+};

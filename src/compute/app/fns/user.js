@@ -1,5 +1,5 @@
 function user(ctx, db) {
-    return { name: 'immux' }
+  return { name: "immux" };
 }
-  
-module.exports = user
+
+module.exports = user;

@@ -1,3 +1,3 @@
 export default {
-    host: "localhost",
-}
+  host: "localhost",
+};
