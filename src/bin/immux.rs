@@ -365,7 +365,7 @@ fn main() -> ExecutorResult<()> {
 
             let mut executor = Executor::open(&pref)?;
             let transaction_id = transaction_id_str.parse::<u64>()?;
-            executor.abort_transaction(TransactionId::new(transaction_id))
+            executor.abort_transaction(&mut TransactionId::new(transaction_id))
         }
         _ => unreachable!(),
     };

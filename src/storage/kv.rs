@@ -43,16 +43,24 @@ impl LogKeyValueStore {
 
         let writer = LogWriter::new(&log_file_path, preferences.ecc_mode, db_version)?;
         let mut reader = LogReader::new(&log_file_path, db_version)?;
-        let (snapshot, current_height, transaction_manager) =
+
+        let (snapshot, current_height, incomplete_transaction_manager) =
             load_snapshot(&mut reader, None)?;
 
-        let engine = LogKeyValueStore {
+        let mut incomplete_transaction_ids =
+            incomplete_transaction_manager.get_current_active_transaction_ids();
+
+        let mut engine = LogKeyValueStore {
             reader,
             writer,
             snapshot,
             current_height,
-            transaction_manager,
+            transaction_manager: incomplete_transaction_manager,
         };
+
+        for transaction_id in incomplete_transaction_ids.iter_mut() {
+            engine.abort_transaction(transaction_id)?;
+        }
 
         return Ok(engine);
     }
@@ -426,17 +434,19 @@ impl LogKeyValueStore {
         return Ok(());
     }
 
-    pub fn abort_transaction(&mut self, transaction_id: TransactionId) -> KVResult<()> {
+    pub fn abort_transaction(&mut self, transaction_id: &mut TransactionId) -> KVResult<()> {
         self.transaction_manager
             .validate_transaction_id(&transaction_id)?;
 
-        let instruction = Instruction::TransactionAbort { transaction_id };
+        let instruction = Instruction::TransactionAbort {
+            transaction_id: *transaction_id,
+        };
         self.writer.append_instruction(&instruction)?;
 
         update_aborted_log_pointers(
             &mut self.transaction_manager,
             &mut self.snapshot,
-            transaction_id,
+            *transaction_id,
         );
 
         self.current_height.increment()?;

@@ -215,7 +215,10 @@ impl Executor {
         return Ok(Outcome::TransactionCommitSuccess);
     }
 
-    pub fn abort_transaction(&mut self, transaction_id: TransactionId) -> ExecutorResult<Outcome> {
+    pub fn abort_transaction(
+        &mut self,
+        transaction_id: &mut TransactionId,
+    ) -> ExecutorResult<Outcome> {
         self.store_engine.abort_transaction(transaction_id)?;
         return Ok(Outcome::TransactionAbortSuccess);
     }
