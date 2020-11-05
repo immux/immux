@@ -1,7 +1,7 @@
 import { Controller } from '../../src/base/controller';
 import { bp } from '../../src/blueprint';
 
-export default class example extends Controller {
+export default class Example extends Controller {
     @bp.get('/example')
     async getExample() {
         this.ctx.body = 'example get'
@@ -14,7 +14,6 @@ export default class example extends Controller {
 
     @bp.post('/example')
     async postExample() {
-        //@ts-ignore
         this.ctx.body = JSON.stringify(this.ctx.request.body);
     }
 }
