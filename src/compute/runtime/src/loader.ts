@@ -3,7 +3,7 @@ import * as fs from 'fs';
 import logger from './logger';
 import { BaseContext } from 'koa';
 import { Frame } from './core';
-import { bp } from './blueprint';
+import { router } from './router';
 interface FileModule {
     module: any,
     filename: string
@@ -50,7 +50,7 @@ export class Loader {
     }
 
     loadRouter() {
-        const r = bp.getRoute();
+        const r = router.getRoute();
         Object.keys(r).forEach((url) => {
             r[url].forEach((object) => {
                 this.koaRouter[object.httpMethod](url, async (ctx: BaseContext) => {

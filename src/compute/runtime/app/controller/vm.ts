@@ -3,7 +3,7 @@ import * as path from "path"
 import * as vm from "vm"
 
 import { Controller } from '../../src/base/controller';
-import { bp } from '../../src/blueprint';
+import { router } from '../../src/router';
 import { randomBytes, scrypt, createHmac } from "crypto";
 
 interface VmOptions {
@@ -77,12 +77,12 @@ export default class Runtime extends Controller {
         return fnString;
     }
 
-    @bp.get('/vm/:project/:fn')
-    @bp.get('/vm/:project/:fn/:param')
-    @bp.post('/vm/:project/:fn')
-    @bp.post('/vm/:project/:fn/:param')
-    @bp.del('/vm/:project/:fn')
-    @bp.del('/vm/:project/:fn/:param')
+    @router.get('/vm/:project/:fn')
+    @router.get('/vm/:project/:fn/:param')
+    @router.post('/vm/:project/:fn')
+    @router.post('/vm/:project/:fn/:param')
+    @router.del('/vm/:project/:fn')
+    @router.del('/vm/:project/:fn/:param')
     async index() {
         let timer = null;
         const split: string = this.ctx.params.project;

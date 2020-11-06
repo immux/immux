@@ -1,18 +1,18 @@
 import { Controller } from '../../src/base/controller';
-import { bp } from '../../src/blueprint';
+import { router } from '../../src/router';
 
 export default class Example extends Controller {
-    @bp.get('/example')
+    @router.get('/example')
     async getExample() {
         this.ctx.body = 'example get'
     }
 
-    @bp.get('/news')
+    @router.get('/news')
     async getNews() {
         this.ctx.body = 'news info get'
     }
 
-    @bp.post('/example')
+    @router.post('/example')
     async postExample() {
         this.ctx.body = JSON.stringify(this.ctx.request.body);
     }
