@@ -1,4 +1,4 @@
-import FrameCluster from "./cluster";
+import FrameCluster from './cluster';
 
 
 const cl = new FrameCluster();

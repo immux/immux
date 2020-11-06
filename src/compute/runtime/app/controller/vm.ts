@@ -1,10 +1,10 @@
-import * as fs from "fs"
-import * as path from "path"
-import * as vm from "vm"
+import * as fs from 'fs'
+import * as path from 'path'
+import * as vm from 'vm'
 
 import { Controller } from '../../src/base/controller';
 import { router } from '../../src/router';
-import { randomBytes, scrypt, createHmac } from "crypto";
+import { randomBytes, scrypt, createHmac } from 'crypto';
 
 interface VmOptions {
     id: string;

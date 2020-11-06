@@ -1,4 +1,4 @@
-import logger from "./logger";
+import logger from './logger';
 
 const methods = ['get', 'post', 'patch', 'del', 'options', 'put']
 
