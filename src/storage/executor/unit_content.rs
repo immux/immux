@@ -1,5 +1,7 @@
+use std::cmp::Ordering;
 use std::collections::HashMap;
 use std::convert::TryFrom;
+use std::fmt;
 
 use crate::utils::bools::{bool_to_u8, u8_to_bool};
 use crate::utils::floats::{f64_to_u8_array, u8_array_to_f64};
@@ -51,6 +53,17 @@ pub enum UnitContentError {
     EmptyInput,
     MissingDataBytes,
     UnexpectedLengthBytes,
+}
+
+impl PartialOrd for UnitContent {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        if let UnitContent::Float64(f1) = self {
+            if let UnitContent::Float64(f2) = other {
+                return f1.partial_cmp(&f2);
+            }
+        }
+        return None;
+    }
 }
 
 impl UnitContent {
@@ -196,24 +209,26 @@ impl UnitContent {
     }
 }
 
-impl ToString for UnitContent {
-    fn to_string(&self) -> String {
+impl fmt::Display for UnitContent {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            UnitContent::Nil => "Nil".to_string(),
-            UnitContent::String(string) => format!("{}{}{}", "\"", string.clone(), "\""),
-            UnitContent::Float64(f) => format!("{}", f),
-            UnitContent::Bool(b) => (if *b { "true" } else { "false" }).to_string(),
+            UnitContent::Nil => write!(f, "{}", "Nil".to_string()),
+            UnitContent::String(string) => write!(f, "{}{}{}", "\"", string.clone(), "\""),
+            UnitContent::Float64(float) => write!(f, "{}", float),
+            UnitContent::Bool(b) => {
+                write!(f, "{}", (if *b { "true" } else { "false" }).to_string())
+            }
             UnitContent::Map(map) => {
                 let kv_pairs: Vec<String> = map
                     .iter()
                     .map(|(key, content)| format!("{}:{}", key, content.to_string()))
                     .collect();
-                format!("{}{}{}", "{", kv_pairs.join(","), "}")
+                write!(f, "{}{}{}", "{", kv_pairs.join(","), "}")
             }
             UnitContent::Array(array) => {
                 let kv_pairs: Vec<String> =
                     array.iter().map(|content| content.to_string()).collect();
-                format!("{}{}{}", "[", kv_pairs.join(","), "]")
+                write!(f, "{}{}{}", "[", kv_pairs.join(","), "]")
             }
         }
     }
@@ -256,14 +271,14 @@ impl From<&str> for UnitContent {
                 array.push(content);
             }
             UnitContent::Array(array)
+        } else if (incoming_str.starts_with("\"") && incoming_str.ends_with("\""))
+            || (incoming_str.starts_with("'") && incoming_str.ends_with("'"))
+        {
+            let str_length = incoming_str.len();
+            let sub_string = &incoming_str[1..str_length - 1];
+            UnitContent::String(String::from(sub_string))
         } else {
-            if incoming_str.trim().starts_with("\"") && incoming_str.ends_with("\"") {
-                let str_length = &incoming_str.len();
-                let sub_string = &incoming_str[1..str_length - 1];
-                UnitContent::String(String::from(sub_string))
-            } else {
-                UnitContent::String(String::from(incoming_str))
-            }
+            UnitContent::String(String::from(incoming_str))
         }
     }
 }

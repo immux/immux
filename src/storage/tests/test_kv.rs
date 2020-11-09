@@ -8,11 +8,11 @@ mod kv_tests {
     use immuxsys::storage::chain_height::ChainHeight;
     use immuxsys::storage::executor::command::SelectCondition;
     use immuxsys::storage::executor::executor::Executor;
-    use immuxsys::storage::executor::filter::{
-        Filter, FilterOperands, FilterOperator, FilterUnit, LogicalOperator,
-    };
     use immuxsys::storage::executor::grouping_label::GroupingLabel;
     use immuxsys::storage::executor::outcome::Outcome;
+    use immuxsys::storage::executor::predicate::{
+        CompoundPredicate, FieldPath, Predicate, PrimitivePredicate,
+    };
     use immuxsys::storage::executor::unit_content::UnitContent;
     use immuxsys::storage::executor::unit_key::UnitKey;
     use immuxsys::storage::kv::{get_main_log_full_path, LogKeyValueStore};
@@ -41,56 +41,26 @@ mod kv_tests {
         return store_engine;
     }
 
-    fn get_filter() -> Filter {
-        let mut filter_units = Vec::new();
-        let mut logical_operators = Vec::new();
-
-        let filter_units_vec = vec![
-            FilterUnit {
-                operator: FilterOperator::GreaterOrEqual,
-                operands: FilterOperands {
-                    map_key: String::from("age"),
-                    unit_content: UnitContent::Float64(12.0),
-                },
-            },
-            FilterUnit {
-                operator: FilterOperator::LessOrEqual,
-                operands: FilterOperands {
-                    map_key: String::from("height"),
-                    unit_content: UnitContent::Float64(170.0),
-                },
-            },
-            FilterUnit {
-                operator: FilterOperator::Equal,
-                operands: FilterOperands {
-                    map_key: String::from("name"),
-                    unit_content: UnitContent::String(String::from("Bob")),
-                },
-            },
-            FilterUnit {
-                operator: FilterOperator::Equal,
-                operands: FilterOperands {
-                    map_key: String::from("boy"),
-                    unit_content: UnitContent::Bool(true),
-                },
-            },
-        ];
-
-        let logical_operators_vec = vec![
-            LogicalOperator::And,
-            LogicalOperator::Or,
-            LogicalOperator::Or,
-        ];
-
-        filter_units.extend(filter_units_vec);
-        logical_operators.extend(logical_operators_vec);
-
-        let filter = Filter {
-            filter_units,
-            logical_operators,
-        };
-
-        return filter;
+    fn get_test_predicate() -> Predicate {
+        // this.age >= 12 && this.height <= 170 && this.name == "Bob" && this.boy == true
+        return Predicate::Compound(CompoundPredicate::And(vec![
+            Predicate::Primitive(PrimitivePredicate::GreaterThan(
+                FieldPath::from(vec![String::from("age")]),
+                UnitContent::Float64(12.0),
+            )),
+            Predicate::Primitive(PrimitivePredicate::LessThan(
+                FieldPath::from(vec![String::from("height")]),
+                UnitContent::Float64(170.0),
+            )),
+            Predicate::Primitive(PrimitivePredicate::Equal(
+                FieldPath::from(vec![String::from("name")]),
+                UnitContent::String(String::from("Bob")),
+            )),
+            Predicate::Primitive(PrimitivePredicate::Equal(
+                FieldPath::from(vec![String::from("boy")]),
+                UnitContent::Bool(true),
+            )),
+        ]));
     }
 
     #[test]
@@ -231,18 +201,19 @@ mod kv_tests {
 
     #[test]
     fn test_content_satisfied_filter_unit() {
-        let satisfied_contents = vec![
-            {
-                let mut map = HashMap::new();
-                map.insert(String::from("age"), UnitContent::Float64(14.0));
-                map.insert(String::from("height"), UnitContent::Float64(168.0));
-                map.insert(
-                    String::from("name"),
-                    UnitContent::String(String::from("Bob")),
-                );
-                map.insert(String::from("boy"), UnitContent::Bool(true));
-                UnitContent::Map(map)
-            },
+        let satisfied_contents = vec![{
+            let mut map = HashMap::new();
+            map.insert(String::from("age"), UnitContent::Float64(14.0));
+            map.insert(String::from("height"), UnitContent::Float64(168.0));
+            map.insert(
+                String::from("name"),
+                UnitContent::String(String::from("Bob")),
+            );
+            map.insert(String::from("boy"), UnitContent::Bool(true));
+            UnitContent::Map(map)
+        }];
+
+        let unsatisfied_contents = vec![
             {
                 let mut map = HashMap::new();
                 map.insert(String::from("age"), UnitContent::Float64(12.0));
@@ -254,9 +225,6 @@ mod kv_tests {
                 map.insert(String::from("boy"), UnitContent::Bool(false));
                 UnitContent::Map(map)
             },
-        ];
-
-        let unsatisfied_contents = vec![
             {
                 let mut map = HashMap::new();
                 map.insert(String::from("age"), UnitContent::Float64(20.0));
@@ -281,8 +249,8 @@ mod kv_tests {
             },
         ];
         let grouping = GroupingLabel::new("any_grouping".as_bytes());
-        let filter = get_filter();
-        let condition = SelectCondition::Filter(grouping.clone(), filter);
+        let predicate = get_test_predicate();
+        let condition = SelectCondition::Predicate(grouping.clone(), predicate);
 
         let mut contents = vec![];
         contents.extend_from_slice(&satisfied_contents);
@@ -318,29 +286,6 @@ mod kv_tests {
             }
             _ => panic!("Unexpected outcome"),
         }
-    }
-
-    #[test]
-    fn test_filter_parse_marshal() {
-        let expected_output = get_filter();
-        let filter_bytes = expected_output.marshal();
-        let (actual_output, _) = Filter::parse(&filter_bytes).unwrap();
-        assert_eq!(expected_output, actual_output);
-    }
-
-    #[test]
-    fn test_filter_to_string() {
-        let expected_output = String::from("age>=12&&height<=170||name==\"Bob\"||boy==true");
-        let actual_output = get_filter().to_string();
-        assert_eq!(expected_output, actual_output);
-    }
-
-    #[test]
-    fn test_filter_marshal_parse_reversibility() {
-        let expected_output = get_filter();
-        let filter_bytes = expected_output.marshal();
-        let (actual_output, _) = Filter::parse(&filter_bytes).unwrap();
-        assert_eq!(expected_output, actual_output);
     }
 
     #[test]
