@@ -7,7 +7,6 @@ build
 tmp*
 foldr.json
 dev_utils/src/data_models/data-raw
-*svg
 *.txt
 
 tests/coverage-report

@@ -1,0 +1,13 @@
+logs/
+npm-debug.log
+yarn-error.log
+node_modules/
+package-lock.json
+yarn.lock
+dist/
+.idea/
+.DS_Store
+*.sw*
+*.un~
+.tsbuildinfo
+.tsbuildinfo.*
