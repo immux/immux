@@ -10,3 +10,7 @@ dev_utils/src/data_models/data-raw
 *.txt
 
 tests/coverage-report
+
+*~
+*.swp
+*.swo
