@@ -353,13 +353,13 @@ mod kv_tests {
 
         let expected_value = None;
 
-        let mut transaction_id = store_engine.start_transaction().unwrap();
+        let transaction_id = store_engine.start_transaction().unwrap();
         for pair in &key_value_paris {
             store_engine
                 .set(&pair.0, &pair.1, Some(transaction_id))
                 .unwrap();
         }
-        store_engine.abort_transaction(&mut transaction_id).unwrap();
+        store_engine.abort_transaction(&transaction_id).unwrap();
 
         for pair in &key_value_paris {
             let actual_value = store_engine.get(&pair.0, None).unwrap();
@@ -637,7 +637,7 @@ mod kv_tests {
         let some_random_transaction_id = 10;
 
         store_engine
-            .abort_transaction(&mut TransactionId::new(some_random_transaction_id))
+            .abort_transaction(&TransactionId::new(some_random_transaction_id))
             .unwrap();
     }
 

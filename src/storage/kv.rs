@@ -47,18 +47,18 @@ impl LogKeyValueStore {
         let (snapshot, current_height, incomplete_transaction_manager) =
             load_snapshot(&mut reader, None)?;
 
-        let mut incomplete_transaction_ids =
-            incomplete_transaction_manager.get_current_active_transaction_ids();
+        let incomplete_transaction_ids =
+            transaction_manager.get_current_active_transaction_ids();
 
         let mut engine = LogKeyValueStore {
             reader,
             writer,
             snapshot,
             current_height,
-            transaction_manager: incomplete_transaction_manager,
+            transaction_manager,
         };
 
-        for transaction_id in incomplete_transaction_ids.iter_mut() {
+        for transaction_id in incomplete_transaction_ids.iter() {
             engine.abort_transaction(transaction_id)?;
         }
 
@@ -350,7 +350,6 @@ impl LogKeyValueStore {
 
     pub fn inspect_one(&mut self, target_key: &KVKey) -> KVResult<Vec<(Instruction, ChainHeight)>> {
         let (instruction_iterator, _) = self.reader.read_all()?;
-
         let mut appeared_key = HashSet::new();
         let result = instruction_iterator
             .enumerate()
@@ -434,12 +433,12 @@ impl LogKeyValueStore {
         return Ok(());
     }
 
-    pub fn abort_transaction(&mut self, transaction_id: &mut TransactionId) -> KVResult<()> {
+    pub fn abort_transaction(&mut self, transaction_id: &TransactionId) -> KVResult<()> {
         self.transaction_manager
             .validate_transaction_id(&transaction_id)?;
 
         let instruction = Instruction::TransactionAbort {
-            transaction_id: *transaction_id,
+            transaction_id: transaction_id.clone(),
         };
         self.writer.append_instruction(&instruction)?;
 
