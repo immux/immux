@@ -4,7 +4,7 @@ use std::sync::mpsc::{RecvError, SendError};
 
 use crate::storage::executor::command::CommandError;
 use crate::storage::executor::errors::ExecutorError;
-use crate::storage::executor::filter::FilterError;
+use crate::storage::executor::predicate::PredicateError;
 
 #[derive(Debug)]
 pub enum ServerError {
@@ -15,7 +15,7 @@ pub enum ServerError {
     BodyParsingError,
     ParseIntError(ParseIntError),
     HttpResponseError(Error),
-    FilterError(FilterError),
+    PredicateError(PredicateError),
     SenderError,
     ReceiverError(RecvError),
     TCPServerError(Error),
@@ -53,15 +53,15 @@ impl From<ParseIntError> for ServerError {
     }
 }
 
-impl From<FilterError> for ServerError {
-    fn from(err: FilterError) -> ServerError {
-        ServerError::FilterError(err)
-    }
-}
-
 impl From<CommandError> for ServerError {
     fn from(err: CommandError) -> ServerError {
         ServerError::CommandError(err)
+    }
+}
+
+impl From<PredicateError> for ServerError {
+    fn from(err: PredicateError) -> ServerError {
+        ServerError::PredicateError(err)
     }
 }
 

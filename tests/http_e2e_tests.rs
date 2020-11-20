@@ -17,8 +17,8 @@ mod http_e2e_tests {
         covid::Covid,
     };
     use immuxsys_dev_utils::dev_utils::{
-        csv_to_json_table, e2e_verify_correctness, get_filter, get_key_content_pairs,
-        launch_test_db_servers, UnitList,
+        csv_to_json_table, e2e_verify_correctness, get_key_content_pairs,
+        get_phone_mode_test_predicates, get_phone_model_fixture, launch_test_db_servers, UnitList,
     };
 
     #[test]
@@ -1075,84 +1075,8 @@ mod http_e2e_tests {
     }
 
     #[test]
-    fn http_e2e_filter_read() {
-        let expected_satisfied_contents = vec![
-            {
-                let mut map = HashMap::new();
-                map.insert(
-                    String::from("brand"),
-                    UnitContent::String(String::from("Apple")),
-                );
-                map.insert(String::from("price"), UnitContent::Float64(3000.0));
-                map.insert(String::from("used"), UnitContent::Bool(true));
-                map.insert(String::from("size"), UnitContent::Float64(13.0));
-
-                UnitContent::Map(map)
-            },
-            {
-                let mut map = HashMap::new();
-                map.insert(
-                    String::from("brand"),
-                    UnitContent::String(String::from("Microsoft")),
-                );
-                map.insert(String::from("price"), UnitContent::Float64(1300.0));
-                map.insert(String::from("used"), UnitContent::Bool(false));
-                map.insert(String::from("size"), UnitContent::Float64(13.0));
-
-                UnitContent::Map(map)
-            },
-            {
-                let mut map = HashMap::new();
-                map.insert(
-                    String::from("brand"),
-                    UnitContent::String(String::from("IBM")),
-                );
-                map.insert(String::from("price"), UnitContent::Float64(1900.0));
-                map.insert(String::from("used"), UnitContent::Bool(true));
-                map.insert(String::from("size"), UnitContent::Float64(11.0));
-
-                UnitContent::Map(map)
-            },
-            {
-                let mut map = HashMap::new();
-                map.insert(
-                    String::from("brand"),
-                    UnitContent::String(String::from("Apple")),
-                );
-                map.insert(String::from("price"), UnitContent::Float64(1500.0));
-                map.insert(String::from("used"), UnitContent::Bool(false));
-                map.insert(String::from("size"), UnitContent::Float64(9.0));
-
-                UnitContent::Map(map)
-            },
-        ];
-
-        let unsatisfied_content = vec![
-            {
-                let mut map = HashMap::new();
-                map.insert(
-                    String::from("brand"),
-                    UnitContent::String(String::from("Apple")),
-                );
-                map.insert(String::from("price"), UnitContent::Float64(500.0));
-                map.insert(String::from("used"), UnitContent::Bool(true));
-                map.insert(String::from("size"), UnitContent::Float64(13.0));
-
-                UnitContent::Map(map)
-            },
-            {
-                let mut map = HashMap::new();
-                map.insert(
-                    String::from("brand"),
-                    UnitContent::String(String::from("Apple")),
-                );
-                map.insert(String::from("price"), UnitContent::Float64(1500.0));
-                map.insert(String::from("used"), UnitContent::Bool(true));
-                map.insert(String::from("size"), UnitContent::Float64(15.0));
-
-                UnitContent::Map(map)
-            },
-        ];
+    fn http_e2e_predicate_read() {
+        let (expected_satisfied_contents, unsatisfied_content) = get_phone_model_fixture();
 
         let mut contents = vec![];
         contents.extend_from_slice(&expected_satisfied_contents);
@@ -1175,8 +1099,8 @@ mod http_e2e_tests {
                 .unwrap();
         }
 
-        let filter = get_filter();
-        let (status_code, response) = client.get_by_filter(&grouping, &filter).unwrap();
+        let predicate = get_phone_mode_test_predicates();
+        let (status_code, response) = client.get_by_predicate(&grouping, &predicate).unwrap();
 
         assert_eq!(status_code, 200);
 

@@ -12,13 +12,13 @@ use crate::server::message::{AnnotatedCommand, AnnotatedCommandSender};
 use crate::storage::chain_height::ChainHeight;
 use crate::storage::executor::command::{Command, SelectCondition};
 use crate::storage::executor::executor::Executor;
-use crate::storage::executor::filter::parse_filter_string;
 use crate::storage::executor::grouping_label::GroupingLabel;
 use crate::storage::executor::outcome::Outcome;
 use crate::storage::executor::unit_content::UnitContent;
 use crate::storage::executor::unit_key::UnitKey;
 use crate::storage::transaction_manager::TransactionId;
 
+use crate::storage::executor::predicate::Predicate;
 use crate::storage::preferences::DBPreferences;
 use tiny_http::{Method, Request, Response, Server};
 use url::Url;
@@ -371,16 +371,15 @@ fn parse_http_request(request: &mut Request) -> ServerResult<Command> {
                     let command = Command::Select { condition };
                     return Ok(command);
                 } else {
-                    if let Some(filter_string) =
-                        url_info.extract_string_query(Constants::FILTER_KEY_WORD)
+                    if let Some(predicate_str) =
+                        url_info.extract_string_query(Constants::PREDICATE_URL_KEY)
                     {
                         let grouping_str = segments[1];
                         let grouping = GroupingLabel::new(grouping_str.as_bytes());
-                        let filter = parse_filter_string(filter_string)?;
-                        let condition = SelectCondition::Filter(grouping, filter);
+                        let predicate = Predicate::parse_str(&predicate_str)?;
+                        let condition = SelectCondition::Predicate(grouping, predicate);
 
                         let command = Command::Select { condition };
-
                         return Ok(command);
                     } else {
                         let grouping_str = segments[1];

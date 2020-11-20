@@ -1,14 +1,11 @@
-import { Frame } from "../core";
-import { BaseContext } from "koa";
-
-
+import * as Application from 'koa'
+import { Context } from "koa";
 
 export class Controller {
-    ctx: BaseContext;
-    app: Frame;
-    constructor(ctx: BaseContext) {
+    ctx: Context;
+    app: Application;
+    constructor(ctx: Context) {
         this.ctx = ctx;
-        //@ts-ignore
         this.app = ctx.app;
     }
 }

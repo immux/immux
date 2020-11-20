@@ -1,4 +1,4 @@
-import { Frame } from "./core";
+import { Frame } from './core';
 import * as cluster from 'cluster';
 
 

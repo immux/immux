@@ -1,11 +1,11 @@
-//@ts-nocheck
-import { Controller } from '../../src/base/controller';
-import { bp } from '../../src/blueprint';
-import { randomBytes, scrypt, createHmac } from "crypto";
+import * as fs from 'fs'
+import * as path from 'path'
+import * as vm from 'vm'
 
-const fs = require('fs');
-const path = require('path');
-const vm = require('vm');
+import { Controller } from '../../src/base/controller';
+import { router } from '../../src/router';
+import { randomBytes, scrypt, createHmac } from 'crypto';
+
 interface VmOptions {
     id: string;
 }
@@ -27,7 +27,7 @@ interface Sandbox {
   
 const TIMEOUT = 1000 * 1.5 * 10000;
 
-export default class runtime extends Controller {
+export default class Runtime extends Controller {
     fnPool: FnObject = {}
 
     onFileContent(filename: string, content: string): void {
@@ -36,9 +36,9 @@ export default class runtime extends Controller {
 
     async readFiles({ dirname, onError }: ReadFilesParams): Promise<FnsResult> {
         return new Promise(next => {
-          fs.readdir(dirname, (err: string, filenames: string[]) => {
+          fs.readdir(dirname, (err: NodeJS.ErrnoException | null, filenames: string[]) => {
             if (err) {
-              onError(err);
+              onError(err.message);
               return;
             }
     
@@ -48,9 +48,9 @@ export default class runtime extends Controller {
               fs.readFile(
                 `${dirname}/${filename}`,
                 'utf-8',
-                (err: string, content: string) => {
+                (err: NodeJS.ErrnoException | null, content: string) => {
                   if (err) {
-                    onError(err);
+                    onError(err.message);
                     return;
                   }
                   this.onFileContent(filename, content);
@@ -77,14 +77,14 @@ export default class runtime extends Controller {
         return fnString;
     }
 
-    @bp.get('/vm/:project/:fn')
-    @bp.get('/vm/:project/:fn/:param')
-    @bp.post('/vm/:project/:fn')
-    @bp.post('/vm/:project/:fn/:param')
-    @bp.del('/vm/:project/:fn')
-    @bp.del('/vm/:project/:fn/:param')
+    @router.get('/vm/:project/:fn')
+    @router.get('/vm/:project/:fn/:param')
+    @router.post('/vm/:project/:fn')
+    @router.post('/vm/:project/:fn/:param')
+    @router.del('/vm/:project/:fn')
+    @router.del('/vm/:project/:fn/:param')
     async index() {
-        let timr = null;
+        let timer = null;
         const split: string = this.ctx.params.project;
         const path: string = this.ctx.request.url.split(split)[1];
 
@@ -163,9 +163,9 @@ export default class runtime extends Controller {
               return err instanceof Error ? err : new Error(err.stack);
           });
       
-          if (timr) {
-              clearTimeout(timr);
-              timr = null;
+          if (timer) {
+              clearTimeout(timer);
+              timer = null;
           }
       
           let resBody = {};

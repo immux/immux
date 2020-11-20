@@ -3,7 +3,7 @@ import { Loader } from './loader';
 // import logger from './logger';
 import { Controller } from './base/controller';
 import * as req from 'request';
-import { blueprint, bp } from './blueprint';
+import { RouterInstance, router } from './router';
 
 
 export interface KV {
@@ -15,7 +15,7 @@ export class Frame extends Koa {
     private port: number;
     private ip: string;
     static Controller: typeof Controller = Controller;
-    static Blueprint: blueprint = bp;
+    static router: RouterInstance = router;
     config: any = {};
 
     constructor() {

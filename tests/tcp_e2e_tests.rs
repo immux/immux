@@ -1,6 +1,5 @@
 #[cfg(test)]
 mod tcp_e2e_tests {
-    use std::collections::HashMap;
     use std::error::Error;
 
     use immuxsys::constants as Constants;
@@ -19,7 +18,8 @@ mod tcp_e2e_tests {
     use immuxsys_dev_utils::data_models::census90::CensusEntry;
     use immuxsys_dev_utils::data_models::covid::Covid;
     use immuxsys_dev_utils::dev_utils::{
-        csv_to_json_table, get_filter, get_key_content_pairs, launch_test_db_servers, UnitList,
+        csv_to_json_table, get_key_content_pairs, get_phone_mode_test_predicates,
+        get_phone_model_fixture, launch_test_db_servers, UnitList,
     };
 
     #[test]
@@ -895,84 +895,8 @@ mod tcp_e2e_tests {
     }
 
     #[test]
-    fn tcp_e2e_filter_read() {
-        let expected_satisfied_contents = vec![
-            {
-                let mut map = HashMap::new();
-                map.insert(
-                    String::from("brand"),
-                    UnitContent::String(String::from("Apple")),
-                );
-                map.insert(String::from("price"), UnitContent::Float64(3000.0));
-                map.insert(String::from("used"), UnitContent::Bool(true));
-                map.insert(String::from("size"), UnitContent::Float64(13.0));
-
-                UnitContent::Map(map)
-            },
-            {
-                let mut map = HashMap::new();
-                map.insert(
-                    String::from("brand"),
-                    UnitContent::String(String::from("Microsoft")),
-                );
-                map.insert(String::from("price"), UnitContent::Float64(1300.0));
-                map.insert(String::from("used"), UnitContent::Bool(false));
-                map.insert(String::from("size"), UnitContent::Float64(13.0));
-
-                UnitContent::Map(map)
-            },
-            {
-                let mut map = HashMap::new();
-                map.insert(
-                    String::from("brand"),
-                    UnitContent::String(String::from("IBM")),
-                );
-                map.insert(String::from("price"), UnitContent::Float64(1900.0));
-                map.insert(String::from("used"), UnitContent::Bool(true));
-                map.insert(String::from("size"), UnitContent::Float64(11.0));
-
-                UnitContent::Map(map)
-            },
-            {
-                let mut map = HashMap::new();
-                map.insert(
-                    String::from("brand"),
-                    UnitContent::String(String::from("Apple")),
-                );
-                map.insert(String::from("price"), UnitContent::Float64(1500.0));
-                map.insert(String::from("used"), UnitContent::Bool(false));
-                map.insert(String::from("size"), UnitContent::Float64(9.0));
-
-                UnitContent::Map(map)
-            },
-        ];
-
-        let unsatisfied_content = vec![
-            {
-                let mut map = HashMap::new();
-                map.insert(
-                    String::from("brand"),
-                    UnitContent::String(String::from("Apple")),
-                );
-                map.insert(String::from("price"), UnitContent::Float64(500.0));
-                map.insert(String::from("used"), UnitContent::Bool(true));
-                map.insert(String::from("size"), UnitContent::Float64(13.0));
-
-                UnitContent::Map(map)
-            },
-            {
-                let mut map = HashMap::new();
-                map.insert(
-                    String::from("brand"),
-                    UnitContent::String(String::from("Apple")),
-                );
-                map.insert(String::from("price"), UnitContent::Float64(1500.0));
-                map.insert(String::from("used"), UnitContent::Bool(true));
-                map.insert(String::from("size"), UnitContent::Float64(15.0));
-
-                UnitContent::Map(map)
-            },
-        ];
+    fn tcp_e2e_predicate_read() {
+        let (expected_satisfied_contents, unsatisfied_content) = get_phone_model_fixture();
 
         let mut contents = vec![];
         contents.extend_from_slice(&expected_satisfied_contents);
@@ -996,8 +920,8 @@ mod tcp_e2e_tests {
             assert_eq!(outcome, Outcome::InsertSuccess);
         }
 
-        let filter = get_filter();
-        let outcome = client.get_by_filter(&grouping, &filter).unwrap();
+        let predicate = get_phone_mode_test_predicates();
+        let outcome = client.get_by_predicate(&grouping, &predicate).unwrap();
 
         match outcome {
             Outcome::Select(actual_satisfied_contents) => {

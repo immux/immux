@@ -8,9 +8,9 @@ use crate::ImmuxDBClient;
 use immuxsys::storage::chain_height::ChainHeight;
 use immuxsys::storage::executor::command::Command;
 use immuxsys::storage::executor::command::SelectCondition;
-use immuxsys::storage::executor::filter::Filter;
 use immuxsys::storage::executor::grouping_label::GroupingLabel;
 use immuxsys::storage::executor::outcome::Outcome;
+use immuxsys::storage::executor::predicate::Predicate;
 use immuxsys::storage::executor::unit_content::UnitContent;
 use immuxsys::storage::executor::unit_key::UnitKey;
 use immuxsys::storage::transaction_manager::TransactionId;
@@ -83,12 +83,12 @@ impl ImmuxDBClient<ImmuxDBTcpClientResult<Outcome>> for ImmuxDBTcpClient {
         return Ok(outcome);
     }
 
-    fn get_by_filter(
+    fn get_by_predicate(
         &self,
         grouping: &GroupingLabel,
-        filter: &Filter,
+        predicate: &Predicate,
     ) -> ImmuxDBTcpClientResult<Outcome> {
-        let condition = SelectCondition::Filter(grouping.clone(), filter.clone());
+        let condition = SelectCondition::Predicate(grouping.clone(), predicate.clone());
         let command = Command::Select { condition };
 
         let mut stream = self.stream.borrow_mut();

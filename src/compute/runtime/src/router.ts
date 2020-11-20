@@ -1,15 +1,15 @@
-import logger from "./logger";
+import logger from './logger';
 
 const methods = ['get', 'post', 'patch', 'del', 'options', 'put']
 
-interface Bp {
+interface Routers {
     [key: string]: Array<{
         httpMethod: string,
         constructor: any,
         handler: string
     }>
 }
-interface BP {
+interface RouterInfo {
     httpMethod: string,
     constructor: any,
     handler: string
@@ -18,7 +18,7 @@ interface Decorator {
     (target: any, propertyKey: string): void
 }
 
-export interface blueprint extends Blueprint {
+export interface RouterInstance extends Router {
     /**
      * http post method
      * @param url 
@@ -36,22 +36,22 @@ export interface blueprint extends Blueprint {
     put(url: string): Decorator;
 }
 
-class Blueprint {
-    router: Bp = {}
-    setRouter(url: string, blueprint: BP) {
-        const _bp = this.router[url];
-        if (_bp) {
-            for (const index in _bp) {
-                const object = _bp[index];
-                if (object.httpMethod === blueprint.httpMethod) {
+class Router {
+    router: Routers = {}
+    setRouter(url: string, routerInfo: RouterInfo) {
+        const _currentRoutingGroup = this.router[url];
+        if (_currentRoutingGroup) {
+            for (const index in _currentRoutingGroup) {
+                const object = _currentRoutingGroup[index];
+                if (object.httpMethod === routerInfo.httpMethod) {
                     logger.error(`router path ${object.httpMethod} ${url} already exist`);
                     return
                 }
             }
-            this.router[url].push(blueprint);
+            this.router[url].push(routerInfo);
         } else {
             this.router[url] = [];
-            this.router[url].push(blueprint);
+            this.router[url].push(routerInfo);
         }
     }
 
@@ -61,7 +61,7 @@ class Blueprint {
 }
 
 methods.forEach((httpMethod) => {
-    Object.defineProperty(Blueprint.prototype, httpMethod, {
+    Object.defineProperty(Router.prototype, httpMethod, {
         get: function () {
             return (url: string) => {
                 return (target: any, propertyKey: string) => {
@@ -76,4 +76,4 @@ methods.forEach((httpMethod) => {
     })
 })
 
-export const bp: blueprint = <any>new Blueprint
+export const router: RouterInstance = <any>new Router
