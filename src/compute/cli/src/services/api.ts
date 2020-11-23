@@ -2,6 +2,8 @@ import { Account } from '@/types/models';
 
 import request = require('request-promise-native');
 import { apiOrigin } from '@/constants';
+import { getConfig } from '@/utils';
+
 import _ from 'lodash';
 import FormData = require('form-data');
 import * as fs from 'fs';
@@ -39,6 +41,9 @@ export function verifyRsaSignature(
 export function uploadFile() {
   const pathName = `${process.cwd()}/../app/fns`;
   const form = new FormData();
+
+  const config = getConfig();
+  form.append('name', config.projectName);
 
   fs.readdir(pathName, (err, files) => {
     (function iterator(i) {

@@ -1,5 +1,4 @@
 import { Context } from 'koa';
-import multer = require('multer');
 import * as fs from 'fs';
 
 import {
@@ -12,19 +11,27 @@ import {
   Ctx,
   HttpError
 } from 'routing-controllers';
+
+import { dirExists } from '@/utils';
 import requestPromise = require('request-promise-native');
 
 @JsonController('/cli/upload')
 export default class FileHistoryController {
   @Post('')
-  async updateFile(@UploadedFiles('files') files: any[], @Ctx() ctx: Context) {
+  async updateFile(
+    @UploadedFiles('files') files: any[], 
+    @Ctx() ctx: Context,
+    @BodyParam('name') ProjectName: string,
+  ){
     if (!files.length) {
       throw new HttpError(400, 'please add files');
     }
 
+    await dirExists(`./uploads/${ProjectName}`);
+
     for (let i = 0; i < files.length; i++) {
       fs.writeFile(
-        `./uploads/${files[i].originalname}`,
+        `./uploads/${ProjectName}/${files[i].originalname}`,
         files[i].buffer,
         'binary',
         function (err) {
