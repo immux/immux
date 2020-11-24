@@ -28,7 +28,7 @@ export class Uploader {
 
   async init() {
     await this.getPublicPem();
-    // await this.getTicket();
+    await this.getTicket();
   }
 
   async exec() {
@@ -76,7 +76,7 @@ export class Uploader {
   }
 
   async uploadFiles() {
-    await uploadFile();
+    await uploadFile(this.ticket);
 
     this.spinner.succeed(`${PREFIX} Successfully uploaded files`);
   }

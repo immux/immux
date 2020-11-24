@@ -13,14 +13,20 @@ import {
 } from 'routing-controllers';
 
 import { dirExists } from '@/utils';
+import { AccessTicketMiddleware } from '@/middlewares/account';
+import { AccountSchema } from '@/types/models/Account';
+import { createNameSpace } from '@/services/nameSpace';
+
 import requestPromise = require('request-promise-native');
 
 @JsonController('/cli/upload')
 export default class FileHistoryController {
   @Post('')
+  @UseBefore(AccessTicketMiddleware)
   async updateFile(
-    @UploadedFiles('files') files: any[], 
+    @State('account') account: AccountSchema,
     @Ctx() ctx: Context,
+    @UploadedFiles('files') files: any[], 
     @BodyParam('name') ProjectName: string,
   ){
     if (!files.length) {
@@ -40,6 +46,12 @@ export default class FileHistoryController {
           }
         }
       );
+    }
+
+    const nameSpace = createNameSpace( account, { name: ProjectName });
+ 
+    if (!nameSpace) {
+      throw new HttpError(404, 'nameSpace not found');
     }
 
     return { total: files.length };

@@ -22,7 +22,6 @@ import {
   findOneAndUpdateAccount,
   destroyAccountPems,
   removeAccessToken,
-  existsAccountPems,
   toResAccountPems,
   saveAccountPems,
   genAccessToken,
@@ -30,6 +29,8 @@ import {
   genAccountPems,
   toResPublicPem
 } from '@/services/account';
+
+import { AccountPems } from '@/types';
 
 @JsonController('/account')
 export default class AccountController {
@@ -79,13 +80,10 @@ export default class AccountController {
   @Get('/pems')
   @UseBefore(AccessTokenMiddleware)
   async getPems(@State('account') account: AccountSchema) {
-    // if (!(await existsAccountPems(account.email))) {
-    //   return {};
-    // }
+    const pems: AccountPems = await getAccountPems(account.email);
 
-    const pems = await getAccountPems(account.email);
-    // todo cli database
-    //@ts-ignorets-ignore
+    if (!pems) { return {} }
+
     const publicPem = toResPublicPem(pems);
 
     return _.defaults(
@@ -96,10 +94,10 @@ export default class AccountController {
 
   @Post('/pems')
   @UseBefore(AccessTokenMiddleware)
-  async genPems(@State('account') account: AccountSchema) {
-    // if (await existsAccountPems(account.email)) {
-    //   return await getAccountPems(account.email);
-    // }
+  async createPems(@State('account') account: AccountSchema) {
+    const existPem: AccountPems = await getAccountPems(account.email);
+
+    if (existPem) { return existPem };
 
     const pems = genAccountPems(account.email);
     const resPems = toResAccountPems(pems);
@@ -117,11 +115,13 @@ export default class AccountController {
   @Delete('/pems')
   @UseBefore(AccessTokenMiddleware)
   async destroyPems(@State('account') account: AccountSchema) {
-    // if (!(await existsAccountPems(account.email))) {
-    //   throw new HttpError(404, 'account pems not found');
-    // }
+    const existPem = await getAccountPems(account.email);
 
-    // await destroyAccountPems(await getAccountPems(account.email));
+    if (!existPem) {
+      throw new HttpError(404, 'account pems not found');
+    }
+
+    await destroyAccountPems(existPem);
 
     return { message: 'ok' };
   }

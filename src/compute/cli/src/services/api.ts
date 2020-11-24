@@ -38,7 +38,7 @@ export function verifyRsaSignature(
   }>;
 }
 
-export function uploadFile() {
+export function uploadFile(ticket: string) {
   const pathName = `${process.cwd()}/../app/fns`;
   const form = new FormData();
 
@@ -50,8 +50,10 @@ export function uploadFile() {
       if (i == files.length) {
         const url = `${apiOrigin}/cli/upload`;
         return fetch(url, {
+          headers: {
+            authorization: `Bearer ${ticket}`
+          },
           method: 'POST',
-          //@ts-ignore
           body: form
         });
       }
