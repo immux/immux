@@ -47,7 +47,10 @@ pub const MISSING_FILTER_MESSAGE: &str = "FILTER argument missing";
 
 pub const TEMP_LOG_FILE_DIR: &str = "/tmp";
 pub const MAIN_LOG_FILENAME: &str = "instruction_log.imm";
-pub const MAIN_LOG_DEFAULT_DIR_UNIX: &str = "/var/immux";
+pub const MAIN_LOG_FALLBACK_DIR_UNIX: &str = "/var/immux_log";
+pub const MAIN_LOG_FALLBACK_DIR_WINDOWS: &str = "C:\\immux_log";
+pub const MAIN_LOG_DIR_ENV: &str = "IMMUX_LOG";
+pub const MAIN_LOG_DIR_HOME_SUBDIR: &str = "immux_log";
 
 pub const MAX_KEY_LENGTH: usize = 8 * 1024;
 

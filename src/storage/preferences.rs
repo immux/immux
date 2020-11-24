@@ -1,6 +1,8 @@
+use std::env;
 use std::path::PathBuf;
 
 use crate::constants as Constants;
+use crate::constants::{MAIN_LOG_DIR_ENV, MAIN_LOG_DIR_HOME_SUBDIR};
 use crate::storage::ecc::ECCMode;
 
 const CLI_ARG_DATA_DIR: &str = "--data-dir=";
@@ -51,10 +53,35 @@ impl DBPreferences {
     }
 }
 
+fn get_home() -> Option<String> {
+    return if let Ok(home) = env::var("HOME") {
+        Some(home)
+    } else if let Ok(home) = env::var("USERPROFILE") {
+        Some(home)
+    } else {
+        None
+    };
+}
+
+fn get_log_dir() -> PathBuf {
+    return if let Ok(dir) = env::var(MAIN_LOG_DIR_ENV) {
+        PathBuf::from(dir)
+    } else {
+        let home = get_home();
+        if let Some(home) = home {
+            PathBuf::from(home).join(MAIN_LOG_DIR_HOME_SUBDIR)
+        } else if env::consts::OS == "windows" {
+            PathBuf::from(Constants::MAIN_LOG_FALLBACK_DIR_WINDOWS)
+        } else {
+            PathBuf::from(Constants::MAIN_LOG_FALLBACK_DIR_UNIX)
+        }
+    };
+}
+
 impl Default for DBPreferences {
     fn default() -> Self {
         return Self {
-            log_dir: PathBuf::from(Constants::MAIN_LOG_DEFAULT_DIR_UNIX),
+            log_dir: get_log_dir(),
             ecc_mode: ECCMode::Identity,
             http_port: Some(Constants::HTTP_SERVER_DEFAULT_PORT),
             tcp_port: Some(Constants::TCP_SERVER_DEFAULT_PORT),
