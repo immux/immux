@@ -13,9 +13,7 @@
     </div>
     <div>
         <p>Get Messge：</p>
-        <p id="result">
-
-        </p>
+        <p id="result"></p>
     </div>
     <div>
         <button id="btn">send</button>
@@ -23,13 +21,13 @@
 </body>
 <script>
 
-    if (window.WebSocket){
+    if (window.WebSocket) {
         init();
     } else {
         alert('this browser does not support WebSocket');
     }
     
-    function init(){
+    function init() {
         var socket = new WebSocket('ws://localhost:8082');
       
         socket.onopen = (event) => {

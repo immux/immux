@@ -17,6 +17,20 @@ Before running, open mongodb first
 ./run.sh
 ```
 
+### Use
+
+upload the project to the compute
+
+```bash
+cd cli
+npm start
+```
+
+Support websocket and http
+
+- websocket: run websocket/client/index.html
+- http: visit http://localhost:3001/vm/demo/user
+
 Runs the app in the development mode.<br />
 Open [http://localhost:8081](http://localhost:8081) to view it in the browser.
 
