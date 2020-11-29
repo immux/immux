@@ -14,9 +14,7 @@ Platform for creating projects and functions
 Before running, open mongodb first
 
 ```bash
-cd server && npm start
-
-cd client && npm start
+./run.sh
 ```
 
 Runs the app in the development mode.<br />
