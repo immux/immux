@@ -13,12 +13,12 @@ use crate::storage::log_reader::LogReader;
 use crate::storage::log_version::LogVersion;
 use crate::storage::log_writer::LogWriter;
 use crate::storage::preferences::DBPreferences;
-use crate::storage::transaction_manager::{TransactionId, TransactionManager};
+use crate::storage::transaction_manager::{Snapshot, TransactionId, TransactionManager};
 
 pub struct LogKeyValueStore {
     reader: LogReader,
     writer: LogWriter,
-    key_pointer_map: HashMap<KVKey, HashMap<Option<TransactionId>, LogPointer>>,
+    key_pointer_map: Snapshot,
     current_height: ChainHeight,
     transaction_manager: TransactionManager,
 }
@@ -33,7 +33,11 @@ impl LogKeyValueStore {
         let db_version_minor_str = env!("CARGO_PKG_VERSION_MINOR");
         let db_version_revise_str = env!("CARGO_PKG_VERSION_PATCH");
 
-        let db_version = vec![db_version_major_str, db_version_minor_str, db_version_revise_str];
+        let db_version = vec![
+            db_version_major_str,
+            db_version_minor_str,
+            db_version_revise_str,
+        ];
 
         let db_version = LogVersion::try_from(&db_version)?;
 
@@ -68,7 +72,7 @@ impl LogKeyValueStore {
                 self.transaction_manager
                     .validate_transaction_id(&transaction_id)?;
                 self.transaction_manager
-                    .add_affected_keys(&transaction_id, &key);
+                    .add_affected_keys(&transaction_id, &key)?;
 
                 Instruction::TransactionalSet {
                     key: key.clone(),
@@ -86,6 +90,13 @@ impl LogKeyValueStore {
         let log_pointer = self.writer.append_instruction(&instruction)?;
 
         self.current_height.increment()?;
+        if let Some(transaction_id) = transaction_id {
+            self.transaction_manager.update_transaction_meta_data(
+                &key,
+                &log_pointer,
+                &transaction_id,
+            )?;
+        }
 
         update_key_pointer_map(key, &log_pointer, &mut self.key_pointer_map, transaction_id);
 
@@ -97,7 +108,25 @@ impl LogKeyValueStore {
         key: &KVKey,
         transaction_id: Option<TransactionId>,
     ) -> KVResult<Option<KVValue>> {
-        match self.key_pointer_map.get(&key) {
+        let key_pointer_map = if let Some(transaction_id) = transaction_id {
+            let transaction_meta_data = self
+                .transaction_manager
+                .get_transaction_meta_data(&transaction_id)?;
+            transaction_meta_data.snapshot
+        } else {
+            self.key_pointer_map.clone()
+        };
+
+        self.read_from_snapshot(&key_pointer_map, key, transaction_id)
+    }
+
+    fn read_from_snapshot(
+        &mut self,
+        key_pointer_map: &Snapshot,
+        key: &KVKey,
+        transaction_id: Option<TransactionId>,
+    ) -> KVResult<Option<KVValue>> {
+        match key_pointer_map.get(&key) {
             None => Ok(None),
             Some(log_pointers) => {
                 if let Some(log_pointer) = log_pointers.get(&transaction_id) {
@@ -126,7 +155,7 @@ impl LogKeyValueStore {
                     }
                 } else {
                     return if transaction_id.is_some() {
-                        self.get(&key, None)
+                        self.read_from_snapshot(key_pointer_map, &key, None)
                     } else {
                         Ok(None)
                     };
@@ -200,12 +229,20 @@ impl LogKeyValueStore {
             self.transaction_manager
                 .validate_transaction_id(&transaction_id)?;
             self.transaction_manager
-                .add_affected_keys(&transaction_id, &key);
+                .add_affected_keys(&transaction_id, &key)?;
         }
 
         let log_pointer = self.writer.append_instruction(&instruction)?;
 
         self.current_height.increment()?;
+
+        if let Some(transaction_id) = transaction_id {
+            self.transaction_manager.update_transaction_meta_data(
+                &key,
+                &log_pointer,
+                &transaction_id,
+            )?;
+        }
 
         update_key_pointer_map(key, &log_pointer, &mut self.key_pointer_map, transaction_id);
 
@@ -258,12 +295,20 @@ impl LogKeyValueStore {
             self.transaction_manager
                 .validate_transaction_id(&transaction_id)?;
             self.transaction_manager
-                .add_affected_keys(&transaction_id, &key);
+                .add_affected_keys(&transaction_id, &key)?;
         }
 
         self.current_height.increment()?;
 
         update_key_pointer_map(key, &log_pointer, &mut self.key_pointer_map, transaction_id);
+
+        if let Some(transaction_id) = transaction_id {
+            self.transaction_manager.update_transaction_meta_data(
+                &key,
+                &log_pointer,
+                &transaction_id,
+            )?;
+        }
 
         return Ok(());
     }
@@ -278,6 +323,9 @@ impl LogKeyValueStore {
         }
 
         self.current_height.increment()?;
+
+        self.key_pointer_map = HashMap::new();
+        self.transaction_manager = TransactionManager::new();
 
         return Ok(());
     }
@@ -303,41 +351,41 @@ impl LogKeyValueStore {
                     appeared_key.insert(key.clone());
 
                     if target_key == key {
-                        return Some((instruction, ChainHeight::new((index) as u64)));
+                        Some((instruction, ChainHeight::new((index) as u64)))
                     } else {
-                        return None;
+                        None
                     }
                 }
                 Instruction::RevertOne { key, height: _ } => {
                     appeared_key.insert(key.clone());
 
                     if target_key == key {
-                        return Some((instruction, ChainHeight::new((index) as u64)));
+                        Some((instruction, ChainHeight::new((index) as u64)))
                     } else {
-                        return None;
+                        None
                     }
                 }
                 Instruction::RevertAll { height: _ } => {
                     if appeared_key.contains(&target_key) {
-                        return Some((instruction, ChainHeight::new((index) as u64)));
+                        Some((instruction, ChainHeight::new((index) as u64)))
                     } else {
-                        return None;
+                        None
                     }
                 }
                 Instruction::RemoveOne { key } => {
                     appeared_key.insert(key.clone());
 
                     if target_key == key {
-                        return Some((instruction, ChainHeight::new((index) as u64)));
+                        Some((instruction, ChainHeight::new((index) as u64)))
                     } else {
-                        return None;
+                        None
                     }
                 }
                 Instruction::RemoveAll => {
                     if appeared_key.contains(&target_key) {
-                        return Some((instruction, ChainHeight::new((index) as u64)));
+                        Some((instruction, ChainHeight::new((index) as u64)))
                     } else {
-                        return None;
+                        None
                     }
                 }
                 _ => None,
@@ -351,8 +399,9 @@ impl LogKeyValueStore {
         let instruction = Instruction::TransactionStart { transaction_id };
         self.writer.append_instruction(&instruction)?;
 
+        let snapshot = self.key_pointer_map.clone();
         self.transaction_manager
-            .initialize_affected_keys(&transaction_id);
+            .initialize_transaction(&transaction_id, snapshot);
 
         self.current_height.increment()?;
 
@@ -369,7 +418,7 @@ impl LogKeyValueStore {
         update_committed_log_pointers(
             &mut self.transaction_manager,
             &mut self.key_pointer_map,
-            transaction_id,
+            transaction_id.clone(),
         );
 
         self.current_height.increment()?;
@@ -421,18 +470,18 @@ fn recursive_find(
     match target_instruction {
         Instruction::Set { key, value } => {
             if target_key == key {
-                return Ok(Some(value.to_owned()));
+                Ok(Some(value.to_owned()))
             } else {
                 let next_target_height = &target_height.clone().decrement()?;
-                return recursive_find(&target_key, &instructions, &next_target_height);
+                recursive_find(&target_key, &instructions, &next_target_height)
             }
         }
         Instruction::RevertOne { key, height } => {
             if target_key == key {
-                return recursive_find(&target_key, &instructions, height);
+                recursive_find(&target_key, &instructions, height)
             } else {
                 let next_target_height = &target_height.clone().decrement()?;
-                return recursive_find(&target_key, &instructions, &next_target_height);
+                recursive_find(&target_key, &instructions, &next_target_height)
             }
         }
         Instruction::RevertAll { height } => {
@@ -440,18 +489,16 @@ fn recursive_find(
         }
         Instruction::RemoveOne { key } => {
             if target_key == key {
-                return Ok(None);
+                Ok(None)
             } else {
                 let next_target_height = &target_height.clone().decrement()?;
-                return recursive_find(&target_key, &instructions, next_target_height);
+                recursive_find(&target_key, &instructions, next_target_height)
             }
         }
-        Instruction::RemoveAll => {
-            return Ok(None);
-        }
+        Instruction::RemoveAll => Ok(None),
         _ => {
             let next_target_height = &target_height.clone().decrement()?;
-            return recursive_find(&target_key, &instructions, &next_target_height);
+            recursive_find(&target_key, &instructions, &next_target_height)
         }
     }
 }
@@ -459,11 +506,7 @@ fn recursive_find(
 fn load_key_pointer_map(
     mut reader: &mut LogReader,
     target_height: Option<&ChainHeight>,
-) -> KVResult<(
-    HashMap<KVKey, HashMap<Option<TransactionId>, LogPointer>>,
-    ChainHeight,
-    TransactionManager,
-)> {
+) -> KVResult<(Snapshot, ChainHeight, TransactionManager)> {
     let (instruction_iterator, header_offset) = reader.read_all()?;
     let mut current_position = header_offset as u64;
     let mut height = ChainHeight::new(0);
@@ -496,7 +539,8 @@ fn load_key_pointer_map(
                 }
             }
             Instruction::TransactionStart { transaction_id } => {
-                transaction_manager.initialize_affected_keys(&transaction_id);
+                let snapshot = key_pointer_map.clone();
+                transaction_manager.initialize_transaction(&transaction_id, snapshot);
                 transaction_manager.update_transaction_id(&transaction_id);
             }
             Instruction::TransactionalSet {
@@ -511,7 +555,7 @@ fn load_key_pointer_map(
                     &mut key_pointer_map,
                     Some(transaction_id),
                 );
-                transaction_manager.add_affected_keys(&transaction_id, &key);
+                transaction_manager.add_affected_keys(&transaction_id, &key)?;
             }
             Instruction::TransactionalRevertOne {
                 key,
@@ -526,7 +570,7 @@ fn load_key_pointer_map(
                     Some(transaction_id),
                 );
 
-                transaction_manager.add_affected_keys(&transaction_id, &key);
+                transaction_manager.add_affected_keys(&transaction_id, &key)?;
             }
             Instruction::TransactionalRemoveOne {
                 key,
@@ -540,7 +584,7 @@ fn load_key_pointer_map(
                     Some(transaction_id),
                 );
 
-                transaction_manager.add_affected_keys(&transaction_id, &key);
+                transaction_manager.add_affected_keys(&transaction_id, &key)?;
             }
             Instruction::TransactionCommit { transaction_id } => {
                 update_committed_log_pointers(
@@ -574,7 +618,7 @@ fn load_key_pointer_map(
 
 fn update_committed_log_pointers(
     transaction_manager: &mut TransactionManager,
-    key_pointer_map: &mut HashMap<KVKey, HashMap<Option<TransactionId>, LogPointer>>,
+    key_pointer_map: &mut Snapshot,
     transaction_id: TransactionId,
 ) {
     let affected_keys = transaction_manager.get_affected_keys(&transaction_id);
@@ -592,7 +636,7 @@ fn update_committed_log_pointers(
 
 fn update_aborted_log_pointers(
     transaction_manager: &mut TransactionManager,
-    key_pointer_map: &mut HashMap<KVKey, HashMap<Option<TransactionId>, LogPointer>>,
+    key_pointer_map: &mut Snapshot,
     transaction_id: TransactionId,
 ) {
     let affected_keys = transaction_manager.get_affected_keys(&transaction_id);
@@ -608,7 +652,7 @@ fn update_aborted_log_pointers(
 fn update_key_pointer_map(
     key: &KVKey,
     log_pointer: &LogPointer,
-    key_pointer_map: &mut HashMap<KVKey, HashMap<Option<TransactionId>, LogPointer>>,
+    key_pointer_map: &mut Snapshot,
     transaction_id: Option<TransactionId>,
 ) {
     if let Some(log_pointers) = key_pointer_map.get_mut(&key) {

@@ -608,86 +608,6 @@ mod tcp_e2e_tests {
     }
 
     #[test]
-    fn tcp_e2e_remove_all_isolation() {
-        let port = 8012;
-        launch_test_db_servers("tcp_e2e_remove_all_isolation", None, Some(port)).unwrap();
-
-        let host = &format!("{}:{}", Constants::SERVER_END_POINT, port);
-        let client = ImmuxDBTcpClient::new(host).unwrap();
-        let grouping = GroupingLabel::new("any_grouping".as_bytes());
-        let expected_transaction_id = TransactionId::new(1);
-
-        let key_content_pairs = get_key_content_pairs();
-
-        for (key, content) in key_content_pairs.iter() {
-            let outcome = client.set_unit(&grouping, &key, &content).unwrap();
-
-            assert_eq!(outcome, Outcome::InsertSuccess);
-        }
-
-        let outcome = client.create_transaction().unwrap();
-
-        assert_eq!(
-            outcome,
-            Outcome::CreateTransaction(expected_transaction_id.clone())
-        );
-
-        let outcome = client.remove_all().unwrap();
-
-        assert_eq!(outcome, Outcome::RemoveAllSuccess);
-
-        for (key, _content) in key_content_pairs.iter() {
-            let outcome = client
-                .transactional_get(&grouping, &key, &expected_transaction_id)
-                .unwrap();
-
-            assert_eq!(outcome, Outcome::Select(vec![]));
-        }
-    }
-
-    #[test]
-    fn tcp_e2e_revert_all_isolation() {
-        let port = 8013;
-        launch_test_db_servers("tcp_e2e_revert_all_isolation", None, Some(port)).unwrap();
-
-        let host = &format!("{}:{}", Constants::SERVER_END_POINT, port);
-        let client = ImmuxDBTcpClient::new(host).unwrap();
-        let grouping = GroupingLabel::new("any_grouping".as_bytes());
-        let expected_transaction_id = TransactionId::new(1);
-
-        let key_content_pairs = get_key_content_pairs();
-        let target_pair_index = 4;
-        let target_height = ChainHeight::new(target_pair_index);
-
-        for (key, content) in key_content_pairs.iter() {
-            let outcome = client.set_unit(&grouping, &key, &content).unwrap();
-
-            assert_eq!(outcome, Outcome::InsertSuccess);
-        }
-
-        let outcome = client.create_transaction().unwrap();
-
-        assert_eq!(outcome, Outcome::CreateTransaction(expected_transaction_id));
-
-        let outcome = client.revert_all(&target_height).unwrap();
-
-        assert_eq!(outcome, Outcome::RevertAllSuccess);
-
-        for (index, (key, content)) in key_content_pairs.iter().enumerate() {
-            let outcome = client
-                .transactional_get(&grouping, &key, &expected_transaction_id)
-                .unwrap();
-
-            if index <= target_height.as_u64() as usize {
-                assert_eq!(outcome, Outcome::Select(vec![content.clone()]));
-            } else {
-                assert_eq!(outcome, Outcome::Select(vec![]));
-            }
-        }
-    }
-
-    #[test]
-    #[should_panic]
     fn tcp_e2e_transaction_not_alive_after_revert_all() {
         let port = 8014;
         launch_test_db_servers(
@@ -720,11 +640,11 @@ mod tcp_e2e_tests {
 
         assert_eq!(outcome, Outcome::RevertAllSuccess);
 
-        client.commit_transaction(&expected_transaction_id).unwrap();
+        let outcome = client.commit_transaction(&expected_transaction_id).unwrap();
+        assert_eq!(outcome, Outcome::ServerError);
     }
 
     #[test]
-    #[should_panic]
     fn tcp_e2e_unexpected_commit_transaction_id() {
         let port = 8016;
         launch_test_db_servers("tcp_e2e_unexpected_commit_transaction_id", None, Some(port))
@@ -735,11 +655,11 @@ mod tcp_e2e_tests {
 
         let fake_transaction_id = TransactionId::new(100);
 
-        client.commit_transaction(&fake_transaction_id).unwrap();
+        let outcome = client.commit_transaction(&fake_transaction_id).unwrap();
+        assert_eq!(outcome, Outcome::ServerError);
     }
 
     #[test]
-    #[should_panic]
     fn tcp_e2e_unexpected_abort_transaction_id() {
         let port = 8015;
         launch_test_db_servers("tcp_e2e_unexpected_abort_transaction_id", None, Some(port))
@@ -750,7 +670,8 @@ mod tcp_e2e_tests {
 
         let fake_transaction_id = TransactionId::new(100);
 
-        client.abort_transaction(&fake_transaction_id).unwrap();
+        let outcome = client.abort_transaction(&fake_transaction_id).unwrap();
+        assert_eq!(outcome, Outcome::ServerError);
     }
 
     #[test]
@@ -890,7 +811,7 @@ mod tcp_e2e_tests {
             let outcome = client
                 .transactional_get(&grouping, &key, &expected_tid)
                 .unwrap();
-            assert_eq!(outcome, Outcome::Select(vec![value_in_transaction]));
+            assert_eq!(outcome, Outcome::ServerError);
         }
     }
 

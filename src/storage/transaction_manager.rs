@@ -2,7 +2,10 @@ use std::collections::HashMap;
 
 use crate::constants as Constants;
 use crate::storage::kvkey::KVKey;
+use crate::storage::log_pointer::LogPointer;
 use crate::utils::varint::varint_encode;
+
+pub type Snapshot = HashMap<KVKey, HashMap<Option<TransactionId>, LogPointer>>;
 
 #[derive(Debug, Clone, Copy, PartialEq, PartialOrd, Hash, Eq)]
 pub struct TransactionId(u64);
@@ -35,16 +38,32 @@ pub enum TransactionManagerError {
     TransactionNotAlive,
 }
 
+#[derive(Debug, Clone)]
+pub struct TransactionMetaData {
+    pub affected_keys: Vec<KVKey>,
+    pub snapshot: Snapshot,
+}
+
+impl TransactionMetaData {
+    pub fn new(affected_keys: Vec<KVKey>, snapshot: Snapshot) -> TransactionMetaData {
+        TransactionMetaData {
+            affected_keys,
+            snapshot,
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
 pub struct TransactionManager {
-    current_transaction_id: TransactionId,
-    affected_keys_in_transactions: HashMap<TransactionId, Vec<KVKey>>,
+    pub current_transaction_id: TransactionId,
+    pub transactions: HashMap<TransactionId, TransactionMetaData>,
 }
 
 impl TransactionManager {
     pub fn new() -> TransactionManager {
         TransactionManager {
             current_transaction_id: TransactionId::new(0),
-            affected_keys_in_transactions: HashMap::new(),
+            transactions: HashMap::new(),
         }
     }
 
@@ -59,28 +78,30 @@ impl TransactionManager {
         self.current_transaction_id = transaction_id.to_owned();
     }
 
-    pub fn add_affected_keys(&mut self, transaction_id: &TransactionId, key: &KVKey) {
-        if let Some(keys) = self.affected_keys_in_transactions.get_mut(&transaction_id) {
-            keys.push(key.to_owned());
+    pub fn add_affected_keys(
+        &mut self,
+        transaction_id: &TransactionId,
+        key: &KVKey,
+    ) -> Result<(), TransactionManagerError> {
+        if let Some(transaction_meta_data) = self.transactions.get_mut(&transaction_id) {
+            transaction_meta_data.affected_keys.push(key.to_owned());
+            return Ok(());
         } else {
-            self.affected_keys_in_transactions
-                .insert(transaction_id.clone(), vec![key.to_owned()]);
+            return Err(TransactionManagerError::TransactionNotAlive);
         }
     }
 
-    pub fn initialize_affected_keys(&mut self, transaction_id: &TransactionId) {
-        self.affected_keys_in_transactions
-            .insert(transaction_id.clone(), vec![]);
+    pub fn initialize_transaction(&mut self, transaction_id: &TransactionId, snapshot: Snapshot) {
+        let transaction_meta_data = TransactionMetaData::new(vec![], snapshot);
+        self.transactions
+            .insert(transaction_id.clone(), transaction_meta_data);
     }
 
     pub fn validate_transaction_id(
         &self,
         transaction_id: &TransactionId,
     ) -> Result<(), TransactionManagerError> {
-        return if self
-            .affected_keys_in_transactions
-            .contains_key(&transaction_id)
-        {
+        return if self.transactions.contains_key(&transaction_id) {
             Ok(())
         } else {
             Err(TransactionManagerError::TransactionNotAlive)
@@ -88,14 +109,48 @@ impl TransactionManager {
     }
 
     pub fn get_affected_keys(&self, transaction_id: &TransactionId) -> Vec<KVKey> {
-        if let Some(keys) = self.affected_keys_in_transactions.get(&transaction_id) {
-            return keys.to_owned();
+        if let Some(transaction_meta_data) = self.transactions.get(&transaction_id) {
+            let keys = &transaction_meta_data.affected_keys;
+            keys.to_owned()
         } else {
-            return vec![];
+            vec![]
         }
     }
 
     pub fn remove_transaction(&mut self, transaction_id: &TransactionId) {
-        self.affected_keys_in_transactions.remove(&transaction_id);
+        self.transactions.remove(&transaction_id);
+    }
+
+    pub fn get_transaction_meta_data(
+        &self,
+        transaction_id: &TransactionId,
+    ) -> Result<TransactionMetaData, TransactionManagerError> {
+        if let Some(transaction_meta_data) = self.transactions.get(transaction_id) {
+            Ok(transaction_meta_data.clone())
+        } else {
+            Err(TransactionManagerError::TransactionNotAlive)
+        }
+    }
+
+    pub fn update_transaction_meta_data(
+        &mut self,
+        key: &KVKey,
+        log_pointer: &LogPointer,
+        transaction_id: &TransactionId,
+    ) -> Result<(), TransactionManagerError> {
+        if let Some(transaction_meta_data) = self.transactions.get_mut(&transaction_id) {
+            if let Some(log_pointers) = transaction_meta_data.snapshot.get_mut(&key) {
+                log_pointers.insert(Some(transaction_id.clone()), log_pointer.clone());
+            } else {
+                let mut log_pointers = HashMap::new();
+                log_pointers.insert(Some(transaction_id.clone()), log_pointer.clone());
+                transaction_meta_data
+                    .snapshot
+                    .insert(key.clone(), log_pointers);
+            }
+            Ok(())
+        } else {
+            Err(TransactionManagerError::TransactionNotAlive)
+        }
     }
 }

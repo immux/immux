@@ -6,6 +6,7 @@ mod http_e2e_tests {
     use immuxsys::constants as Constants;
     use immuxsys::storage::chain_height::ChainHeight;
     use immuxsys::storage::executor::grouping_label::GroupingLabel;
+    use immuxsys::storage::executor::outcome::Outcome;
     use immuxsys::storage::executor::unit_content::UnitContent;
     use immuxsys::storage::executor::unit_key::UnitKey;
     use immuxsys::storage::transaction_manager::TransactionId;
@@ -741,9 +742,14 @@ mod http_e2e_tests {
     }
 
     #[test]
-    fn http_e2e_remove_all_isolation() {
+    fn http_transaction_not_alive_after_remove_all() {
         let port = 10093;
-        launch_test_db_servers("http_e2e_remove_all_isolation", Some(port), None).unwrap();
+        launch_test_db_servers(
+            "http_transaction_not_alive_after_remove_all",
+            Some(port),
+            None,
+        )
+        .unwrap();
 
         let host = &format!("{}:{}", Constants::SERVER_END_POINT, port);
         let client = ImmuxDBHttpClient::new(host).unwrap();
@@ -773,59 +779,7 @@ mod http_e2e_tests {
                 )
                 .unwrap();
             assert_eq!(status_code.as_u16(), 200);
-            assert_eq!(actual_output, "Nil");
-        }
-    }
-
-    #[test]
-    fn http_e2e_revert_all_isolation() {
-        let port = 10094;
-        launch_test_db_servers("http_e2e_revert_all_isolation", Some(port), None).unwrap();
-
-        let host = &format!("{}:{}", Constants::SERVER_END_POINT, port);
-        let client = ImmuxDBHttpClient::new(host).unwrap();
-        let grouping = String::from("any_grouping");
-
-        let key_content_pairs = get_key_content_pairs();
-        let target_pair_index = 4;
-        let target_height = ChainHeight::new(target_pair_index);
-
-        for (key, content) in key_content_pairs.iter() {
-            client
-                .set_unit(&GroupingLabel::new(&grouping.as_bytes()), &key, &content)
-                .unwrap();
-        }
-
-        let (status_code, transaction_id_str) = client.create_transaction().unwrap();
-        assert_eq!(status_code.as_u16(), 200);
-
-        let transaction_id = TransactionId::new(transaction_id_str.parse::<u64>().unwrap());
-
-        client.revert_all(&target_height).unwrap();
-
-        for (index, (key, content)) in key_content_pairs.iter().enumerate() {
-            if index <= target_height.as_u64() as usize {
-                let (status_code, actual_output) = client
-                    .transactional_get(
-                        &GroupingLabel::new(&grouping.as_bytes()),
-                        &key,
-                        &transaction_id,
-                    )
-                    .unwrap();
-                let expected_output = content.to_string();
-                assert_eq!(status_code.as_u16(), 200);
-                assert_eq!(actual_output, expected_output);
-            } else {
-                let (status_code, actual_output) = client
-                    .transactional_get(
-                        &GroupingLabel::new(&grouping.as_bytes()),
-                        &key,
-                        &transaction_id,
-                    )
-                    .unwrap();
-                assert_eq!(status_code.as_u16(), 200);
-                assert_eq!(actual_output, "Nil");
-            }
+            assert_eq!(actual_output, Outcome::ServerError.to_string());
         }
     }
 
@@ -859,9 +813,9 @@ mod http_e2e_tests {
 
         client.revert_all(&target_height).unwrap();
 
-        let (status_code, _) = client.commit_transaction(&transaction_id).unwrap();
-
-        assert_eq!(status_code.as_u16(), 500);
+        let (status_code, outcome) = client.commit_transaction(&transaction_id).unwrap();
+        assert_eq!(status_code.as_u16(), 200);
+        assert_eq!(outcome, Outcome::ServerError.to_string());
     }
 
     #[test]
@@ -879,8 +833,9 @@ mod http_e2e_tests {
 
         let fake_transaction_id = TransactionId::new(100);
 
-        let (status_code, _) = client.commit_transaction(&fake_transaction_id).unwrap();
-        assert_eq!(status_code.as_u16(), 500);
+        let (status_code, outcome) = client.commit_transaction(&fake_transaction_id).unwrap();
+        assert_eq!(status_code.as_u16(), 200);
+        assert_eq!(outcome, Outcome::ServerError.to_string());
     }
 
     #[test]
@@ -894,8 +849,9 @@ mod http_e2e_tests {
 
         let fake_transaction_id = TransactionId::new(100);
 
-        let (status_code, _) = client.abort_transaction(&fake_transaction_id).unwrap();
-        assert_eq!(status_code.as_u16(), 500);
+        let (status_code, outcome) = client.abort_transaction(&fake_transaction_id).unwrap();
+        assert_eq!(status_code.as_u16(), 200);
+        assert_eq!(outcome, Outcome::ServerError.to_string());
     }
 
     #[test]
@@ -1060,17 +1016,15 @@ mod http_e2e_tests {
         client.commit_transaction(&transaction_id).unwrap();
 
         {
-            let (status_code, actual_value) = client
+            let (status_code, outcome) = client
                 .transactional_get(
                     &GroupingLabel::new(&grouping.as_bytes()),
                     &key,
                     &transaction_id,
                 )
                 .unwrap();
-            let expected_value = &value_in_transaction;
-
             assert_eq!(status_code.as_u16(), 200);
-            assert_eq!(&UnitContent::from(actual_value.as_str()), expected_value);
+            assert_eq!(outcome, Outcome::ServerError.to_string())
         }
     }
 

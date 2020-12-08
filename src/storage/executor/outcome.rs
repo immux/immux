@@ -61,6 +61,8 @@ pub enum OutcomePrefix {
     CreateTransactionSuccess = 0xd0,
     TransactionCommitSuccess = 0xd1,
     TransactionAbortSuccess = 0xd2,
+
+    ServerError = 0xf0,
 }
 
 #[derive(Debug, PartialEq)]
@@ -81,6 +83,7 @@ pub enum Outcome {
     TransactionAbortSuccess,
     GetAllGroupingsSuccess(Vec<GroupingLabel>),
     DeleteGroupingSuccess,
+    ServerError,
 }
 
 impl Outcome {
@@ -159,6 +162,7 @@ impl Outcome {
                 return result;
             }
             Outcome::DeleteGroupingSuccess => vec![OutcomePrefix::DeleteGroupingsSuccess as u8],
+            Outcome::ServerError => vec![OutcomePrefix::ServerError as u8],
         }
     }
     pub fn parse(data: &[u8]) -> Result<(Self, usize), OutcomeError> {
@@ -276,6 +280,8 @@ impl Outcome {
             return Ok((Outcome::GetAllGroupingsSuccess(result), position));
         } else if prefix == OutcomePrefix::DeleteGroupingsSuccess as u8 {
             return Ok((Outcome::DeleteGroupingSuccess, position));
+        } else if prefix == OutcomePrefix::ServerError as u8 {
+            return Ok((Outcome::ServerError, position));
         } else {
             return Err(OutcomeError::UnexpectedPrefix);
         }
@@ -329,6 +335,7 @@ impl fmt::Display for Outcome {
                 output_vec.join("\r\n")
             }
             Outcome::DeleteGroupingSuccess => String::from("Delete Groupings Success"),
+            Outcome::ServerError => String::from("Server Error"),
         };
         write!(f, "{}", string)
     }

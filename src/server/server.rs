@@ -60,7 +60,10 @@ fn spawn_db_thread(
             let message = server_db_receiver.recv()?;
             let received_command = message.command;
 
-            let outcome = handle_command(received_command, &mut executor)?;
+            let outcome = match handle_command(received_command, &mut executor) {
+                Ok(outcome) => outcome,
+                Err(_error) => Outcome::ServerError,
+            };
 
             match message.sender {
                 AnnotatedCommandSender::HTTP => {
@@ -161,6 +164,10 @@ pub fn run_http_server(
                                 .map(|grouping| grouping.to_string())
                                 .collect();
                             let body = outcome_string_vec.join("\r\n");
+                            (200, body)
+                        }
+                        Outcome::ServerError => {
+                            let body = Outcome::ServerError.to_string();
                             (200, body)
                         }
                         _ => (200, String::from("Unspecified outcome")),
