@@ -14,7 +14,7 @@ export interface FunctionsDoc {
 
   marketStatus: Boolean;
 
-  price: number,
+  price: number;
 
   updateAt: Date;
 }
