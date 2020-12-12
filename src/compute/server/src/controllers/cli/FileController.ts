@@ -16,6 +16,8 @@ import { dirExists } from '@/utils';
 import { AccessTicketMiddleware } from '@/middlewares/account';
 import { AccountSchema } from '@/types/models/Account';
 import { createNameSpace } from '@/services/nameSpace';
+import { createFunction } from '@/services/functions';
+import _ = require('lodash');
 
 import requestPromise = require('request-promise-native');
 
@@ -36,8 +38,18 @@ export default class FileHistoryController {
     await dirExists(`./uploads/${ProjectName}`);
 
     for (let i = 0; i < files.length; i++) {
+      const fileName = files[i].originalname;
+
+      createFunction(
+        account,
+        {
+          name: fileName,
+          projectId: ProjectName,
+        }
+      );
+
       fs.writeFile(
-        `./uploads/${ProjectName}/${files[i].originalname}`,
+        `./uploads/${ProjectName}/${fileName}`,
         files[i].buffer,
         'binary',
         function (err) {
