@@ -15,6 +15,8 @@ import _ from 'lodash';
 
 const NAME_SPACE_KEY = 'name-space';
 const HOME_KEY = 'home';
+const MY_FUNCTIONS_KEY = 'my-functions';
+const MARKET_KEY = 'market';
 
 export default function HomeAside() {
   const [selectedKeys, setSelectedKeys] = useState<string[]>([]);
@@ -60,9 +62,18 @@ export default function HomeAside() {
 
       <AsideCard className={styles.section} title="Function Market">
         <AsideMenu selectedKeys={[]}>
-          <Menu.Item key="1" disabled>
-            <BuildOutlined />
-            UploadFunctions
+          <Menu.Item key="MARKET_KEY">
+            <Link to="/market/public-functions">
+              <AppstoreOutlined />
+              Market
+            </Link>  
+          </Menu.Item>
+
+          <Menu.Item key="MY_FUNCTIONS_KEY">
+            <Link to="/market/personal-functions">
+              <BuildOutlined />
+              MyFunctions
+            </Link>  
           </Menu.Item>
         </AsideMenu>
       </AsideCard>
