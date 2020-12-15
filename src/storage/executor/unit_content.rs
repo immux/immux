@@ -137,35 +137,48 @@ impl UnitContent {
                         }
                     }
                     ContentTypePrefix::String => {
-                        let (length, offset) = varint_decode(&remaining_bytes).map_err(|_| UnitContentError::UnexpectedLengthBytes)?;
+                        let (length, offset) = varint_decode(&remaining_bytes)
+                            .map_err(|_| UnitContentError::UnexpectedLengthBytes)?;
                         let string_bytes = &remaining_bytes[offset..offset + length as usize];
                         let content_string = String::from_utf8_lossy(string_bytes).to_string();
-                        return Ok((UnitContent::String(content_string), 1 + offset + length as usize));
+                        return Ok((
+                            UnitContent::String(content_string),
+                            1 + offset + length as usize,
+                        ));
                     }
                     ContentTypePrefix::Array => {
                         let mut result: Vec<UnitContent> = Vec::with_capacity(1);
-                        let (total_length, offset) = varint_decode(&remaining_bytes).map_err(|_| UnitContentError::UnexpectedLengthBytes)?;
-                        let contents_bytes = &remaining_bytes[offset..offset + total_length as usize];
+                        let (total_length, offset) = varint_decode(&remaining_bytes)
+                            .map_err(|_| UnitContentError::UnexpectedLengthBytes)?;
+                        let contents_bytes =
+                            &remaining_bytes[offset..offset + total_length as usize];
 
                         let mut position = 0;
                         while position < contents_bytes.len() {
-                            let (content, offset) = UnitContent::parse(&contents_bytes[position..])?;
+                            let (content, offset) =
+                                UnitContent::parse(&contents_bytes[position..])?;
                             result.push(content);
                             position += offset;
                         }
 
-                        return Ok((UnitContent::Array(result), 1 + offset + total_length as usize));
+                        return Ok((
+                            UnitContent::Array(result),
+                            1 + offset + total_length as usize,
+                        ));
                     }
                     ContentTypePrefix::Map => {
                         let mut result = HashMap::new();
-                        let (total_length, offset) = varint_decode(&remaining_bytes).map_err(|_| UnitContentError::UnexpectedLengthBytes)?;
+                        let (total_length, offset) = varint_decode(&remaining_bytes)
+                            .map_err(|_| UnitContentError::UnexpectedLengthBytes)?;
                         let map_bytes = &remaining_bytes[offset..offset + total_length as usize];
 
                         let mut position = 0;
                         while position < map_bytes.len() {
-                            let (string_length, offset) = varint_decode(&map_bytes[position..]).map_err(|_| UnitContentError::UnexpectedLengthBytes)?;
+                            let (string_length, offset) = varint_decode(&map_bytes[position..])
+                                .map_err(|_| UnitContentError::UnexpectedLengthBytes)?;
                             position += offset;
-                            let string_bytes = &map_bytes[position..position + string_length as usize];
+                            let string_bytes =
+                                &map_bytes[position..position + string_length as usize];
                             position += string_length as usize;
 
                             let (content, offset) = UnitContent::parse(&map_bytes[position..])?;
@@ -186,12 +199,71 @@ impl UnitContent {
 impl ToString for UnitContent {
     fn to_string(&self) -> String {
         match self {
-            UnitContent::Nil => String::from("nil"),
-            UnitContent::String(string) => string.clone(),
+            UnitContent::Nil => "Nil".to_string(),
+            UnitContent::String(string) => format!("{}{}{}", "\"", string.clone(), "\""),
             UnitContent::Float64(f) => format!("{}", f),
             UnitContent::Bool(b) => (if *b { "true" } else { "false" }).to_string(),
-            UnitContent::Map(map) => format!("{:?}", map),
-            UnitContent::Array(array) => format!("{:?}", array),
+            UnitContent::Map(map) => {
+                let kv_pairs: Vec<String> = map
+                    .iter()
+                    .map(|(key, content)| format!("{}:{}", key, content.to_string()))
+                    .collect();
+                format!("{}{}{}", "{", kv_pairs.join(","), "}")
+            }
+            UnitContent::Array(array) => {
+                let kv_pairs: Vec<String> =
+                    array.iter().map(|content| content.to_string()).collect();
+                format!("{}{}{}", "[", kv_pairs.join(","), "]")
+            }
+        }
+    }
+}
+
+impl From<&str> for UnitContent {
+    fn from(incoming_str: &str) -> UnitContent {
+        if incoming_str.starts_with("{") && incoming_str.ends_with("}") {
+            let body_length = incoming_str.len();
+            let sub_body = &incoming_str[1..body_length - 1];
+            let kv_paris_str: Vec<&str> = sub_body.split(",").collect();
+
+            let mut map = HashMap::new();
+
+            for kv_pair_str in kv_paris_str.iter() {
+                let kv_pair_str = kv_pair_str.trim();
+                let segments: Vec<&str> = kv_pair_str.split(":").collect();
+                let key = segments[0].trim();
+                let content = UnitContent::from(segments[1].trim());
+                map.insert(key.to_string(), content);
+            }
+            UnitContent::Map(map)
+        } else if let Ok(num_f64) = incoming_str.parse::<f64>() {
+            UnitContent::Float64(num_f64)
+        } else if incoming_str == "true" {
+            UnitContent::Bool(true)
+        } else if incoming_str == "false" {
+            UnitContent::Bool(false)
+        } else if incoming_str == "Nil" {
+            UnitContent::Nil
+        } else if incoming_str.starts_with("[") && incoming_str.ends_with("]") {
+            let body_length = incoming_str.len();
+            let sub_body = &incoming_str[1..body_length - 1];
+            let contents_str: Vec<&str> = sub_body.split(",").collect();
+
+            let mut array = vec![];
+
+            for content_str in contents_str.into_iter() {
+                let content = UnitContent::from(content_str);
+                array.push(content);
+            }
+            UnitContent::Array(array)
+        } else {
+            if incoming_str.trim().starts_with("\"") && incoming_str.ends_with("\"") {
+                let str_length = &incoming_str.len();
+                let sub_string = &incoming_str[1..str_length - 1];
+                UnitContent::String(String::from(sub_string))
+            } else {
+                UnitContent::String(String::from(incoming_str))
+            }
         }
     }
 }
@@ -234,10 +306,92 @@ mod unit_content_tests {
     }
 
     #[test]
+    fn unit_content_marshal_parse_reversibility() {
+        let mut map = HashMap::new();
+        map.insert(
+            String::from("brand"),
+            UnitContent::String(String::from("apple")),
+        );
+        map.insert(String::from("price"), UnitContent::Float64(4000.0));
+        let map_content = UnitContent::Map(map);
+
+        let contents = vec![
+            map_content,
+            UnitContent::String(String::from("this is a string")),
+            UnitContent::Bool(true),
+            UnitContent::Bool(false),
+            UnitContent::Nil,
+            UnitContent::String(String::from("true")),
+            UnitContent::String(String::from("false")),
+            UnitContent::String(String::from("Nil")),
+            UnitContent::Array(vec![
+                UnitContent::Float64(1.0),
+                UnitContent::String(String::from("Andy")),
+            ]),
+        ];
+
+        for content in contents {
+            let expected_output = &content;
+            let content_bytes = content.marshal();
+            let (actual_output, offset) = UnitContent::parse(&content_bytes).unwrap();
+            assert_eq!(expected_output, &actual_output);
+            assert_eq!(content_bytes.len(), offset);
+        }
+    }
+
+    #[test]
+    fn unit_content_from_string() {
+        let mut map = HashMap::new();
+        map.insert(
+            String::from("name"),
+            UnitContent::String(String::from("Tom")),
+        );
+        map.insert(String::from("age"), UnitContent::Float64(40.0));
+
+        let content_pairs = [
+            (
+                "\"this is a string\"",
+                UnitContent::String(String::from("this is a string")),
+            ),
+            ("true", UnitContent::Bool(true)),
+            ("false", UnitContent::Bool(false)),
+            ("Nil", UnitContent::Nil),
+            ("\"true\"", UnitContent::String(String::from("true"))),
+            ("\"false\"", UnitContent::String(String::from("false"))),
+            ("\"Nil\"", UnitContent::String(String::from("Nil"))),
+            ("{name:\"Tom\", age:40}", UnitContent::Map(map)),
+            (
+                "[1,2,3,\"Andy\",5]",
+                UnitContent::Array(vec![
+                    UnitContent::Float64(1.0),
+                    UnitContent::Float64(2.0),
+                    UnitContent::Float64(3.0),
+                    UnitContent::String(String::from("Andy")),
+                    UnitContent::Float64(5.0),
+                ]),
+            ),
+            ("\"\"", UnitContent::String(String::from(""))),
+            ("", UnitContent::String(String::from(""))),
+        ];
+
+        for (content_str, expected_output) in content_pairs.iter() {
+            let actual_output = UnitContent::from(*content_str);
+            assert_eq!(&actual_output, expected_output);
+        }
+    }
+
+    #[test]
     fn weak_permutation_test() {
         let array = [1, 2, 3];
         let actual_result = permutation(&array);
-        let expected_result = vec![[1, 2, 3], [1, 3, 2], [2, 1, 3], [2, 3, 1], [3, 1, 2], [3, 2, 1]];
+        let expected_result = vec![
+            [1, 2, 3],
+            [1, 3, 2],
+            [2, 1, 3],
+            [2, 3, 1],
+            [3, 1, 2],
+            [3, 2, 1],
+        ];
 
         assert_eq!(actual_result, expected_result);
     }
@@ -297,7 +451,10 @@ mod unit_content_tests {
             (Some(UnitContent::Nil), vec![vec![0x00]]),
             (Some(UnitContent::Bool(true)), vec![vec![0x11, 0x01]]),
             (Some(UnitContent::Bool(false)), vec![vec![0x11, 0x00]]),
-            (Some(UnitContent::Float64(1.5)), vec![vec![0x12, 0, 0, 0, 0, 0, 0, 0xf8, 0x3f]]),
+            (
+                Some(UnitContent::Float64(1.5)),
+                vec![vec![0x12, 0, 0, 0, 0, 0, 0, 0xf8, 0x3f]],
+            ),
             (
                 Some(UnitContent::String(String::from("hello"))),
                 vec![vec![0x10, 0x05, 0x68, 0x65, 0x6c, 0x6c, 0x6f]],

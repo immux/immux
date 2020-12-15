@@ -1,0 +1,31 @@
+.bp3-navbar-group {
+  &::-webkit-scrollbar {
+    width: 0.5rem;
+    height: 0.35rem;
+  }
+
+  &::-webkit-scrollbar-thumb {
+    -webkit-transition: 0.3s ease all;
+    transition: 0.3s ease all;
+    border-color: transparent;
+    border: 1px solid black;
+    background-color: rgba(255, 255, 255, 0.1);
+    z-index: 40;
+  }
+}
+
+.scroll {
+  &::-webkit-scrollbar {
+    width: 0.5rem;
+    height: 0.35rem;
+  }
+
+  &::-webkit-scrollbar-thumb {
+    -webkit-transition: 0.3s ease all;
+    transition: 0.3s ease all;
+    border-color: transparent;
+    background-color: rgba(255, 255, 255, 0.1);
+    border: 1px solid black;
+    z-index: 40;
+  }
+}

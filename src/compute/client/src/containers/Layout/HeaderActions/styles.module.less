@@ -1,0 +1,110 @@
+@import '~antd/lib/style/themes/default';
+
+.icon-btn {
+  font-size: @font-size-lg;
+
+  a& {
+    display: block;
+    padding: @padding-xss;
+    border-radius: @border-radius-base;
+    line-height: 1;
+    color: inherit;
+    transition: background-color @animation-duration-base;
+
+    :global {
+      .@{iconfont-css-prefix} path {
+        transition: fill @animation-duration-base;
+      }
+    }
+
+    &:hover {
+      background: @primary-1;
+
+      :global {
+        .@{iconfont-css-prefix} path {
+          fill: @primary-color;
+        }
+      }
+    }
+  }
+}
+
+.deploy-env {
+  display: flex;
+  padding: 0 0.75em;
+  border-radius: @border-radius-base;
+  align-items: center;
+  font-size: @font-size-base;
+  line-height: 1.75;
+  cursor: default;
+  pointer-events: none;
+
+  :global {
+    .@{iconfont-css-prefix} {
+      margin-right: @padding-xs;
+      font-size: @font-size-lg;
+    }
+  }
+
+  &.development {
+    background: @gold-1;
+    color: @gold-6;
+  }
+
+  &.beta {
+    background: @magenta-1;
+    color: @magenta-6;
+  }
+}
+
+.version {
+  display: flex;
+  align-items: center;
+  padding: 0 0.75em;
+  border-radius: @border-radius-base;
+  height: auto;
+  line-height: 28px;
+  font-size: @font-size-sm;
+  transition: all @animation-duration-base;
+  color: @text-color-secondary;
+  cursor: pointer;
+
+  &:hover,
+  &.hover {
+    background: @primary-1;
+    color: @primary-color;
+  }
+
+  :global {
+    .@{iconfont-css-prefix} {
+      margin-right: @padding-xs;
+    }
+  }
+
+  &-overlay:global(.@{ant-prefix}-popover) {
+    padding-top: @padding-md;
+    width: 240px;
+
+    :global {
+      .@{ant-prefix}-popover-arrow {
+        display: none;
+      }
+    }
+
+    dl {
+      margin: 0;
+
+      dt {
+        float: left;
+        clear: left;
+        margin-right: @padding-xs;
+        color: @text-color-secondary;
+      }
+
+      dt,
+      dd {
+        margin-bottom: 0;
+      }
+    }
+  }
+}

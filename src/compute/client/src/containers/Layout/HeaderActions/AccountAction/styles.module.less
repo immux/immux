@@ -1,0 +1,73 @@
+@import '~antd/lib/style/themes/default';
+
+@dropdown-item-height: 36px;
+@dropdown-desc-height: 20px;
+
+.action {
+  position: relative;
+  width: 28px;
+  height: 28px;
+  cursor: pointer;
+
+  &:hover .ellipsis {
+    opacity: 1;
+  }
+
+  :global {
+    .@{ant-prefix}-avatar {
+      display: block;
+    }
+  }
+
+  .ellipsis {
+    opacity: 0;
+    position: absolute;
+    z-index: 2;
+    top: 0;
+    left: 0;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    border-radius: 50%;
+    width: 100%;
+    height: 100%;
+    background: rgba(#333, 0.66);
+    color: @white;
+    transition: opacity 0.2s;
+  }
+}
+
+.overlay {
+  padding-top: @padding-md;
+  width: 240px;
+
+  :global {
+    .@{ant-prefix}-dropdown-menu-item {
+      padding: 0 @padding-md;
+      height: @dropdown-item-height;
+      line-height: @dropdown-item-height;
+    }
+  }
+}
+
+.multi-item {
+  display: inline-block;
+
+  &-wrapper:global(.@{ant-prefix}-dropdown-menu-item) {
+    height: auto;
+  }
+
+  > strong,
+  > small {
+    display: block;
+  }
+
+  > strong {
+    font-weight: 400;
+  }
+
+  > small {
+    line-height: @dropdown-desc-height;
+    color: @text-color-secondary;
+  }
+}

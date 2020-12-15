@@ -1,0 +1,102 @@
+@import '~antd/lib/style/themes/default';
+
+.icon {
+  padding: @padding-xss;
+  border-radius: @border-radius-base;
+  font-size: @font-size-lg;
+  color: @text-color-secondary;
+  cursor: pointer;
+  transition: background-color @animation-duration-base;
+
+  path {
+    transition: fill @animation-duration-base;
+  }
+
+  &:hover {
+    background: @primary-1;
+
+    path {
+      fill: @primary-color;
+    }
+  }
+}
+
+.drawer:global(.@{ant-prefix}-drawer) :global {
+  .@{ant-prefix}-drawer-header {
+    border-bottom: none;
+  }
+
+  .@{ant-prefix}-drawer-title .@{iconfont-css-prefix} {
+    margin-right: @padding-xs;
+  }
+
+  .@{ant-prefix}-drawer-close {
+    display: none;
+  }
+}
+
+.apps :global {
+  .@{ant-prefix}-col {
+    margin-bottom: @padding-md;
+    text-align: center;
+  }
+}
+
+.app {
+  position: absolute;
+  top: 0;
+  left: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  border-radius: @border-radius-base;
+  width: 100%;
+  height: 100%;
+  cursor: pointer;
+  transition: background-color @animation-duration-base;
+
+  a& {
+    color: @text-color;
+  }
+
+  &:hover {
+    background: @primary-1;
+
+    p {
+      color: @primary-color;
+    }
+  }
+
+  &-wrapper {
+    position: relative;
+    padding-bottom: 100%;
+  }
+
+  :global {
+    .@{iconfont-css-prefix} {
+      font-size: @avatar-size-lg;
+    }
+  }
+
+  p {
+    margin: @padding-xss auto 0;
+    transition: color @animation-duration-base;
+  }
+}
+
+.jql {
+  &-preview {
+    overflow: auto;
+    padding: @padding-xs;
+    border: @border-width-base @border-style-base @border-color-base;
+    border-radius: @border-radius-base;
+    background-color: @background-color-light;
+    height: 128px;
+  }
+
+  &-btn {
+    margin-top: @padding-md;
+    text-align: center;
+  }
+}

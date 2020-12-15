@@ -1,0 +1,30 @@
+@import '~antd/lib/style/themes/default';
+
+.date {
+  margin-left: -0.35em;
+}
+
+.root {
+  font-style: italic;
+  color: @text-color-secondary;
+
+  :global {
+    .@{iconfont-css-prefix} {
+      margin-right: @padding-xs;
+    }
+  }
+}
+
+.resize {
+  user-select: none;
+
+  &-section {
+    background-color: #fff;
+  }
+  
+  &-bar {
+    background-color: #888888;
+    cursor: "col-resize";
+    width: 1px;
+  }
+}

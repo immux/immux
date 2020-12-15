@@ -1,0 +1,53 @@
+@import '~antd/lib/style/themes/default';
+
+@card-head-height: 40px;
+
+.card:global(.@{ant-prefix}-card) {
+  :global {
+    .@{ant-prefix}-card {
+      &-head {
+        padding: 0;
+        border-bottom: none;
+        min-height: 0;
+
+        &-wrapper {
+          display: flex;
+          align-items: center;
+          height: @card-head-height;
+        }
+
+        &-title {
+          margin-right: @padding-xs;
+          font-size: @font-size-lg;
+        }
+      }
+
+      &-head-title,
+      &-extra {
+        padding: 0;
+      }
+
+      &-extra {
+        .@{iconfont-css-prefix} {
+          cursor: pointer;
+
+          &:not(:last-child) {
+            margin-right: @padding-xs * 1.5;
+          }
+
+          &:hover path {
+            fill: @primary-color;
+          }
+
+          path {
+            transition: fill 0.2s;
+          }
+        }
+      }
+
+      &-body {
+        padding: 0;
+      }
+    }
+  }
+}

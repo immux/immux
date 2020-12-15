@@ -1,0 +1,67 @@
+@import '~antd/lib/style/themes/default';
+
+.alert {
+  margin-bottom: @padding-md;
+
+  ul {
+    margin-bottom: 0;
+  }
+}
+
+.card:global(.@{ant-prefix}-card) {
+}
+
+.pems {
+  display: flex;
+  align-items: center;
+  height: 160px;
+
+  > header {
+    flex: 0 128px;
+    margin-right: @padding-md;
+    font-size: 40px;
+    text-align: center;
+    color: @primary-color;
+  }
+
+  > main {
+    flex: 1;
+    margin-right: @padding-lg;
+
+    h2 {
+      margin-bottom: 0;
+      font-size: @font-size-lg;
+      color: @primary-color;
+
+      strong {
+        display: block;
+        font-size: @font-size-base;
+        font-weight: 400;
+        color: #808080;
+
+        small {
+          margin-left: @padding-xs;
+        }
+      }
+    }
+
+    p {
+      margin-bottom: 0;
+      color: #808080;
+    }
+  }
+
+  > footer {
+    display: flex;
+    flex-direction: column;
+
+    :global {
+      .@{ant-prefix}-btn,
+      .@{ant-prefix}-skeleton {
+        &:not(:last-child) {
+          margin-bottom: @padding-md;
+        }
+      }
+    }
+  }
+}

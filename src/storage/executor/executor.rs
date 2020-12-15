@@ -2,9 +2,12 @@ use std::convert::TryFrom;
 use std::path::PathBuf;
 
 use crate::storage::chain_height::ChainHeight;
+use crate::storage::executor::command::{Command, CommandError, SelectCondition};
 use crate::storage::executor::errors::ExecutorResult;
-use crate::storage::executor::instruction::Instruction;
-use crate::storage::executor::unit_content::{UnitContent, UnitContentError};
+use crate::storage::executor::filter::content_satisfied_filter;
+use crate::storage::executor::grouping_label::GroupingLabel;
+use crate::storage::executor::outcome::Outcome;
+use crate::storage::executor::unit_content::UnitContent;
 use crate::storage::executor::unit_key::UnitKey;
 use crate::storage::kv::LogKeyValueStore;
 use crate::storage::kvkey::KVKey;
@@ -22,87 +25,172 @@ impl Executor {
         return Ok(executor);
     }
 
-    pub fn set(&mut self, key: &UnitKey, value: &UnitContent, transaction_id: Option<TransactionId>) -> ExecutorResult<()> {
-        let kv_key = KVKey::from(key);
+    pub fn set(
+        &mut self,
+        grouping: &GroupingLabel,
+        key: &UnitKey,
+        value: &UnitContent,
+        transaction_id: Option<TransactionId>,
+    ) -> ExecutorResult<Outcome> {
+        let kv_key = KVKey::from_grouping_and_unit_key(&grouping, &key);
         let kv_value = KVValue::from(value);
         self.store_engine.set(&kv_key, &kv_value, transaction_id)?;
-        return Ok(());
+
+        if let Some(_) = transaction_id {
+            return Ok(Outcome::TransactionalInsertSuccess);
+        } else {
+            return Ok(Outcome::InsertSuccess);
+        }
     }
 
-    pub fn get(&mut self, key: &UnitKey, transaction_id: Option<TransactionId>) -> ExecutorResult<Option<UnitContent>> {
-        let kv_key = KVKey::from(key);
-        match self.store_engine.get(&kv_key, transaction_id)? {
-            None => Ok(None),
-            Some(kv_value) => {
-                let (content, _) = UnitContent::parse(kv_value.as_bytes())?;
-                return Ok(Some(content));
+    pub fn get(
+        &mut self,
+        target_grouping: &GroupingLabel,
+        condition: &SelectCondition,
+    ) -> ExecutorResult<Outcome> {
+        match condition {
+            SelectCondition::UnconditionalMatch => {
+                let kvs = self.store_engine.get_all_current()?;
+                let result: Vec<UnitContent> = kvs
+                    .iter()
+                    .filter_map(|(key, value)| {
+                        if let Ok((grouping, _)) = KVKey::parse(&key.as_bytes()) {
+                            if &grouping == target_grouping {
+                                match UnitContent::parse(value.as_bytes()) {
+                                    Err(_error) => return None,
+                                    Ok((content, _)) => return Some(content),
+                                }
+                            }
+                        }
+                        return None;
+                    })
+                    .collect();
+                return Ok(Outcome::Select(result));
+            }
+            SelectCondition::Filter(filter) => {
+                let kvs = self.store_engine.get_all_current()?;
+                let result: Vec<UnitContent> = kvs
+                    .iter()
+                    .filter_map(|(key, value)| {
+                        if let Ok((grouping, _unit_key)) = KVKey::parse(&key.as_bytes()) {
+                            if &grouping == target_grouping {
+                                match UnitContent::parse(value.as_bytes()) {
+                                    Err(_error) => return None,
+                                    Ok((content, _)) => {
+                                        if content_satisfied_filter(&content, &filter) {
+                                            return Some(content);
+                                        }
+                                        return None;
+                                    }
+                                }
+                            }
+                        }
+                        return None;
+                    })
+                    .collect();
+                return Ok(Outcome::Select(result));
+            }
+            SelectCondition::Key(key, transaction_id) => {
+                let kv_key = KVKey::from_grouping_and_unit_key(&target_grouping, &key);
+                match self.store_engine.get(&kv_key, *transaction_id)? {
+                    None => Ok(Outcome::Select(vec![])),
+                    Some(kv_value) => {
+                        let (content, _) = UnitContent::parse(kv_value.as_bytes())?;
+                        return Ok(Outcome::Select(vec![content]));
+                    }
+                }
             }
         }
     }
 
-    pub fn revert_one(&mut self, key: &UnitKey, height: &ChainHeight, transaction_id: Option<TransactionId>) -> ExecutorResult<()> {
-        let kv_key = KVKey::from(key);
-        self.store_engine.revert_one(&kv_key, height, transaction_id)?;
-        return Ok(());
+    pub fn revert_one(
+        &mut self,
+        grouping: &GroupingLabel,
+        key: &UnitKey,
+        height: &ChainHeight,
+        transaction_id: Option<TransactionId>,
+    ) -> ExecutorResult<Outcome> {
+        let kv_key = KVKey::from_grouping_and_unit_key(&grouping, &key);
+        self.store_engine
+            .revert_one(&kv_key, height, transaction_id)?;
+        if let Some(_) = transaction_id {
+            return Ok(Outcome::TransactionalRevertOneSuccess);
+        } else {
+            return Ok(Outcome::RevertOneSuccess);
+        }
     }
 
-    pub fn revert_all(&mut self, height: &ChainHeight) -> ExecutorResult<()> {
+    pub fn revert_all(&mut self, height: &ChainHeight) -> ExecutorResult<Outcome> {
         self.store_engine.revert_all(height)?;
-        return Ok(());
+        return Ok(Outcome::RevertAllSuccess);
     }
 
-    pub fn remove_one(&mut self, key: &UnitKey, transaction_id: Option<TransactionId>) -> ExecutorResult<()> {
-        let kv_key = KVKey::from(key);
+    pub fn remove_one(
+        &mut self,
+        grouping: &GroupingLabel,
+        key: &UnitKey,
+        transaction_id: Option<TransactionId>,
+    ) -> ExecutorResult<Outcome> {
+        let kv_key = KVKey::from_grouping_and_unit_key(&grouping, &key);
         self.store_engine.remove_one(&kv_key, transaction_id)?;
-        return Ok(());
+        if let Some(_) = transaction_id {
+            return Ok(Outcome::TransactionalRemoveOneSuccess);
+        } else {
+            return Ok(Outcome::RemoveOneSuccess);
+        }
     }
 
-    pub fn remove_all(&mut self) -> ExecutorResult<()> {
+    pub fn remove_all(&mut self) -> ExecutorResult<Outcome> {
         self.store_engine.remove_all()?;
-        return Ok(());
+        return Ok(Outcome::RemoveAllSuccess);
     }
 
-    pub fn inspect_all(&mut self) -> ExecutorResult<Vec<(Instruction, ChainHeight)>> {
-        let result: Result<Vec<_>, UnitContentError> = self
+    pub fn inspect_all(&mut self) -> ExecutorResult<Outcome> {
+        let result: Result<Vec<_>, CommandError> = self
             .store_engine
             .inspect_all()?
             .iter()
             .map(|(command, height)| {
-                let instruction = Instruction::try_from(command)?;
+                let instruction = Command::try_from(command)?;
                 Ok((instruction, height.to_owned()))
             })
             .collect();
-
-        return Ok(result?);
+        let outcome = Outcome::InspectAll(result?);
+        return Ok(outcome);
     }
 
-    pub fn inspect_one(&mut self, target_key: &UnitKey) -> ExecutorResult<Vec<(Instruction, ChainHeight)>> {
-        let kv_key = KVKey::from(target_key);
-        let result: Result<Vec<_>, UnitContentError> = self
+    pub fn inspect_one(
+        &mut self,
+        grouping: &GroupingLabel,
+        target_key: &UnitKey,
+    ) -> ExecutorResult<Outcome> {
+        let kv_key = KVKey::from_grouping_and_unit_key(&grouping, &target_key);
+        let result: Result<Vec<_>, CommandError> = self
             .store_engine
             .inspect_one(&kv_key)?
             .iter()
             .map(|(command, height)| {
-                let instruction = Instruction::try_from(command)?;
+                let instruction = Command::try_from(command)?;
                 Ok((instruction, height.to_owned()))
             })
             .collect();
 
-        return Ok(result?);
+        let outcome = Outcome::InspectOne(result?);
+        return Ok(outcome);
     }
 
-    pub fn start_transaction(&mut self) -> ExecutorResult<TransactionId> {
+    pub fn start_transaction(&mut self) -> ExecutorResult<Outcome> {
         let transaction_id = self.store_engine.start_transaction()?;
-        return Ok(transaction_id);
+        return Ok(Outcome::CreateTransaction(transaction_id));
     }
 
-    pub fn commit_transaction(&mut self, transaction_id: TransactionId) -> ExecutorResult<()> {
+    pub fn commit_transaction(&mut self, transaction_id: TransactionId) -> ExecutorResult<Outcome> {
         self.store_engine.commit_transaction(transaction_id)?;
-        return Ok(());
+        return Ok(Outcome::TransactionCommitSuccess);
     }
 
-    pub fn abort_transaction(&mut self, transaction_id: TransactionId) -> ExecutorResult<()> {
+    pub fn abort_transaction(&mut self, transaction_id: TransactionId) -> ExecutorResult<Outcome> {
         self.store_engine.abort_transaction(transaction_id)?;
-        return Ok(());
+        return Ok(Outcome::TransactionAbortSuccess);
     }
 }
