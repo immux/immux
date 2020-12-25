@@ -18,7 +18,7 @@ use crate::storage::transaction_manager::{Snapshot, TransactionId, TransactionMa
 pub struct LogKeyValueStore {
     reader: LogReader,
     writer: LogWriter,
-    key_pointer_map: Snapshot,
+    snapshot: Snapshot,
     current_height: ChainHeight,
     transaction_manager: TransactionManager,
 }
@@ -43,13 +43,13 @@ impl LogKeyValueStore {
 
         let writer = LogWriter::new(&log_file_path, preferences.ecc_mode, db_version)?;
         let mut reader = LogReader::new(&log_file_path, db_version)?;
-        let (key_pointer_map, current_height, transaction_manager) =
-            load_key_pointer_map(&mut reader, None)?;
+        let (snapshot, current_height, transaction_manager) =
+            load_snapshot(&mut reader, None)?;
 
         let engine = LogKeyValueStore {
             reader,
             writer,
-            key_pointer_map,
+            snapshot,
             current_height,
             transaction_manager,
         };
@@ -98,7 +98,7 @@ impl LogKeyValueStore {
             )?;
         }
 
-        update_key_pointer_map(key, &log_pointer, &mut self.key_pointer_map, transaction_id);
+        update_snapshot(key, &log_pointer, &mut self.snapshot, transaction_id);
 
         return Ok(());
     }
@@ -108,25 +108,25 @@ impl LogKeyValueStore {
         key: &KVKey,
         transaction_id: Option<TransactionId>,
     ) -> KVResult<Option<KVValue>> {
-        let key_pointer_map = if let Some(transaction_id) = transaction_id {
+        let snapshot = if let Some(transaction_id) = transaction_id {
             let transaction_meta_data = self
                 .transaction_manager
                 .get_transaction_meta_data(&transaction_id)?;
             transaction_meta_data.snapshot
         } else {
-            self.key_pointer_map.clone()
+            self.snapshot.clone()
         };
 
-        self.read_from_snapshot(&key_pointer_map, key, transaction_id)
+        self.read_from_snapshot(&snapshot, key, transaction_id)
     }
 
     fn read_from_snapshot(
         &mut self,
-        key_pointer_map: &Snapshot,
+        snapshot: &Snapshot,
         key: &KVKey,
         transaction_id: Option<TransactionId>,
     ) -> KVResult<Option<KVValue>> {
-        match key_pointer_map.get(&key) {
+        match snapshot.get(&key) {
             None => Ok(None),
             Some(log_pointers) => {
                 if let Some(log_pointer) = log_pointers.get(&transaction_id) {
@@ -155,7 +155,7 @@ impl LogKeyValueStore {
                     }
                 } else {
                     return if transaction_id.is_some() {
-                        self.read_from_snapshot(key_pointer_map, &key, None)
+                        self.read_from_snapshot(snapshot, &key, None)
                     } else {
                         Ok(None)
                     };
@@ -165,14 +165,14 @@ impl LogKeyValueStore {
     }
 
     pub fn get_current_keys(&mut self) -> KVResult<Vec<KVKey>> {
-        let keys: Vec<KVKey> = self.key_pointer_map.keys().map(|key| key.clone()).collect();
+        let keys: Vec<KVKey> = self.snapshot.keys().map(|key| key.clone()).collect();
         return Ok(keys);
     }
 
     pub fn get_all_current(&mut self) -> KVResult<Vec<(KVKey, KVValue)>> {
         let mut result = vec![];
 
-        for (_key, log_pointer) in &self.key_pointer_map {
+        for (_key, log_pointer) in &self.snapshot {
             match log_pointer.get(&None) {
                 None => {}
                 Some(log_pointer) => {
@@ -244,7 +244,7 @@ impl LogKeyValueStore {
             )?;
         }
 
-        update_key_pointer_map(key, &log_pointer, &mut self.key_pointer_map, transaction_id);
+        update_snapshot(key, &log_pointer, &mut self.snapshot, transaction_id);
 
         return Ok(());
     }
@@ -261,9 +261,9 @@ impl LogKeyValueStore {
         self.writer.append_instruction(&instruction)?;
 
         self.current_height.increment()?;
-        let (new_key_pointer_map, _, _) = load_key_pointer_map(&mut self.reader, Some(height))?;
+        let (new_snapshot, _, _) = load_snapshot(&mut self.reader, Some(height))?;
 
-        self.key_pointer_map = new_key_pointer_map;
+        self.snapshot = new_snapshot;
         self.transaction_manager = TransactionManager::new();
 
         return Ok(());
@@ -300,7 +300,7 @@ impl LogKeyValueStore {
 
         self.current_height.increment()?;
 
-        update_key_pointer_map(key, &log_pointer, &mut self.key_pointer_map, transaction_id);
+        update_snapshot(key, &log_pointer, &mut self.snapshot, transaction_id);
 
         if let Some(transaction_id) = transaction_id {
             self.transaction_manager.update_transaction_meta_data(
@@ -318,13 +318,13 @@ impl LogKeyValueStore {
 
         self.writer.append_instruction(&instruction)?;
 
-        for log_pointers in self.key_pointer_map.values_mut() {
+        for log_pointers in self.snapshot.values_mut() {
             log_pointers.remove(&None);
         }
 
         self.current_height.increment()?;
 
-        self.key_pointer_map = HashMap::new();
+        self.snapshot = HashMap::new();
         self.transaction_manager = TransactionManager::new();
 
         return Ok(());
@@ -399,7 +399,7 @@ impl LogKeyValueStore {
         let instruction = Instruction::TransactionStart { transaction_id };
         self.writer.append_instruction(&instruction)?;
 
-        let snapshot = self.key_pointer_map.clone();
+        let snapshot = self.snapshot.clone();
         self.transaction_manager
             .initialize_transaction(&transaction_id, snapshot);
 
@@ -417,7 +417,7 @@ impl LogKeyValueStore {
 
         update_committed_log_pointers(
             &mut self.transaction_manager,
-            &mut self.key_pointer_map,
+            &mut self.snapshot,
             transaction_id.clone(),
         );
 
@@ -435,7 +435,7 @@ impl LogKeyValueStore {
 
         update_aborted_log_pointers(
             &mut self.transaction_manager,
-            &mut self.key_pointer_map,
+            &mut self.snapshot,
             transaction_id,
         );
 
@@ -503,14 +503,14 @@ fn recursive_find(
     }
 }
 
-fn load_key_pointer_map(
+fn load_snapshot(
     mut reader: &mut LogReader,
     target_height: Option<&ChainHeight>,
 ) -> KVResult<(Snapshot, ChainHeight, TransactionManager)> {
     let (instruction_iterator, header_offset) = reader.read_all()?;
     let mut current_position = header_offset as u64;
     let mut height = ChainHeight::new(0);
-    let mut key_pointer_map: HashMap<KVKey, HashMap<Option<TransactionId>, LogPointer>> =
+    let mut snapshot: HashMap<KVKey, HashMap<Option<TransactionId>, LogPointer>> =
         HashMap::new();
     let mut transaction_manager = TransactionManager::new();
 
@@ -518,28 +518,28 @@ fn load_key_pointer_map(
         match instruction {
             Instruction::Set { key, value: _ } => {
                 let log_pointer = LogPointer::new(current_position, instruction_length);
-                update_key_pointer_map(&key, &log_pointer, &mut key_pointer_map, None);
+                update_snapshot(&key, &log_pointer, &mut snapshot, None);
             }
             Instruction::RevertOne { key, height: _ } => {
                 let log_pointer = LogPointer::new(current_position, instruction_length);
-                update_key_pointer_map(&key, &log_pointer, &mut key_pointer_map, None);
+                update_snapshot(&key, &log_pointer, &mut snapshot, None);
             }
             Instruction::RevertAll { height } => {
-                let (new_key_pointer_map, _, _) = load_key_pointer_map(&mut reader, Some(&height))?;
+                let (new_snapshot, _, _) = load_snapshot(&mut reader, Some(&height))?;
                 transaction_manager = TransactionManager::new();
-                key_pointer_map = new_key_pointer_map;
+                snapshot = new_snapshot;
             }
             Instruction::RemoveOne { key } => {
                 let log_pointer = LogPointer::new(current_position, instruction_length);
-                update_key_pointer_map(&key, &log_pointer, &mut key_pointer_map, None);
+                update_snapshot(&key, &log_pointer, &mut snapshot, None);
             }
             Instruction::RemoveAll => {
-                for log_pointers in key_pointer_map.values_mut() {
+                for log_pointers in snapshot.values_mut() {
                     log_pointers.remove(&None);
                 }
             }
             Instruction::TransactionStart { transaction_id } => {
-                let snapshot = key_pointer_map.clone();
+                let snapshot = snapshot.clone();
                 transaction_manager.initialize_transaction(&transaction_id, snapshot);
                 transaction_manager.update_transaction_id(&transaction_id);
             }
@@ -549,10 +549,10 @@ fn load_key_pointer_map(
                 transaction_id,
             } => {
                 let log_pointer = LogPointer::new(current_position, instruction_length);
-                update_key_pointer_map(
+                update_snapshot(
                     &key,
                     &log_pointer,
-                    &mut key_pointer_map,
+                    &mut snapshot,
                     Some(transaction_id),
                 );
                 transaction_manager.add_affected_keys(&transaction_id, &key)?;
@@ -563,10 +563,10 @@ fn load_key_pointer_map(
                 transaction_id,
             } => {
                 let log_pointer = LogPointer::new(current_position, instruction_length);
-                update_key_pointer_map(
+                update_snapshot(
                     &key,
                     &log_pointer,
-                    &mut key_pointer_map,
+                    &mut snapshot,
                     Some(transaction_id),
                 );
 
@@ -577,10 +577,10 @@ fn load_key_pointer_map(
                 transaction_id,
             } => {
                 let log_pointer = LogPointer::new(current_position, instruction_length);
-                update_key_pointer_map(
+                update_snapshot(
                     &key,
                     &log_pointer,
-                    &mut key_pointer_map,
+                    &mut snapshot,
                     Some(transaction_id),
                 );
 
@@ -589,14 +589,14 @@ fn load_key_pointer_map(
             Instruction::TransactionCommit { transaction_id } => {
                 update_committed_log_pointers(
                     &mut transaction_manager,
-                    &mut key_pointer_map,
+                    &mut snapshot,
                     transaction_id,
                 );
             }
             Instruction::TransactionAbort { transaction_id } => {
                 update_aborted_log_pointers(
                     &mut transaction_manager,
-                    &mut key_pointer_map,
+                    &mut snapshot,
                     transaction_id,
                 );
             }
@@ -613,17 +613,17 @@ fn load_key_pointer_map(
         height.increment()?;
     }
 
-    return Ok((key_pointer_map, height, transaction_manager));
+    return Ok((snapshot, height, transaction_manager));
 }
 
 fn update_committed_log_pointers(
     transaction_manager: &mut TransactionManager,
-    key_pointer_map: &mut Snapshot,
+    snapshot: &mut Snapshot,
     transaction_id: TransactionId,
 ) {
     let affected_keys = transaction_manager.get_affected_keys(&transaction_id);
     for key in affected_keys {
-        if let Some(log_pointers) = key_pointer_map.get_mut(&key) {
+        if let Some(log_pointers) = snapshot.get_mut(&key) {
             if let Some(target_log_pointer) = log_pointers.get(&Some(transaction_id)).cloned() {
                 log_pointers.insert(None, target_log_pointer);
                 log_pointers.remove(&Some(transaction_id));
@@ -636,12 +636,12 @@ fn update_committed_log_pointers(
 
 fn update_aborted_log_pointers(
     transaction_manager: &mut TransactionManager,
-    key_pointer_map: &mut Snapshot,
+    snapshot: &mut Snapshot,
     transaction_id: TransactionId,
 ) {
     let affected_keys = transaction_manager.get_affected_keys(&transaction_id);
     for key in affected_keys {
-        if let Some(log_pointers) = key_pointer_map.get_mut(&key) {
+        if let Some(log_pointers) = snapshot.get_mut(&key) {
             log_pointers.remove(&Some(transaction_id));
         }
     }
@@ -649,18 +649,18 @@ fn update_aborted_log_pointers(
     transaction_manager.remove_transaction(&transaction_id);
 }
 
-fn update_key_pointer_map(
+fn update_snapshot(
     key: &KVKey,
     log_pointer: &LogPointer,
-    key_pointer_map: &mut Snapshot,
+    snapshot: &mut Snapshot,
     transaction_id: Option<TransactionId>,
 ) {
-    if let Some(log_pointers) = key_pointer_map.get_mut(&key) {
+    if let Some(log_pointers) = snapshot.get_mut(&key) {
         log_pointers.insert(transaction_id, log_pointer.clone());
     } else {
         let mut log_pointers = HashMap::new();
         log_pointers.insert(transaction_id, log_pointer.to_owned());
-        key_pointer_map.insert(key.clone(), log_pointers);
+        snapshot.insert(key.clone(), log_pointers);
     }
 }
 
