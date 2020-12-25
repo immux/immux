@@ -83,7 +83,6 @@ pub enum Outcome {
     TransactionAbortSuccess,
     GetAllGroupingsSuccess(Vec<GroupingLabel>),
     DeleteGroupingSuccess,
-    ServerError,
 }
 
 impl Outcome {
@@ -162,7 +161,6 @@ impl Outcome {
                 return result;
             }
             Outcome::DeleteGroupingSuccess => vec![OutcomePrefix::DeleteGroupingsSuccess as u8],
-            Outcome::ServerError => vec![OutcomePrefix::ServerError as u8],
         }
     }
     pub fn parse(data: &[u8]) -> Result<(Self, usize), OutcomeError> {
@@ -280,8 +278,6 @@ impl Outcome {
             return Ok((Outcome::GetAllGroupingsSuccess(result), position));
         } else if prefix == OutcomePrefix::DeleteGroupingsSuccess as u8 {
             return Ok((Outcome::DeleteGroupingSuccess, position));
-        } else if prefix == OutcomePrefix::ServerError as u8 {
-            return Ok((Outcome::ServerError, position));
         } else {
             return Err(OutcomeError::UnexpectedPrefix);
         }
@@ -294,21 +290,21 @@ impl fmt::Display for Outcome {
             Outcome::Select(contents) => {
                 let output_vec: Vec<String> = contents
                     .into_iter()
-                    .map(|content| content.to_string())
+                    .map(|content| format!("{}", content))
                     .collect();
                 output_vec.join("\r\n")
             }
             Outcome::InspectOne(commands_with_heights) => {
                 let output_vec: Vec<String> = commands_with_heights
                     .into_iter()
-                    .map(|(command, height)| format!("{} {}", command.to_string(), height.as_u64()))
+                    .map(|(command, height)| format!("{} {}", command, height.as_u64()))
                     .collect();
                 output_vec.join("\r\n")
             }
             Outcome::InspectAll(commands_with_heights) => {
                 let output_vec: Vec<String> = commands_with_heights
                     .into_iter()
-                    .map(|(command, height)| format!("{} {}", command.to_string(), height.as_u64()))
+                    .map(|(command, height)| format!("{} {}", command, height.as_u64()))
                     .collect();
                 output_vec.join("\r\n")
             }
@@ -330,12 +326,11 @@ impl fmt::Display for Outcome {
             Outcome::GetAllGroupingsSuccess(groupings) => {
                 let output_vec: Vec<String> = groupings
                     .into_iter()
-                    .map(|grouping| grouping.to_string())
+                    .map(|grouping| format!("{}", grouping))
                     .collect();
                 output_vec.join("\r\n")
             }
             Outcome::DeleteGroupingSuccess => String::from("Delete Groupings Success"),
-            Outcome::ServerError => String::from("Server Error"),
         };
         write!(f, "{}", string)
     }

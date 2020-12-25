@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::fmt;
 
 use crate::constants as Constants;
 use crate::storage::kvkey::KVKey;
@@ -32,10 +33,74 @@ impl TransactionId {
     }
 }
 
+impl fmt::Display for TransactionId {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+
 #[derive(Debug, PartialEq)]
 pub enum TransactionManagerError {
     TransactionIdOutOfRange,
     TransactionNotAlive,
+    ParseTransactionManagerErrorError,
+}
+
+enum TransactionManagerErrorPrefix {
+    TransactionIdOutOfRange = 0x01,
+    TransactionNotAlive = 0x02,
+    ParseTransactionManagerErrorError = 0x03,
+}
+
+impl TransactionManagerError {
+    pub fn marshal(&self) -> Vec<u8> {
+        match self {
+            TransactionManagerError::TransactionIdOutOfRange => {
+                vec![TransactionManagerErrorPrefix::TransactionIdOutOfRange as u8]
+            }
+            TransactionManagerError::TransactionNotAlive => {
+                vec![TransactionManagerErrorPrefix::TransactionNotAlive as u8]
+            }
+            TransactionManagerError::ParseTransactionManagerErrorError => {
+                vec![TransactionManagerErrorPrefix::ParseTransactionManagerErrorError as u8]
+            }
+        }
+    }
+
+    pub fn parse(data: &[u8]) -> Result<(TransactionManagerError, usize), TransactionManagerError> {
+        let mut position = 0;
+        let prefix = data[position];
+        position += 1;
+
+        if prefix == TransactionManagerErrorPrefix::TransactionIdOutOfRange as u8 {
+            Ok((TransactionManagerError::TransactionIdOutOfRange, position))
+        } else if prefix == TransactionManagerErrorPrefix::TransactionNotAlive as u8 {
+            Ok((TransactionManagerError::TransactionNotAlive, position))
+        } else {
+            Ok((
+                TransactionManagerError::ParseTransactionManagerErrorError,
+                position,
+            ))
+        }
+    }
+}
+
+impl fmt::Display for TransactionManagerError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            TransactionManagerError::TransactionIdOutOfRange => {
+                write!(f, "{}", "TransactionManagerError::TransactionIdOutOfRange")
+            }
+            TransactionManagerError::TransactionNotAlive => {
+                write!(f, "{}", "TransactionManagerError::TransactionNotAlive")
+            }
+            TransactionManagerError::ParseTransactionManagerErrorError => write!(
+                f,
+                "{}",
+                "TransactionManagerError::ParseTransactionManagerErrorError"
+            ),
+        }
+    }
 }
 
 #[derive(Debug, Clone)]

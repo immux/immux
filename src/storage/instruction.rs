@@ -1,3 +1,5 @@
+use std::fmt;
+
 use crate::constants::{INSTRUCTION_PACK_MAGIC, INSTRUCTION_PACK_VERSION};
 use crate::storage::chain_height::ChainHeight;
 use crate::storage::ecc::{
@@ -6,10 +8,10 @@ use crate::storage::ecc::{
 use crate::storage::kvkey::KVKey;
 use crate::storage::kvvalue::KVValue;
 use crate::storage::transaction_manager::TransactionId;
-use crate::utils::ints::{byte_slice_to_u32, u32_to_u8_array};
+use crate::utils::ints::{byte_slice_to_u32, u32_to_u8_array, u64_to_u8_array, u8_array_to_u64};
 use crate::utils::varint::{varint_decode, VarIntError};
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum InstructionError {
     MissingPrefixByte,
     KeyExceedsMaxLength,
@@ -20,6 +22,180 @@ pub enum InstructionError {
     UnexpectedPackVersion(u8),
     ErrorCorrection(ErrorCorrectionError),
     UnexpectedECCMode(u8),
+    ParseInstructionErrorError,
+}
+
+pub enum InstructionErrorPrefix {
+    MissingPrefixByte = 0x01,
+    KeyExceedsMaxLength = 0x02,
+    VarIntError = 0x03,
+    UnknownPrefix = 0x04,
+    PackTooShort = 0x05,
+    UnexpectedMagicNumber = 0x06,
+    UnexpectedPackVersion = 0x07,
+    ErrorCorrection = 0x08,
+    UnexpectedECCMode = 0x09,
+    ParseInstructionErrorError = 0x10,
+}
+
+impl InstructionError {
+    pub fn marshal(&self) -> Vec<u8> {
+        match self {
+            InstructionError::MissingPrefixByte => {
+                vec![InstructionErrorPrefix::MissingPrefixByte as u8]
+            }
+            InstructionError::KeyExceedsMaxLength => {
+                vec![InstructionErrorPrefix::KeyExceedsMaxLength as u8]
+            }
+            InstructionError::VarIntError(error) => {
+                let mut result = vec![InstructionErrorPrefix::VarIntError as u8];
+                let error_bytes = error.marshal();
+                result.extend_from_slice(&error_bytes);
+                return result;
+            }
+            InstructionError::UnknownPrefix(byte) => {
+                let mut result = vec![InstructionErrorPrefix::UnknownPrefix as u8];
+                result.push(byte.clone());
+                return result;
+            }
+            InstructionError::PackTooShort(size) => {
+                let mut result = vec![InstructionErrorPrefix::PackTooShort as u8];
+                result.extend_from_slice(&u64_to_u8_array(*size as u64));
+                return result;
+            }
+            InstructionError::UnexpectedMagicNumber(numbers) => {
+                let mut result = vec![InstructionErrorPrefix::UnexpectedMagicNumber as u8];
+                result.extend_from_slice(&numbers.to_vec());
+                return result;
+            }
+            InstructionError::UnexpectedPackVersion(byte) => {
+                let mut result = vec![InstructionErrorPrefix::UnexpectedPackVersion as u8];
+                result.push(byte.clone());
+                return result;
+            }
+            InstructionError::ErrorCorrection(error) => {
+                let mut result = vec![InstructionErrorPrefix::ErrorCorrection as u8];
+                result.extend_from_slice(&error.marshal());
+                return result;
+            }
+            InstructionError::UnexpectedECCMode(byte) => {
+                let mut result = vec![InstructionErrorPrefix::UnexpectedECCMode as u8];
+                result.push(byte.clone());
+                return result;
+            }
+            InstructionError::ParseInstructionErrorError => {
+                vec![InstructionErrorPrefix::ParseInstructionErrorError as u8]
+            }
+        }
+    }
+
+    pub fn parse(data: &[u8]) -> Result<(InstructionError, usize), InstructionError> {
+        let mut position = 0;
+        let prefix = data[position];
+        position += 1;
+
+        if prefix == InstructionErrorPrefix::MissingPrefixByte as u8 {
+            Ok((InstructionError::MissingPrefixByte, position))
+        } else if prefix == InstructionErrorPrefix::KeyExceedsMaxLength as u8 {
+            Ok((InstructionError::KeyExceedsMaxLength, position))
+        } else if prefix == InstructionErrorPrefix::VarIntError as u8 {
+            let (error, offset) = VarIntError::parse(&data[position..])?;
+            position += offset;
+            Ok((InstructionError::VarIntError(error), position))
+        } else if prefix == InstructionErrorPrefix::UnknownPrefix as u8 {
+            let byte = &data[position];
+            position += 1;
+            Ok((InstructionError::UnknownPrefix(byte.clone()), position))
+        } else if prefix == InstructionErrorPrefix::PackTooShort as u8 {
+            let size = u8_array_to_u64(&[
+                data[position],
+                data[position + 1],
+                data[position + 2],
+                data[position + 3],
+                data[position + 4],
+                data[position + 5],
+                data[position + 6],
+                data[position + 7],
+            ]);
+            position += 8;
+            Ok((InstructionError::PackTooShort(size as usize), position))
+        } else if prefix == InstructionErrorPrefix::UnexpectedMagicNumber as u8 {
+            let numbers = &[
+                data[position],
+                data[position + 1],
+                data[position + 2],
+                data[position + 3],
+            ];
+            position += 4;
+            Ok((
+                InstructionError::UnexpectedMagicNumber(numbers.clone()),
+                position,
+            ))
+        } else if prefix == InstructionErrorPrefix::UnexpectedPackVersion as u8 {
+            let byte = &data[position];
+            position += 1;
+            Ok((
+                InstructionError::UnexpectedPackVersion(byte.clone()),
+                position,
+            ))
+        } else if prefix == InstructionErrorPrefix::ErrorCorrection as u8 {
+            let (error, offset) = ErrorCorrectionError::parse(&data[position..])?;
+            position += offset;
+            Ok((InstructionError::ErrorCorrection(error), position))
+        } else if prefix == InstructionErrorPrefix::UnexpectedECCMode as u8 {
+            let byte = &data[position];
+            position += 1;
+            Ok((InstructionError::UnexpectedECCMode(byte.clone()), position))
+        } else {
+            Ok((InstructionError::ParseInstructionErrorError, position))
+        }
+    }
+}
+
+impl fmt::Display for InstructionError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            InstructionError::MissingPrefixByte => {
+                write!(f, "{}", "InstructionError::MissingPrefixByte")
+            }
+            InstructionError::KeyExceedsMaxLength => {
+                write!(f, "{}", "InstructionError::KeyExceedsMaxLength")
+            }
+            InstructionError::VarIntError(error) => {
+                write!(f, "{}::{}", "InstructionError::KeyExceedsMaxLength", error)
+            }
+            InstructionError::UnknownPrefix(byte) => {
+                write!(f, "{}::{}", "InstructionError::KeyExceedsMaxLength", byte)
+            }
+            InstructionError::PackTooShort(size) => {
+                write!(f, "{}::{}", "InstructionError::KeyExceedsMaxLength", size)
+            }
+            InstructionError::UnexpectedMagicNumber(numbers) => {
+                let numbers_string = numbers
+                    .iter()
+                    .map(|number| format!("{}", number))
+                    .collect::<Vec<String>>()
+                    .join(",");
+                write!(
+                    f,
+                    "{}::{}",
+                    "InstructionError::KeyExceedsMaxLength", numbers_string
+                )
+            }
+            InstructionError::UnexpectedPackVersion(byte) => {
+                write!(f, "{}::{}", "InstructionError::KeyExceedsMaxLength", byte)
+            }
+            InstructionError::ErrorCorrection(error) => {
+                write!(f, "{}::{}", "InstructionError::KeyExceedsMaxLength", error)
+            }
+            InstructionError::UnexpectedECCMode(byte) => {
+                write!(f, "{}::{}", "InstructionError::KeyExceedsMaxLength", byte)
+            }
+            InstructionError::ParseInstructionErrorError => {
+                write!(f, "{}", "InstructionError::ParseInstructionErrorError",)
+            }
+        }
+    }
 }
 
 impl From<VarIntError> for InstructionError {
