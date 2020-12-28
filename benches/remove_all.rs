@@ -52,7 +52,7 @@ fn main() {
             let grouping = GroupingLabel::from("census90");
             let (table, read_bytes) = csv_to_json_table_with_size::<CensusEntry>(
                 "dev_utils/src/data_models/data-raw/census90.txt",
-                &grouping.to_string(),
+                format!("{}", &grouping).as_str(),
                 b',',
                 bench_spec.bytes_limit,
             )

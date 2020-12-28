@@ -12,6 +12,7 @@ use crate::storage::executor::predicate::Token::ContentString;
 use crate::storage::executor::unit_content::{UnitContent, UnitContentError};
 use crate::utils::serialize::{extract_data_with_varint_width, prepend_varint_width};
 use crate::utils::varint::{varint_decode, VarIntError};
+use std::string::FromUtf8Error;
 
 #[derive(Debug, PartialOrd, PartialEq)]
 enum Token {
@@ -32,7 +33,7 @@ enum Token {
     Not,
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum PredicateError {
     UnexpectedToken,
     MalformedTokens,
@@ -43,6 +44,108 @@ pub enum PredicateError {
     UnexpectedPrefix(u8),
 
     UnitContent(UnitContentError),
+
+    ParsePredicateErrorError,
+}
+
+pub enum PredicateErrorPrefix {
+    UnexpectedToken = 0x01,
+    MalformedTokens = 0x02,
+    InsufficientBytes = 0x03,
+    MalformedBytes = 0x04,
+    UnexpectedPrefix = 0x05,
+    UnitContent = 0x06,
+    ParsePredicateErrorError = 0x07,
+}
+
+impl PredicateError {
+    pub fn marshal(&self) -> Vec<u8> {
+        match self {
+            PredicateError::UnexpectedToken => vec![PredicateErrorPrefix::UnexpectedToken as u8],
+            PredicateError::MalformedTokens => vec![PredicateErrorPrefix::MalformedTokens as u8],
+            PredicateError::InsufficientBytes => {
+                vec![PredicateErrorPrefix::InsufficientBytes as u8]
+            }
+            PredicateError::MalformedBytes(error) => {
+                let mut result = vec![PredicateErrorPrefix::MalformedBytes as u8];
+                let error_bytes = error.marshal();
+                result.extend_from_slice(&error_bytes);
+                return result;
+            }
+            PredicateError::UnexpectedPrefix(byte) => {
+                let mut result = vec![PredicateErrorPrefix::UnexpectedPrefix as u8];
+
+                result.push(byte.clone());
+                return result;
+            }
+            PredicateError::UnitContent(content_error) => {
+                let mut result = vec![PredicateErrorPrefix::UnitContent as u8];
+                let error_bytes = content_error.marshal();
+                result.extend_from_slice(&error_bytes);
+                return result;
+            }
+            PredicateError::ParsePredicateErrorError => {
+                vec![PredicateErrorPrefix::ParsePredicateErrorError as u8]
+            }
+        }
+    }
+
+    pub fn parse(data: &[u8]) -> Result<(PredicateError, usize), PredicateError> {
+        let mut position = 0;
+        let prefix = data[position];
+        position += 1;
+
+        if prefix == PredicateErrorPrefix::UnexpectedToken as u8 {
+            Ok((PredicateError::UnexpectedToken, position))
+        } else if prefix == PredicateErrorPrefix::MalformedTokens as u8 {
+            Ok((PredicateError::MalformedTokens, position))
+        } else if prefix == PredicateErrorPrefix::InsufficientBytes as u8 {
+            Ok((PredicateError::InsufficientBytes, position))
+        } else if prefix == PredicateErrorPrefix::MalformedBytes as u8 {
+            let (error, offset) = VarIntError::parse(&data[position..])?;
+            position += offset;
+            Ok((PredicateError::MalformedBytes(error), position))
+        } else if prefix == PredicateErrorPrefix::UnexpectedPrefix as u8 {
+            let byte = data[position];
+            position += 1;
+
+            return Ok((PredicateError::UnexpectedPrefix(byte), position));
+        } else if prefix == PredicateErrorPrefix::UnitContent as u8 {
+            let (error, offset) = UnitContentError::parse(&data[position..])?;
+            position += offset;
+            Ok((PredicateError::UnitContent(error), position))
+        } else {
+            return Ok((PredicateError::ParsePredicateErrorError, position));
+        }
+    }
+}
+
+impl fmt::Display for PredicateError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            PredicateError::UnexpectedToken => {
+                write!(f, "{}", "PredicateError::UnexpectedToken")
+            }
+            PredicateError::MalformedTokens => {
+                write!(f, "{}", "PredicateError::MalformedTokens")
+            }
+            PredicateError::InsufficientBytes => {
+                write!(f, "{}", "PredicateError::InsufficientBytes")
+            }
+            PredicateError::MalformedBytes(error) => {
+                write!(f, "{}::{}", "PredicateError::MalformedBytes", error)
+            }
+            PredicateError::UnexpectedPrefix(byte) => {
+                write!(f, "{}::{}", "PredicateError::MalformedBytes", byte)
+            }
+            PredicateError::UnitContent(content_error) => {
+                write!(f, "{}::{}", "PredicateError::MalformedBytes", content_error)
+            }
+            PredicateError::ParsePredicateErrorError => {
+                write!(f, "{}", "PredicateError::ParsePredicateErrorToStringError")
+            }
+        }
+    }
 }
 
 impl From<VarIntError> for PredicateError {
@@ -54,6 +157,12 @@ impl From<VarIntError> for PredicateError {
 impl From<UnitContentError> for PredicateError {
     fn from(err: UnitContentError) -> Self {
         Self::UnitContent(err)
+    }
+}
+
+impl From<FromUtf8Error> for PredicateError {
+    fn from(_err: FromUtf8Error) -> PredicateError {
+        PredicateError::ParsePredicateErrorError
     }
 }
 
@@ -182,7 +291,7 @@ pub enum Predicate {
 fn combine_subpredicates(subpredicates: &[Predicate], separator: &str) -> String {
     subpredicates
         .iter()
-        .map(|predicate| predicate.to_string())
+        .map(|predicate| format!("{}", predicate))
         .collect::<Vec<String>>()
         .join(separator)
 }
@@ -847,7 +956,7 @@ mod predicate_tests {
             let parsed = Predicate::parse_str(str).unwrap();
             assert_eq!(parsed, predicate);
             if reversible {
-                let stringified = predicate.to_string();
+                let stringified = format!("{}", predicate);
                 assert_eq!(str, stringified);
             }
         }

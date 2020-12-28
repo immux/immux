@@ -47,12 +47,91 @@ pub enum UnitContent {
     Map(HashMap<String, UnitContent>),
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum UnitContentError {
     UnexpectedTypePrefix(u8),
     EmptyInput,
     MissingDataBytes,
     UnexpectedLengthBytes,
+    ParseUnitContentErrorError,
+}
+
+enum UnitContentErrorPrefix {
+    UnexpectedTypePrefix = 0x01,
+    EmptyInput = 0x02,
+    MissingDataBytes = 0x03,
+    UnexpectedLengthBytes = 0x04,
+    ParseUnitContentErrorError = 0x05,
+}
+
+impl UnitContentError {
+    pub fn marshal(&self) -> Vec<u8> {
+        match self {
+            UnitContentError::UnexpectedTypePrefix(byte) => {
+                let mut result = vec![UnitContentErrorPrefix::UnexpectedTypePrefix as u8];
+                result.push(byte.clone());
+                return result;
+            }
+            UnitContentError::EmptyInput => {
+                let result = vec![UnitContentErrorPrefix::EmptyInput as u8];
+                return result;
+            }
+            UnitContentError::MissingDataBytes => {
+                let result = vec![UnitContentErrorPrefix::MissingDataBytes as u8];
+                return result;
+            }
+            UnitContentError::UnexpectedLengthBytes => {
+                let result = vec![UnitContentErrorPrefix::UnexpectedLengthBytes as u8];
+                return result;
+            }
+            UnitContentError::ParseUnitContentErrorError => {
+                let result = vec![UnitContentErrorPrefix::ParseUnitContentErrorError as u8];
+                return result;
+            }
+        }
+    }
+
+    pub fn parse(data: &[u8]) -> Result<(UnitContentError, usize), UnitContentError> {
+        let mut position = 0;
+        let prefix = data[position];
+        position += 1;
+
+        if prefix == UnitContentErrorPrefix::UnexpectedTypePrefix as u8 {
+            let byte = data[position];
+            position += 1;
+            Ok((UnitContentError::UnexpectedTypePrefix(byte), position))
+        } else if prefix == UnitContentErrorPrefix::EmptyInput as u8 {
+            Ok((UnitContentError::EmptyInput, position))
+        } else if prefix == UnitContentErrorPrefix::MissingDataBytes as u8 {
+            Ok((UnitContentError::MissingDataBytes, position))
+        } else if prefix == UnitContentErrorPrefix::UnexpectedLengthBytes as u8 {
+            Ok((UnitContentError::UnexpectedLengthBytes, position))
+        } else {
+            Ok((UnitContentError::ParseUnitContentErrorError, position))
+        }
+    }
+}
+
+impl fmt::Display for UnitContentError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            UnitContentError::UnexpectedTypePrefix(byte) => {
+                write!(f, "{}::{}", "UnitContentError::UnexpectedTypePrefix", byte)
+            }
+            UnitContentError::EmptyInput => {
+                write!(f, "{}", "UnitContentError::UnexpectedTypePrefix")
+            }
+            UnitContentError::MissingDataBytes => {
+                write!(f, "{}", "UnitContentError::MissingDataBytes")
+            }
+            UnitContentError::UnexpectedLengthBytes => {
+                write!(f, "{}", "UnitContentError::UnexpectedLengthBytes")
+            }
+            UnitContentError::ParseUnitContentErrorError => {
+                write!(f, "{}", "UnitContentError::ParseUnitContentErrorError")
+            }
+        }
+    }
 }
 
 impl PartialOrd for UnitContent {
@@ -221,13 +300,13 @@ impl fmt::Display for UnitContent {
             UnitContent::Map(map) => {
                 let kv_pairs: Vec<String> = map
                     .iter()
-                    .map(|(key, content)| format!("{}:{}", key, content.to_string()))
+                    .map(|(key, content)| format!("{}:{}", key, content))
                     .collect();
                 write!(f, "{}{}{}", "{", kv_pairs.join(","), "}")
             }
             UnitContent::Array(array) => {
                 let kv_pairs: Vec<String> =
-                    array.iter().map(|content| content.to_string()).collect();
+                    array.iter().map(|content| format!("{}", content)).collect();
                 write!(f, "{}{}{}", "[", kv_pairs.join(","), "]")
             }
         }

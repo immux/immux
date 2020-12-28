@@ -1,10 +1,60 @@
+use std::fmt;
+
 use crate::storage::executor::grouping_label::GroupingLabel;
 use crate::storage::executor::unit_key::UnitKey;
 use crate::utils::varint::{varint_decode, varint_encode, VarIntError};
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum KVKeyError {
     VarIntError(VarIntError),
+    ParseKVKeyErrorError,
+}
+
+enum KVKeyErrorPrefix {
+    VarIntError = 0x01,
+    ParseKVKeyErrorError = 0x02,
+}
+
+impl KVKeyError {
+    pub fn marshal(&self) -> Vec<u8> {
+        match self {
+            KVKeyError::VarIntError(error) => {
+                let mut result = vec![KVKeyErrorPrefix::VarIntError as u8];
+                let error_bytes = error.marshal();
+                result.extend_from_slice(&error_bytes);
+                result
+            }
+            KVKeyError::ParseKVKeyErrorError => vec![KVKeyErrorPrefix::ParseKVKeyErrorError as u8],
+        }
+    }
+
+    pub fn parse(data: &[u8]) -> Result<(KVKeyError, usize), KVKeyError> {
+        let mut position = 0;
+        let prefix = data[position];
+        position += 1;
+
+        if prefix == KVKeyErrorPrefix::VarIntError as u8 {
+            let (error, offset) = VarIntError::parse(&data[position..])?;
+            position += offset;
+            Ok((KVKeyError::VarIntError(error), position))
+        } else {
+            Ok((KVKeyError::ParseKVKeyErrorError, position))
+        }
+    }
+}
+
+impl fmt::Display for KVKeyError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            KVKeyError::VarIntError(error) => {
+                let error_string = format!("{}", error);
+                write!(f, "{}::{}", "KVKeyError::VarIntError", error_string)
+            }
+            KVKeyError::ParseKVKeyErrorError => {
+                write!(f, "{}", "KVKeyError::ParseKVKeyErrorError")
+            }
+        }
+    }
 }
 
 impl From<VarIntError> for KVKeyError {

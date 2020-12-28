@@ -1,5 +1,6 @@
+use crate::system_error::SystemError;
 use std::cmp::Ordering;
-use std::fmt::Formatter;
+use std::fmt;
 use std::num::ParseIntError;
 
 #[derive(Debug, Clone, Copy)]
@@ -81,7 +82,7 @@ impl PartialEq for LogVersion {
 }
 
 impl std::fmt::Display for LogVersion {
-    fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter) -> std::fmt::Result {
         write!(f, "{}.{}.{}", self.major, self.minor, self.revise)
     }
 }
@@ -90,12 +91,86 @@ impl std::fmt::Display for LogVersion {
 pub enum LogVersionError {
     LogVersionParsingError,
     InvalidString,
-    ParseIntError(ParseIntError),
+    ParseIntError(SystemError),
     UnexpectedLogVersion,
+    ParseLogVersionErrorError,
+}
+
+enum LogVersionErrorPrefix {
+    LogVersionParsingError = 0x01,
+    InvalidString = 0x02,
+    ParseIntError = 0x03,
+    UnexpectedLogVersion = 0x04,
+    ParseLogVersionErrorError = 0x05,
+}
+
+impl LogVersionError {
+    pub fn marshal(&self) -> Vec<u8> {
+        match self {
+            LogVersionError::LogVersionParsingError => {
+                vec![LogVersionErrorPrefix::LogVersionParsingError as u8]
+            }
+            LogVersionError::InvalidString => vec![LogVersionErrorPrefix::InvalidString as u8],
+            LogVersionError::ParseIntError(error) => {
+                let mut result = vec![LogVersionErrorPrefix::ParseIntError as u8];
+                let error_byte = error.marshal();
+                result.push(error_byte);
+                result
+            }
+            LogVersionError::UnexpectedLogVersion => {
+                vec![LogVersionErrorPrefix::UnexpectedLogVersion as u8]
+            }
+            LogVersionError::ParseLogVersionErrorError => {
+                vec![LogVersionErrorPrefix::ParseLogVersionErrorError as u8]
+            }
+        }
+    }
+
+    pub fn parse(data: &[u8]) -> Result<(LogVersionError, usize), LogVersionError> {
+        let mut position = 0;
+        let prefix = data[position];
+        position += 1;
+
+        if prefix == LogVersionErrorPrefix::LogVersionParsingError as u8 {
+            Ok((LogVersionError::LogVersionParsingError, position))
+        } else if prefix == LogVersionErrorPrefix::InvalidString as u8 {
+            Ok((LogVersionError::InvalidString, position))
+        } else if prefix == LogVersionErrorPrefix::ParseIntError as u8 {
+            let system_error = SystemError::ParseIntError;
+            Ok((LogVersionError::ParseIntError(system_error), position))
+        } else if prefix == LogVersionErrorPrefix::UnexpectedLogVersion as u8 {
+            Ok((LogVersionError::UnexpectedLogVersion, position))
+        } else {
+            Ok((LogVersionError::ParseLogVersionErrorError, position))
+        }
+    }
+}
+
+impl fmt::Display for LogVersionError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            LogVersionError::LogVersionParsingError => {
+                write!(f, "{}", "LogVersionError::LogVersionParsingError")
+            }
+            LogVersionError::InvalidString => {
+                write!(f, "{}", "LogVersionError::InvalidString")
+            }
+            LogVersionError::ParseIntError(error) => {
+                let error_string = format!("{}", error);
+                write!(f, "{}::{}", "LogVersionError::ParseIntError", error_string)
+            }
+            LogVersionError::UnexpectedLogVersion => {
+                write!(f, "{}", "LogVersionError::UnexpectedLogVersion")
+            }
+            LogVersionError::ParseLogVersionErrorError => {
+                write!(f, "{}", "LogVersionError::ParseLogVersionErrorError")
+            }
+        }
+    }
 }
 
 impl From<ParseIntError> for LogVersionError {
-    fn from(error: ParseIntError) -> LogVersionError {
-        LogVersionError::ParseIntError(error)
+    fn from(_error: ParseIntError) -> LogVersionError {
+        LogVersionError::ParseIntError(SystemError::ParseIntError)
     }
 }

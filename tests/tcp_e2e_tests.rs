@@ -3,12 +3,17 @@ mod tcp_e2e_tests {
     use std::error::Error;
 
     use immuxsys::constants as Constants;
+    use immuxsys::server::errors::ServerError;
+    use immuxsys::server::tcp_response::TcpResponse;
     use immuxsys::storage::chain_height::ChainHeight;
+    use immuxsys::storage::errors::KVError::TransactionManagerError;
+    use immuxsys::storage::executor::errors::ExecutorError::KVError;
     use immuxsys::storage::executor::grouping_label::GroupingLabel;
     use immuxsys::storage::executor::outcome::Outcome;
     use immuxsys::storage::executor::unit_content::UnitContent;
     use immuxsys::storage::executor::unit_key::UnitKey;
     use immuxsys::storage::transaction_manager::TransactionId;
+    use immuxsys::storage::transaction_manager::TransactionManagerError::TransactionNotAlive;
     use immuxsys_client::tcp_client::ImmuxDBTcpClient;
     use immuxsys_client::ImmuxDBClient;
     use immuxsys_dev_utils::data_models::berka99::{
@@ -43,10 +48,14 @@ mod tcp_e2e_tests {
         let random_content = UnitContent::String(String::from("some random value"));
 
         for grouping in expected_groupings.iter() {
-            let outcome = client
+            let response = client
                 .set_unit(&grouping, &random_key, &random_content)
                 .unwrap();
-            assert_eq!(outcome, Outcome::InsertSuccess);
+            let actual_outcome = Outcome::InsertSuccess;
+            match response {
+                TcpResponse::Outcome(outcome) => assert_eq!(outcome, actual_outcome),
+                TcpResponse::ServerError(_) => panic!(),
+            }
         }
 
         let target_groupings = vec![
@@ -54,25 +63,41 @@ mod tcp_e2e_tests {
             expected_groupings[1].clone(),
             expected_groupings[2].clone(),
         ];
-        let outcome = client.remove_groupings(&target_groupings).unwrap();
-        assert_eq!(outcome, Outcome::DeleteGroupingSuccess);
+        let response = client.remove_groupings(&target_groupings).unwrap();
+        let actual_outcome = Outcome::DeleteGroupingSuccess;
 
-        for grouping in target_groupings.iter() {
-            let outcome = client.get_by_key(grouping, &random_key).unwrap();
-            assert_eq!(outcome, Outcome::Select(vec![]));
+        match response {
+            TcpResponse::Outcome(outcome) => {
+                assert_eq!(outcome, actual_outcome);
+            }
+            TcpResponse::ServerError(_) => panic!(),
         }
 
-        let outcome = client.get_all_groupings().unwrap();
-        match outcome {
-            Outcome::GetAllGroupingsSuccess(actual_groupings) => {
-                for grouping in actual_groupings.iter() {
-                    assert!(expected_groupings.contains(grouping));
+        for grouping in target_groupings.iter() {
+            let response = client.get_by_key(grouping, &random_key).unwrap();
+            match response {
+                TcpResponse::Outcome(outcome) => {
+                    let actual_outcome = Outcome::Select(vec![]);
+                    assert_eq!(outcome, actual_outcome);
                 }
-
-                for grouping in target_groupings.iter() {
-                    assert!(!actual_groupings.contains(grouping));
-                }
+                TcpResponse::ServerError(_) => panic!(),
             }
+        }
+
+        let response = client.get_all_groupings().unwrap();
+        match response {
+            TcpResponse::Outcome(outcome) => match outcome {
+                Outcome::GetAllGroupingsSuccess(actual_groupings) => {
+                    for grouping in actual_groupings.iter() {
+                        assert!(expected_groupings.contains(grouping));
+                    }
+
+                    for grouping in target_groupings.iter() {
+                        assert!(!actual_groupings.contains(grouping));
+                    }
+                }
+                _ => panic!("tcp_e2e_remove_groupings failed"),
+            },
             _ => panic!("tcp_e2e_remove_groupings failed"),
         }
     }
@@ -98,26 +123,34 @@ mod tcp_e2e_tests {
         let random_content = UnitContent::String(String::from("hello world"));
 
         for grouping in expected_groupings.iter() {
-            let outcome = client
+            let response = client
                 .set_unit(&grouping, &random_key, &random_content)
                 .unwrap();
-            assert_eq!(outcome, Outcome::InsertSuccess);
+            match response {
+                TcpResponse::Outcome(outcome) => {
+                    assert_eq!(outcome, Outcome::InsertSuccess);
+                }
+                TcpResponse::ServerError(_) => panic!(),
+            }
         }
 
-        let outcome = client.get_all_groupings().unwrap();
+        let response = client.get_all_groupings().unwrap();
 
-        match outcome {
-            Outcome::GetAllGroupingsSuccess(actual_groupings) => {
-                for grouping in actual_groupings.iter() {
-                    assert!(expected_groupings.contains(grouping));
+        match response {
+            TcpResponse::Outcome(outcome) => match outcome {
+                Outcome::GetAllGroupingsSuccess(actual_groupings) => {
+                    for grouping in actual_groupings.iter() {
+                        assert!(expected_groupings.contains(grouping));
+                    }
+
+                    for grouping in expected_groupings.iter() {
+                        assert!(actual_groupings.contains(grouping));
+                    }
+
+                    assert_eq!(actual_groupings.len(), expected_groupings.len());
                 }
-
-                for grouping in expected_groupings.iter() {
-                    assert!(actual_groupings.contains(grouping));
-                }
-
-                assert_eq!(actual_groupings.len(), expected_groupings.len());
-            }
+                _ => panic!("tcp_e2e_get_groupings failed"),
+            },
             _ => panic!("tcp_e2e_get_groupings failed"),
         }
     }
@@ -134,14 +167,20 @@ mod tcp_e2e_tests {
         let unit_key = UnitKey::new("key".as_bytes());
         let content = UnitContent::String("content".to_string());
 
-        let outcome = client.set_unit(&grouping, &unit_key, &content).unwrap();
+        let response = client.set_unit(&grouping, &unit_key, &content).unwrap();
 
-        assert_eq!(outcome, Outcome::InsertSuccess);
+        match response {
+            TcpResponse::Outcome(outcome) => assert_eq!(outcome, Outcome::InsertSuccess),
+            _ => panic!(),
+        }
 
         let grouping = GroupingLabel::new("the_other_grouping".as_bytes());
-        let outcome = client.get_by_key(&grouping, &unit_key).unwrap();
+        let response = client.get_by_key(&grouping, &unit_key).unwrap();
 
-        assert_eq!(outcome, Outcome::Select(vec![]));
+        match response {
+            TcpResponse::Outcome(outcome) => assert_eq!(outcome, Outcome::Select(vec![])),
+            _ => panic!(),
+        }
     }
 
     #[test]
@@ -156,16 +195,22 @@ mod tcp_e2e_tests {
         let unit_key = UnitKey::new("key".as_bytes());
         let unit_content = UnitContent::String("content".to_string());
 
-        let outcome = client
+        let response = client
             .set_unit(&grouping, &unit_key, &unit_content)
             .unwrap();
 
-        assert_eq!(outcome, Outcome::InsertSuccess);
+        match response {
+            TcpResponse::Outcome(outcome) => assert_eq!(outcome, Outcome::InsertSuccess),
+            _ => panic!(),
+        }
 
-        let actual_output = client.get_by_key(&grouping, &unit_key).unwrap();
+        let response = client.get_by_key(&grouping, &unit_key).unwrap();
         let expected_output = Outcome::Select(vec![unit_content]);
 
-        assert_eq!(expected_output, actual_output);
+        match response {
+            TcpResponse::Outcome(outcome) => assert_eq!(expected_output, outcome),
+            _ => panic!(),
+        }
     }
 
     #[test]
@@ -190,23 +235,33 @@ mod tcp_e2e_tests {
         ];
 
         for content in contents.iter() {
-            let outcome = client.set_unit(&grouping, &unit_key, content).unwrap();
+            let response = client.set_unit(&grouping, &unit_key, content).unwrap();
 
-            assert_eq!(outcome, Outcome::InsertSuccess);
+            match response {
+                TcpResponse::Outcome(outcome) => assert_eq!(outcome, Outcome::InsertSuccess),
+                _ => panic!(),
+            }
         }
 
-        let outcome = client
+        let response = client
             .revert_one(&grouping, &unit_key, &target_height)
             .unwrap();
-        assert_eq!(outcome, Outcome::RevertOneSuccess);
 
-        let actual_outcome = client.get_by_key(&grouping, &unit_key).unwrap();
+        match response {
+            TcpResponse::Outcome(outcome) => assert_eq!(outcome, Outcome::RevertOneSuccess),
+            _ => panic!(),
+        }
+
+        let response = client.get_by_key(&grouping, &unit_key).unwrap();
 
         let expected_content = &contents[target_height.as_u64() as usize];
-        assert_eq!(
-            actual_outcome,
-            Outcome::Select(vec![expected_content.clone()])
-        );
+
+        match response {
+            TcpResponse::Outcome(outcome) => {
+                assert_eq!(outcome, Outcome::Select(vec![expected_content.clone()]));
+            }
+            _ => panic!(),
+        }
     }
 
     #[test]
@@ -271,18 +326,25 @@ mod tcp_e2e_tests {
         for (grouping, table) in dataset.iter() {
             for (key, content) in table.iter() {
                 let grouping = GroupingLabel::new(grouping.as_bytes());
-                let outcome = client.set_unit(&grouping, &key, &content).unwrap();
+                let response = client.set_unit(&grouping, &key, &content).unwrap();
 
-                assert_eq!(outcome, Outcome::InsertSuccess);
+                match response {
+                    TcpResponse::Outcome(outcome) => assert_eq!(outcome, Outcome::InsertSuccess),
+                    _ => panic!(),
+                }
             }
         }
 
         for (grouping, table) in dataset.iter() {
             for (key, content) in table.iter() {
                 let grouping = GroupingLabel::new(grouping.as_bytes());
-                let outcome = client.get_by_key(&grouping, &key).unwrap();
-
-                assert_eq!(outcome, Outcome::Select(vec![content.to_owned()]));
+                let response = client.get_by_key(&grouping, &key).unwrap();
+                match response {
+                    TcpResponse::Outcome(outcome) => {
+                        assert_eq!(outcome, Outcome::Select(vec![content.to_owned()]))
+                    }
+                    _ => panic!(),
+                }
             }
         }
     }
@@ -301,21 +363,30 @@ mod tcp_e2e_tests {
         let (target_key, _target_content) = &key_content_pairs[target_pair_index];
 
         for (key, content) in key_content_pairs.iter() {
-            let outcome = client.set_unit(&grouping, &key, &content).unwrap();
-
-            assert_eq!(outcome, Outcome::InsertSuccess);
+            let response = client.set_unit(&grouping, &key, &content).unwrap();
+            match response {
+                TcpResponse::Outcome(outcome) => assert_eq!(outcome, Outcome::InsertSuccess),
+                _ => panic!(),
+            }
         }
 
-        let outcome = client.remove_one(&grouping, &target_key).unwrap();
-        assert_eq!(outcome, Outcome::RemoveOneSuccess);
+        let response = client.remove_one(&grouping, &target_key).unwrap();
+        match response {
+            TcpResponse::Outcome(outcome) => assert_eq!(outcome, Outcome::RemoveOneSuccess),
+            _ => panic!(),
+        }
 
         for (key, content) in key_content_pairs.iter() {
-            let outcome = client.get_by_key(&grouping, &key).unwrap();
-
-            if key == target_key {
-                assert_eq!(outcome, Outcome::Select(vec![]));
-            } else {
-                assert_eq!(outcome, Outcome::Select(vec![content.clone()]));
+            let response = client.get_by_key(&grouping, &key).unwrap();
+            match response {
+                TcpResponse::Outcome(outcome) => {
+                    if key == target_key {
+                        assert_eq!(outcome, Outcome::Select(vec![]));
+                    } else {
+                        assert_eq!(outcome, Outcome::Select(vec![content.clone()]));
+                    }
+                }
+                _ => panic!(),
             }
         }
     }
@@ -334,22 +405,30 @@ mod tcp_e2e_tests {
         let target_height = ChainHeight::new(target_pair_index);
 
         for (key, content) in key_content_pairs.iter() {
-            let outcome = client.set_unit(&grouping, &key, &content).unwrap();
-
-            assert_eq!(outcome, Outcome::InsertSuccess);
+            let response = client.set_unit(&grouping, &key, &content).unwrap();
+            match response {
+                TcpResponse::Outcome(outcome) => assert_eq!(outcome, Outcome::InsertSuccess),
+                _ => panic!(),
+            }
         }
 
-        let outcome = client.revert_all(&target_height).unwrap();
-
-        assert_eq!(outcome, Outcome::RevertAllSuccess);
+        let response = client.revert_all(&target_height).unwrap();
+        match response {
+            TcpResponse::Outcome(outcome) => assert_eq!(outcome, Outcome::RevertAllSuccess),
+            _ => panic!(),
+        }
 
         for (index, (key, content)) in key_content_pairs.iter().enumerate() {
-            let outcome = client.get_by_key(&grouping, &key).unwrap();
-
-            if index <= target_height.as_u64() as usize {
-                assert_eq!(outcome, Outcome::Select(vec![content.clone()]));
-            } else {
-                assert_eq!(outcome, Outcome::Select(vec![]));
+            let response = client.get_by_key(&grouping, &key).unwrap();
+            match response {
+                TcpResponse::Outcome(outcome) => {
+                    if index <= target_height.as_u64() as usize {
+                        assert_eq!(outcome, Outcome::Select(vec![content.clone()]));
+                    } else {
+                        assert_eq!(outcome, Outcome::Select(vec![]));
+                    }
+                }
+                _ => panic!(),
             }
         }
     }
@@ -366,19 +445,25 @@ mod tcp_e2e_tests {
         let key_content_pairs = get_key_content_pairs();
 
         for (key, content) in key_content_pairs.iter() {
-            let outcome = client.set_unit(&grouping, &key, &content).unwrap();
-
-            assert_eq!(outcome, Outcome::InsertSuccess);
+            let response = client.set_unit(&grouping, &key, &content).unwrap();
+            match response {
+                TcpResponse::Outcome(outcome) => assert_eq!(outcome, Outcome::InsertSuccess),
+                _ => panic!(),
+            }
         }
 
-        let outcome = client.remove_all().unwrap();
-
-        assert_eq!(outcome, Outcome::RemoveAllSuccess);
+        let response = client.remove_all().unwrap();
+        match response {
+            TcpResponse::Outcome(outcome) => assert_eq!(outcome, Outcome::RemoveAllSuccess),
+            _ => panic!(),
+        }
 
         for (key, _content) in key_content_pairs.iter() {
-            let outcome = client.get_by_key(&grouping, &key).unwrap();
-
-            assert_eq!(outcome, Outcome::Select(vec![]));
+            let response = client.get_by_key(&grouping, &key).unwrap();
+            match response {
+                TcpResponse::Outcome(outcome) => assert_eq!(outcome, Outcome::Select(vec![])),
+                _ => panic!(),
+            }
         }
     }
 
@@ -392,30 +477,46 @@ mod tcp_e2e_tests {
         let grouping = GroupingLabel::new("any_grouping".as_bytes());
         let expected_transaction_id = TransactionId::new(1);
 
-        let outcome = client.create_transaction().unwrap();
+        let response = client.create_transaction().unwrap();
 
-        assert_eq!(
-            outcome,
-            Outcome::CreateTransaction(expected_transaction_id.clone())
-        );
+        match response {
+            TcpResponse::Outcome(outcome) => assert_eq!(
+                outcome,
+                Outcome::CreateTransaction(expected_transaction_id.clone())
+            ),
+            _ => panic!(),
+        }
 
         let key_content_pairs = get_key_content_pairs();
 
         for (key, content) in key_content_pairs.iter() {
-            let outcome = client
+            let response = client
                 .transactional_set_unit(&grouping, &key, &content, &expected_transaction_id)
                 .unwrap();
 
-            assert_eq!(outcome, Outcome::TransactionalInsertSuccess);
+            match response {
+                TcpResponse::Outcome(outcome) => {
+                    assert_eq!(outcome, Outcome::TransactionalInsertSuccess)
+                }
+                _ => panic!(),
+            }
         }
 
-        let outcome = client.commit_transaction(&expected_transaction_id).unwrap();
+        let response = client.commit_transaction(&expected_transaction_id).unwrap();
 
-        assert_eq!(outcome, Outcome::TransactionCommitSuccess);
+        match response {
+            TcpResponse::Outcome(outcome) => assert_eq!(outcome, Outcome::TransactionCommitSuccess),
+            _ => panic!(),
+        }
 
         for (key, content) in key_content_pairs.iter() {
-            let outcome = client.get_by_key(&grouping, &key).unwrap();
-            assert_eq!(outcome, Outcome::Select(vec![content.clone()]));
+            let response = client.get_by_key(&grouping, &key).unwrap();
+            match response {
+                TcpResponse::Outcome(outcome) => {
+                    assert_eq!(outcome, Outcome::Select(vec![content.clone()]))
+                }
+                _ => panic!(),
+            }
         }
     }
 
@@ -429,31 +530,43 @@ mod tcp_e2e_tests {
         let grouping = GroupingLabel::new("any_grouping".as_bytes());
         let expected_transaction_id = TransactionId::new(1);
 
-        let outcome = client.create_transaction().unwrap();
-
-        assert_eq!(
-            outcome,
-            Outcome::CreateTransaction(expected_transaction_id.clone())
-        );
+        let response = client.create_transaction().unwrap();
+        match response {
+            TcpResponse::Outcome(outcome) => assert_eq!(
+                outcome,
+                Outcome::CreateTransaction(expected_transaction_id.clone())
+            ),
+            _ => panic!(),
+        }
 
         let key_content_pairs = get_key_content_pairs();
 
         for (key, content) in key_content_pairs.iter() {
-            let outcome = client
+            let response = client
                 .transactional_set_unit(&grouping, &key, &content, &expected_transaction_id)
                 .unwrap();
 
-            assert_eq!(outcome, Outcome::TransactionalInsertSuccess);
+            match response {
+                TcpResponse::Outcome(outcome) => {
+                    assert_eq!(outcome, Outcome::TransactionalInsertSuccess)
+                }
+                _ => panic!(),
+            }
         }
 
-        let outcome = client.abort_transaction(&expected_transaction_id).unwrap();
+        let response = client.abort_transaction(&expected_transaction_id).unwrap();
 
-        assert_eq!(outcome, Outcome::TransactionAbortSuccess);
+        match response {
+            TcpResponse::Outcome(outcome) => assert_eq!(outcome, Outcome::TransactionAbortSuccess),
+            _ => panic!(),
+        }
 
         for (key, _content) in key_content_pairs.iter() {
-            let outcome = client.get_by_key(&grouping, &key).unwrap();
-
-            assert_eq!(outcome, Outcome::Select(vec![]));
+            let response = client.get_by_key(&grouping, &key).unwrap();
+            match response {
+                TcpResponse::Outcome(outcome) => assert_eq!(outcome, Outcome::Select(vec![])),
+                _ => panic!(),
+            }
         }
     }
 
@@ -468,40 +581,63 @@ mod tcp_e2e_tests {
 
         let transaction_id = TransactionId::new(1);
 
-        let outcome = client.create_transaction().unwrap();
+        let response = client.create_transaction().unwrap();
 
-        assert_eq!(outcome, Outcome::CreateTransaction(transaction_id.clone()));
+        match response {
+            TcpResponse::Outcome(outcome) => {
+                assert_eq!(outcome, Outcome::CreateTransaction(transaction_id.clone()))
+            }
+            _ => panic!(),
+        }
 
         let unit_key = UnitKey::from("key1");
         let content = UnitContent::String(String::from("This is string"));
-        let outcome = client
+        let response = client
             .transactional_set_unit(&grouping, &unit_key, &content, &transaction_id)
             .unwrap();
 
-        assert_eq!(outcome, Outcome::TransactionalInsertSuccess);
+        match response {
+            TcpResponse::Outcome(outcome) => {
+                assert_eq!(outcome, Outcome::TransactionalInsertSuccess)
+            }
+            _ => panic!(),
+        }
 
         {
-            let outcome = client
+            let response = client
                 .transactional_get(&grouping, &unit_key, &transaction_id)
                 .unwrap();
 
-            assert_eq!(outcome, Outcome::Select(vec![content.clone()]));
+            match response {
+                TcpResponse::Outcome(outcome) => {
+                    assert_eq!(outcome, Outcome::Select(vec![content.clone()]))
+                }
+                _ => panic!(),
+            }
         }
 
         {
-            let outcome = client.get_by_key(&grouping, &unit_key).unwrap();
-
-            assert_eq!(outcome, Outcome::Select(vec![]));
+            let response = client.get_by_key(&grouping, &unit_key).unwrap();
+            match response {
+                TcpResponse::Outcome(outcome) => assert_eq!(outcome, Outcome::Select(vec![])),
+                _ => panic!(),
+            }
         }
 
-        let outcome = client.commit_transaction(&transaction_id).unwrap();
-
-        assert_eq!(outcome, Outcome::TransactionCommitSuccess);
+        let response = client.commit_transaction(&transaction_id).unwrap();
+        match response {
+            TcpResponse::Outcome(outcome) => assert_eq!(outcome, Outcome::TransactionCommitSuccess),
+            _ => panic!(),
+        }
 
         {
-            let outcome = client.get_by_key(&grouping, &unit_key).unwrap();
-
-            assert_eq!(outcome, Outcome::Select(vec![content]));
+            let response = client.get_by_key(&grouping, &unit_key).unwrap();
+            match response {
+                TcpResponse::Outcome(outcome) => {
+                    assert_eq!(outcome, Outcome::Select(vec![content]))
+                }
+                _ => panic!(),
+            }
         }
     }
 
@@ -520,35 +656,49 @@ mod tcp_e2e_tests {
         let (target_key, _target_content) = &key_content_pairs[target_pair_index];
 
         for (key, content) in key_content_pairs.iter() {
-            let outcome = client.set_unit(&grouping, &key, &content).unwrap();
-
-            assert_eq!(outcome, Outcome::InsertSuccess);
+            let response = client.set_unit(&grouping, &key, &content).unwrap();
+            match response {
+                TcpResponse::Outcome(outcome) => assert_eq!(outcome, Outcome::InsertSuccess),
+                _ => panic!(),
+            }
         }
 
-        let outcome = client.create_transaction().unwrap();
+        let response = client.create_transaction().unwrap();
+        match response {
+            TcpResponse::Outcome(outcome) => assert_eq!(
+                outcome,
+                Outcome::CreateTransaction(expected_transaction_id.clone())
+            ),
+            _ => panic!(),
+        }
 
-        assert_eq!(
-            outcome,
-            Outcome::CreateTransaction(expected_transaction_id.clone())
-        );
-
-        let outcome = client
+        let response = client
             .transactional_remove_one(&expected_transaction_id, &grouping, &target_key)
             .unwrap();
+        match response {
+            TcpResponse::Outcome(outcome) => {
+                assert_eq!(outcome, Outcome::TransactionalRemoveOneSuccess)
+            }
+            _ => panic!(),
+        }
 
-        assert_eq!(outcome, Outcome::TransactionalRemoveOneSuccess);
-
-        let outcome = client.commit_transaction(&expected_transaction_id).unwrap();
-
-        assert_eq!(outcome, Outcome::TransactionCommitSuccess);
+        let response = client.commit_transaction(&expected_transaction_id).unwrap();
+        match response {
+            TcpResponse::Outcome(outcome) => assert_eq!(outcome, Outcome::TransactionCommitSuccess),
+            _ => panic!(),
+        }
 
         for (key, content) in key_content_pairs.iter() {
-            let outcome = client.get_by_key(&grouping, &key).unwrap();
-
-            if key == target_key {
-                assert_eq!(outcome, Outcome::Select(vec![]));
-            } else {
-                assert_eq!(outcome, Outcome::Select(vec![content.clone()]));
+            let response = client.get_by_key(&grouping, &key).unwrap();
+            match response {
+                TcpResponse::Outcome(outcome) => {
+                    if key == target_key {
+                        assert_eq!(outcome, Outcome::Select(vec![]));
+                    } else {
+                        assert_eq!(outcome, Outcome::Select(vec![content.clone()]));
+                    }
+                }
+                _ => panic!(),
             }
         }
     }
@@ -577,117 +727,60 @@ mod tcp_e2e_tests {
         ];
 
         for content in contents.iter() {
-            let outcome = client.set_unit(&grouping, &key, &content).unwrap();
-
-            assert_eq!(outcome, Outcome::InsertSuccess);
+            let response = client.set_unit(&grouping, &key, &content).unwrap();
+            match response {
+                TcpResponse::Outcome(outcome) => assert_eq!(outcome, Outcome::InsertSuccess),
+                _ => panic!(),
+            }
         }
 
-        let outcome = client.create_transaction().unwrap();
+        let response = client.create_transaction().unwrap();
 
-        assert_eq!(
-            outcome,
-            Outcome::CreateTransaction(expected_transaction_id.clone())
-        );
+        match response {
+            TcpResponse::Outcome(outcome) => assert_eq!(
+                outcome,
+                Outcome::CreateTransaction(expected_transaction_id.clone())
+            ),
+            _ => panic!(),
+        }
 
-        let outcome = client
+        let response = client
             .transactional_revert_one(&grouping, &key, &target_height, &expected_transaction_id)
             .unwrap();
 
-        assert_eq!(outcome, Outcome::TransactionalRevertOneSuccess);
-
-        let outcome = client.get_by_key(&grouping, &key).unwrap();
-        let expected_output = contents.last().unwrap();
-        assert_eq!(outcome, Outcome::Select(vec![expected_output.clone()]));
-
-        let outcome = client.commit_transaction(&expected_transaction_id).unwrap();
-        assert_eq!(outcome, Outcome::TransactionCommitSuccess);
-
-        let outcome = client.get_by_key(&grouping, &key).unwrap();
-        let expected_content = &contents[target_pair_index as usize];
-        assert_eq!(outcome, Outcome::Select(vec![expected_content.clone()]));
-    }
-
-    #[test]
-    fn tcp_e2e_remove_all_isolation() {
-        let port = 8012;
-        launch_test_db_servers("tcp_e2e_remove_all_isolation", None, Some(port)).unwrap();
-
-        let host = &format!("{}:{}", Constants::SERVER_END_POINT, port);
-        let client = ImmuxDBTcpClient::new(host).unwrap();
-        let grouping = GroupingLabel::new("any_grouping".as_bytes());
-        let expected_transaction_id = TransactionId::new(1);
-
-        let key_content_pairs = get_key_content_pairs();
-
-        for (key, content) in key_content_pairs.iter() {
-            let outcome = client.set_unit(&grouping, &key, &content).unwrap();
-
-            assert_eq!(outcome, Outcome::InsertSuccess);
-        }
-
-        let outcome = client.create_transaction().unwrap();
-
-        assert_eq!(
-            outcome,
-            Outcome::CreateTransaction(expected_transaction_id.clone())
-        );
-
-        let outcome = client.remove_all().unwrap();
-
-        assert_eq!(outcome, Outcome::RemoveAllSuccess);
-
-        for (key, _content) in key_content_pairs.iter() {
-            let outcome = client
-                .transactional_get(&grouping, &key, &expected_transaction_id)
-                .unwrap();
-
-            assert_eq!(outcome, Outcome::Select(vec![]));
-        }
-    }
-
-    #[test]
-    fn tcp_e2e_revert_all_isolation() {
-        let port = 8013;
-        launch_test_db_servers("tcp_e2e_revert_all_isolation", None, Some(port)).unwrap();
-
-        let host = &format!("{}:{}", Constants::SERVER_END_POINT, port);
-        let client = ImmuxDBTcpClient::new(host).unwrap();
-        let grouping = GroupingLabel::new("any_grouping".as_bytes());
-        let expected_transaction_id = TransactionId::new(1);
-
-        let key_content_pairs = get_key_content_pairs();
-        let target_pair_index = 4;
-        let target_height = ChainHeight::new(target_pair_index);
-
-        for (key, content) in key_content_pairs.iter() {
-            let outcome = client.set_unit(&grouping, &key, &content).unwrap();
-
-            assert_eq!(outcome, Outcome::InsertSuccess);
-        }
-
-        let outcome = client.create_transaction().unwrap();
-
-        assert_eq!(outcome, Outcome::CreateTransaction(expected_transaction_id));
-
-        let outcome = client.revert_all(&target_height).unwrap();
-
-        assert_eq!(outcome, Outcome::RevertAllSuccess);
-
-        for (index, (key, content)) in key_content_pairs.iter().enumerate() {
-            let outcome = client
-                .transactional_get(&grouping, &key, &expected_transaction_id)
-                .unwrap();
-
-            if index <= target_height.as_u64() as usize {
-                assert_eq!(outcome, Outcome::Select(vec![content.clone()]));
-            } else {
-                assert_eq!(outcome, Outcome::Select(vec![]));
+        match response {
+            TcpResponse::Outcome(outcome) => {
+                assert_eq!(outcome, Outcome::TransactionalRevertOneSuccess)
             }
+            _ => panic!(),
+        }
+
+        let response = client.get_by_key(&grouping, &key).unwrap();
+        let expected_output = contents.last().unwrap();
+        match response {
+            TcpResponse::Outcome(outcome) => {
+                assert_eq!(outcome, Outcome::Select(vec![expected_output.clone()]))
+            }
+            _ => panic!(),
+        }
+
+        let response = client.commit_transaction(&expected_transaction_id).unwrap();
+        match response {
+            TcpResponse::Outcome(outcome) => assert_eq!(outcome, Outcome::TransactionCommitSuccess),
+            _ => panic!(),
+        }
+
+        let response = client.get_by_key(&grouping, &key).unwrap();
+        let expected_content = &contents[target_pair_index as usize];
+        match response {
+            TcpResponse::Outcome(outcome) => {
+                assert_eq!(outcome, Outcome::Select(vec![expected_content.clone()]))
+            }
+            _ => panic!(),
         }
     }
 
     #[test]
-    #[should_panic]
     fn tcp_e2e_transaction_not_alive_after_revert_all() {
         let port = 8014;
         launch_test_db_servers(
@@ -707,24 +800,42 @@ mod tcp_e2e_tests {
         let target_height = ChainHeight::new(target_pair_index);
 
         for (key, content) in key_content_pairs.iter() {
-            let outcome = client.set_unit(&grouping, &key, &content).unwrap();
-
-            assert_eq!(outcome, Outcome::InsertSuccess);
+            let response = client.set_unit(&grouping, &key, &content).unwrap();
+            match response {
+                TcpResponse::Outcome(outcome) => assert_eq!(outcome, Outcome::InsertSuccess),
+                _ => panic!(),
+            }
         }
 
-        let outcome = client.create_transaction().unwrap();
+        let response = client.create_transaction().unwrap();
+        match response {
+            TcpResponse::Outcome(outcome) => {
+                assert_eq!(outcome, Outcome::CreateTransaction(expected_transaction_id))
+            }
+            _ => panic!(),
+        }
 
-        assert_eq!(outcome, Outcome::CreateTransaction(expected_transaction_id));
+        let response = client.revert_all(&target_height).unwrap();
+        match response {
+            TcpResponse::Outcome(outcome) => assert_eq!(outcome, Outcome::RevertAllSuccess),
+            _ => panic!(),
+        }
 
-        let outcome = client.revert_all(&target_height).unwrap();
-
-        assert_eq!(outcome, Outcome::RevertAllSuccess);
-
-        client.commit_transaction(&expected_transaction_id).unwrap();
+        let response = client.commit_transaction(&expected_transaction_id).unwrap();
+        match response {
+            TcpResponse::Outcome(_outcome) => panic!(),
+            TcpResponse::ServerError(error) => {
+                assert_eq!(
+                    error,
+                    ServerError::ExecutorError(KVError(TransactionManagerError(
+                        TransactionNotAlive
+                    )))
+                );
+            }
+        }
     }
 
     #[test]
-    #[should_panic]
     fn tcp_e2e_unexpected_commit_transaction_id() {
         let port = 8016;
         launch_test_db_servers("tcp_e2e_unexpected_commit_transaction_id", None, Some(port))
@@ -735,11 +846,17 @@ mod tcp_e2e_tests {
 
         let fake_transaction_id = TransactionId::new(100);
 
-        client.commit_transaction(&fake_transaction_id).unwrap();
+        let response = client.commit_transaction(&fake_transaction_id).unwrap();
+        match response {
+            TcpResponse::Outcome(_) => panic!(),
+            TcpResponse::ServerError(error) => assert_eq!(
+                error,
+                ServerError::ExecutorError(KVError(TransactionManagerError(TransactionNotAlive)))
+            ),
+        }
     }
 
     #[test]
-    #[should_panic]
     fn tcp_e2e_unexpected_abort_transaction_id() {
         let port = 8015;
         launch_test_db_servers("tcp_e2e_unexpected_abort_transaction_id", None, Some(port))
@@ -750,7 +867,14 @@ mod tcp_e2e_tests {
 
         let fake_transaction_id = TransactionId::new(100);
 
-        client.abort_transaction(&fake_transaction_id).unwrap();
+        let response = client.abort_transaction(&fake_transaction_id).unwrap();
+        match response {
+            TcpResponse::Outcome(_) => panic!(),
+            TcpResponse::ServerError(error) => assert_eq!(
+                error,
+                ServerError::ExecutorError(KVError(TransactionManagerError(TransactionNotAlive)))
+            ),
+        }
     }
 
     #[test]
@@ -786,37 +910,68 @@ mod tcp_e2e_tests {
         let expected_tid_1 = TransactionId::new(1);
         let expected_tid_2 = TransactionId::new(2);
 
-        let outcome = client.create_transaction().unwrap();
-        assert_eq!(outcome, Outcome::CreateTransaction(expected_tid_1));
+        let response = client.create_transaction().unwrap();
+        match response {
+            TcpResponse::Outcome(outcome) => {
+                assert_eq!(outcome, Outcome::CreateTransaction(expected_tid_1))
+            }
+            _ => panic!(),
+        }
 
-        let outcome = client.create_transaction().unwrap();
-        assert_eq!(outcome, Outcome::CreateTransaction(expected_tid_2));
+        let response = client.create_transaction().unwrap();
+        match response {
+            TcpResponse::Outcome(outcome) => {
+                assert_eq!(outcome, Outcome::CreateTransaction(expected_tid_2))
+            }
+            _ => panic!(),
+        }
 
         for kv_pairs in mixed_kv_pairs {
             let kv_1 = kv_pairs.0;
             let kv_2 = kv_pairs.1;
 
-            let outcome = client
+            let response = client
                 .transactional_set_unit(&grouping, &kv_1.0, &kv_1.1, &expected_tid_1)
                 .unwrap();
-            assert_eq!(outcome, Outcome::TransactionalInsertSuccess);
+            match response {
+                TcpResponse::Outcome(outcome) => {
+                    assert_eq!(outcome, Outcome::TransactionalInsertSuccess)
+                }
+                _ => panic!(),
+            }
 
-            let outcome = client
+            let response = client
                 .transactional_set_unit(&grouping, &kv_2.0, &kv_2.1, &expected_tid_2)
                 .unwrap();
-            assert_eq!(outcome, Outcome::TransactionalInsertSuccess);
+            match response {
+                TcpResponse::Outcome(outcome) => {
+                    assert_eq!(outcome, Outcome::TransactionalInsertSuccess)
+                }
+                _ => panic!(),
+            }
         }
 
-        let outcome = client.commit_transaction(&expected_tid_1).unwrap();
-        assert_eq!(outcome, Outcome::TransactionCommitSuccess);
+        let response = client.commit_transaction(&expected_tid_1).unwrap();
+        match response {
+            TcpResponse::Outcome(outcome) => assert_eq!(outcome, Outcome::TransactionCommitSuccess),
+            _ => panic!(),
+        }
 
-        let outcome = client.commit_transaction(&expected_tid_2).unwrap();
-        assert_eq!(outcome, Outcome::TransactionCommitSuccess);
+        let response = client.commit_transaction(&expected_tid_2).unwrap();
+        match response {
+            TcpResponse::Outcome(outcome) => assert_eq!(outcome, Outcome::TransactionCommitSuccess),
+            _ => panic!(),
+        }
 
         for (index, key) in shared_keys.iter().enumerate() {
-            let outcome = client.get_by_key(&grouping, &key).unwrap();
+            let response = client.get_by_key(&grouping, &key).unwrap();
             let expected_content = key_value_pairs_2[index].1.clone();
-            assert_eq!(outcome, Outcome::Select(vec![expected_content]));
+            match response {
+                TcpResponse::Outcome(outcome) => {
+                    assert_eq!(outcome, Outcome::Select(vec![expected_content]))
+                }
+                _ => panic!(),
+            }
         }
     }
 
@@ -832,19 +987,29 @@ mod tcp_e2e_tests {
         let key = UnitKey::from("a");
         let value = UnitContent::String(String::from("1"));
 
-        let outcome = client.set_unit(&grouping, &key, &value).unwrap();
-        assert_eq!(outcome, Outcome::InsertSuccess);
+        let response = client.set_unit(&grouping, &key, &value).unwrap();
+        match response {
+            TcpResponse::Outcome(outcome) => assert_eq!(outcome, Outcome::InsertSuccess),
+            _ => panic!(),
+        }
 
         let expected_tid = TransactionId::new(1);
-        let outcome = client.create_transaction().unwrap();
-
-        assert_eq!(outcome, Outcome::CreateTransaction(expected_tid));
+        let response = client.create_transaction().unwrap();
+        match response {
+            TcpResponse::Outcome(outcome) => {
+                assert_eq!(outcome, Outcome::CreateTransaction(expected_tid))
+            }
+            _ => panic!(),
+        }
 
         {
-            let outcome = client
+            let response = client
                 .transactional_get(&grouping, &key, &expected_tid)
                 .unwrap();
-            assert_eq!(outcome, Outcome::Select(vec![value]));
+            match response {
+                TcpResponse::Outcome(outcome) => assert_eq!(outcome, Outcome::Select(vec![value])),
+                _ => panic!(),
+            }
         }
     }
 
@@ -861,36 +1026,75 @@ mod tcp_e2e_tests {
         let origin_value = UnitContent::String(String::from("1"));
         let value_in_transaction = UnitContent::String(String::from("2"));
 
-        let outcome = client.set_unit(&grouping, &key, &origin_value).unwrap();
-        assert_eq!(outcome, Outcome::InsertSuccess);
+        let response = client.set_unit(&grouping, &key, &origin_value).unwrap();
+        match response {
+            TcpResponse::Outcome(outcome) => assert_eq!(outcome, Outcome::InsertSuccess),
+            _ => panic!(),
+        }
 
         let expected_tid = TransactionId::new(1);
-        let outcome = client.create_transaction().unwrap();
-        assert_eq!(outcome, Outcome::CreateTransaction(expected_tid));
-
-        {
-            let outcome = client.get_by_key(&grouping, &key).unwrap();
-            assert_eq!(outcome, Outcome::Select(vec![origin_value.clone()]));
+        let response = client.create_transaction().unwrap();
+        match response {
+            TcpResponse::Outcome(outcome) => {
+                assert_eq!(outcome, Outcome::CreateTransaction(expected_tid))
+            }
+            _ => panic!(),
         }
 
         {
-            let outcome = client
+            let response = client.get_by_key(&grouping, &key).unwrap();
+            match response {
+                TcpResponse::Outcome(outcome) => {
+                    assert_eq!(outcome, Outcome::Select(vec![origin_value.clone()]))
+                }
+                _ => panic!(),
+            }
+        }
+
+        {
+            let response = client
                 .transactional_set_unit(&grouping, &key, &value_in_transaction, &expected_tid)
                 .unwrap();
-            assert_eq!(outcome, Outcome::TransactionalInsertSuccess);
+            match response {
+                TcpResponse::Outcome(outcome) => {
+                    assert_eq!(outcome, Outcome::TransactionalInsertSuccess)
+                }
+                _ => panic!(),
+            }
 
-            let outcome = client.get_by_key(&grouping, &key).unwrap();
-            assert_eq!(outcome, Outcome::Select(vec![origin_value.clone()]));
+            let response = client.get_by_key(&grouping, &key).unwrap();
+            match response {
+                TcpResponse::Outcome(outcome) => {
+                    let actual_outcome = Outcome::Select(vec![origin_value.clone()]);
+                    assert_eq!(outcome, actual_outcome);
+                }
+                _ => panic!(),
+            }
         }
 
-        let outcome = client.commit_transaction(&expected_tid).unwrap();
-        assert_eq!(outcome, Outcome::TransactionCommitSuccess);
+        let response = client.commit_transaction(&expected_tid).unwrap();
+
+        match response {
+            TcpResponse::Outcome(outcome) => assert_eq!(outcome, Outcome::TransactionCommitSuccess),
+            _ => panic!(),
+        }
 
         {
-            let outcome = client
+            let response = client
                 .transactional_get(&grouping, &key, &expected_tid)
                 .unwrap();
-            assert_eq!(outcome, Outcome::Select(vec![value_in_transaction]));
+
+            match response {
+                TcpResponse::Outcome(_outcome) => panic!(),
+                TcpResponse::ServerError(error) => {
+                    assert_eq!(
+                        error,
+                        ServerError::ExecutorError(KVError(TransactionManagerError(
+                            TransactionNotAlive
+                        )))
+                    );
+                }
+            }
         }
     }
 
@@ -914,31 +1118,38 @@ mod tcp_e2e_tests {
             let key_str = format!("{}", index);
             let unit_key = UnitKey::new(key_str.as_bytes());
 
-            let outcome = client
+            let response = client
                 .set_unit(&grouping, &unit_key, &unit_content)
                 .unwrap();
-            assert_eq!(outcome, Outcome::InsertSuccess);
+
+            match response {
+                TcpResponse::Outcome(outcome) => assert_eq!(outcome, Outcome::InsertSuccess),
+                _ => panic!(),
+            }
         }
 
         let predicate = get_phone_mode_test_predicates();
-        let outcome = client.get_by_predicate(&grouping, &predicate).unwrap();
+        let response = client.get_by_predicate(&grouping, &predicate).unwrap();
 
-        match outcome {
-            Outcome::Select(actual_satisfied_contents) => {
-                for satisfied_content in actual_satisfied_contents.iter() {
-                    assert!(expected_satisfied_contents.contains(satisfied_content));
+        match response {
+            TcpResponse::Outcome(outcome) => match outcome {
+                Outcome::Select(actual_satisfied_contents) => {
+                    for satisfied_content in actual_satisfied_contents.iter() {
+                        assert!(expected_satisfied_contents.contains(satisfied_content));
+                    }
+
+                    for expected_satisfied_content in expected_satisfied_contents.iter() {
+                        assert!(actual_satisfied_contents.contains(expected_satisfied_content));
+                    }
+
+                    assert_eq!(
+                        actual_satisfied_contents.len(),
+                        expected_satisfied_contents.len()
+                    );
                 }
-
-                for expected_satisfied_content in expected_satisfied_contents.iter() {
-                    assert!(actual_satisfied_contents.contains(expected_satisfied_content));
-                }
-
-                assert_eq!(
-                    actual_satisfied_contents.len(),
-                    expected_satisfied_contents.len()
-                );
-            }
-            _ => panic!("Wrong outcome type."),
+                _ => panic!("Wrong outcome type."),
+            },
+            _ => panic!(),
         }
     }
 }

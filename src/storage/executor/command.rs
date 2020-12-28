@@ -1,4 +1,5 @@
 use std::convert::TryFrom;
+use std::fmt;
 use std::string::FromUtf8Error;
 
 use crate::storage::chain_height::ChainHeight;
@@ -8,10 +9,11 @@ use crate::storage::executor::unit_content::{UnitContent, UnitContentError};
 use crate::storage::executor::unit_key::{UnitKey, UnitKeyError};
 use crate::storage::instruction::Instruction;
 use crate::storage::transaction_manager::TransactionId;
+use crate::system_error::SystemError;
 use crate::utils::ints::{u64_to_u8_array, u8_array_to_u64};
 use crate::utils::varint::{varint_decode, varint_encode, VarIntError};
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum CommandError {
     GroupingErr(GroupingLabelError),
     UnitContentErr(UnitContentError),
@@ -19,6 +21,128 @@ pub enum CommandError {
     SelectConditionErr(SelectConditionError),
     UnitKeyError(UnitKeyError),
     VarIntError(VarIntError),
+    ParseCommandErrorToStringError,
+}
+
+#[derive(Debug)]
+pub enum CommandErrorPrefix {
+    GroupingErr = 0x01,
+    UnitContentErr = 0x02,
+    InvalidPrefix = 0x03,
+    SelectConditionErr = 0x04,
+    UnitKeyError = 0x05,
+    VarIntError = 0x06,
+    ParseCommandErrorToStringError = 0x07,
+}
+
+impl CommandError {
+    pub fn marshal(&self) -> Vec<u8> {
+        match self {
+            CommandError::GroupingErr(error) => {
+                let mut result = vec![CommandErrorPrefix::GroupingErr as u8];
+                let error_bytes = error.marshal();
+                result.extend_from_slice(&error_bytes);
+                return result;
+            }
+            CommandError::UnitContentErr(error) => {
+                let mut result = vec![CommandErrorPrefix::UnitContentErr as u8];
+                let error_bytes = error.marshal();
+                result.extend_from_slice(&error_bytes);
+                return result;
+            }
+            CommandError::InvalidPrefix => vec![CommandErrorPrefix::InvalidPrefix as u8],
+            CommandError::SelectConditionErr(error) => {
+                let mut result = vec![CommandErrorPrefix::SelectConditionErr as u8];
+                let error_bytes = error.marshal();
+                result.extend_from_slice(&error_bytes);
+                return result;
+            }
+            CommandError::UnitKeyError(error) => {
+                let mut result = vec![CommandErrorPrefix::UnitKeyError as u8];
+                let error_bytes = error.marshal();
+                result.extend_from_slice(&error_bytes);
+                return result;
+            }
+            CommandError::VarIntError(error) => {
+                let mut result = vec![CommandErrorPrefix::VarIntError as u8];
+                let error_bytes = error.marshal();
+                result.extend_from_slice(&error_bytes);
+                return result;
+            }
+            CommandError::ParseCommandErrorToStringError => {
+                vec![CommandErrorPrefix::ParseCommandErrorToStringError as u8]
+            }
+        }
+    }
+
+    pub fn parse(data: &[u8]) -> Result<(CommandError, usize), CommandError> {
+        let mut position = 0;
+        let prefix = data[position];
+        position += 1;
+
+        if prefix == CommandErrorPrefix::GroupingErr as u8 {
+            let (error, offset) = GroupingLabelError::parse(&data[position..])?;
+            position += offset;
+            Ok((CommandError::GroupingErr(error), position))
+        } else if prefix == CommandErrorPrefix::UnitContentErr as u8 {
+            let (error, offset) = UnitContentError::parse(&data[position..])?;
+            position += offset;
+            Ok((CommandError::UnitContentErr(error), position))
+        } else if prefix == CommandErrorPrefix::InvalidPrefix as u8 {
+            Ok((CommandError::InvalidPrefix, position))
+        } else if prefix == CommandErrorPrefix::SelectConditionErr as u8 {
+            let (error, offset) = SelectConditionError::parse(&data[position..])?;
+            position += offset;
+            Ok((CommandError::SelectConditionErr(error), position))
+        } else if prefix == CommandErrorPrefix::UnitKeyError as u8 {
+            let (error, offset) = UnitKeyError::parse(&data[position..])?;
+            position += offset;
+            Ok((CommandError::UnitKeyError(error), position))
+        } else if prefix == CommandErrorPrefix::VarIntError as u8 {
+            let (error, offset) = VarIntError::parse(&data[position..])?;
+            position += offset;
+            Ok((CommandError::VarIntError(error), position))
+        } else {
+            Ok((CommandError::ParseCommandErrorToStringError, position))
+        }
+    }
+}
+
+impl fmt::Display for CommandError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            CommandError::GroupingErr(error) => {
+                let error_string = format!("{}", error);
+                write!(f, "{}::{}", "CommandError::GroupingErr", error_string)
+            }
+            CommandError::UnitContentErr(error) => {
+                let error_string = format!("{}", error);
+                write!(f, "{}::{}", "CommandError::UnitContentErr", error_string)
+            }
+            CommandError::InvalidPrefix => {
+                write!(f, "{}", "CommandError::InvalidPrefix")
+            }
+            CommandError::SelectConditionErr(error) => {
+                let error_string = format!("{}", error);
+                write!(
+                    f,
+                    "{}::{}",
+                    "CommandError::SelectConditionErr", error_string
+                )
+            }
+            CommandError::UnitKeyError(error) => {
+                let error_string = format!("{}", error);
+                write!(f, "{}::{}", "CommandError::UnitKeyError", error_string)
+            }
+            CommandError::VarIntError(error) => {
+                let error_string = format!("{}", error);
+                write!(f, "{}::{}", "CommandError::VarIntError", error_string)
+            }
+            CommandError::ParseCommandErrorToStringError => {
+                write!(f, "{}", "CommandError::ParseCommandErrorToStringError")
+            }
+        }
+    }
 }
 
 impl From<GroupingLabelError> for CommandError {
@@ -51,6 +175,12 @@ impl From<VarIntError> for CommandError {
     }
 }
 
+impl From<FromUtf8Error> for CommandError {
+    fn from(_err: FromUtf8Error) -> CommandError {
+        CommandError::ParseCommandErrorToStringError
+    }
+}
+
 #[derive(Debug, PartialEq, Clone)]
 pub enum SelectCondition {
     Key(GroupingLabel, UnitKey, Option<TransactionId>),
@@ -68,18 +198,144 @@ pub enum SelectConditionPrefix {
     AllGrouping = 0x04,
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum SelectConditionError {
     InvalidPrefix,
     UnitKeyError(UnitKeyError),
-    FromUtf8Error(FromUtf8Error),
+    FromUtf8Error(SystemError),
     PredicateError(PredicateError),
     GroupingError(GroupingLabelError),
+    ParseSelectConditionErrorError,
+    SystemError(SystemError),
+}
+
+enum SelectConditionErrorPrefix {
+    InvalidPrefix = 0x01,
+    UnitKeyError = 0x02,
+    FromUtf8Error = 0x03,
+    PredicateError = 0x04,
+    GroupingError = 0x05,
+    ParseSelectConditionErrorError = 0x06,
+    SystemError = 0x07,
+}
+
+impl SelectConditionError {
+    pub fn marshal(&self) -> Vec<u8> {
+        match self {
+            SelectConditionError::InvalidPrefix => {
+                vec![SelectConditionErrorPrefix::InvalidPrefix as u8]
+            }
+            SelectConditionError::UnitKeyError(error) => {
+                let mut result = vec![SelectConditionErrorPrefix::UnitKeyError as u8];
+                let error_bytes = error.marshal();
+                result.extend_from_slice(&error_bytes);
+                result
+            }
+            SelectConditionError::FromUtf8Error(error) => {
+                let mut result = vec![SelectConditionErrorPrefix::FromUtf8Error as u8];
+                let error_byte = error.marshal();
+                result.push(error_byte);
+                result
+            }
+            SelectConditionError::PredicateError(error) => {
+                let mut result = vec![SelectConditionErrorPrefix::PredicateError as u8];
+                let error_bytes = error.marshal();
+                result.extend_from_slice(&error_bytes);
+                result
+            }
+            SelectConditionError::GroupingError(error) => {
+                let mut result = vec![SelectConditionErrorPrefix::GroupingError as u8];
+                let error_bytes = error.marshal();
+                result.extend_from_slice(&error_bytes);
+                result
+            }
+            SelectConditionError::ParseSelectConditionErrorError => {
+                vec![SelectConditionErrorPrefix::ParseSelectConditionErrorError as u8]
+            }
+            SelectConditionError::SystemError(error) => {
+                let mut result = vec![SelectConditionErrorPrefix::SystemError as u8];
+                let error_bytes = error.marshal();
+                result.push(error_bytes);
+                result
+            }
+        }
+    }
+
+    pub fn parse(data: &[u8]) -> Result<(SelectConditionError, usize), SelectConditionError> {
+        let mut position = 0;
+        let prefix = data[position];
+        position += 1;
+
+        if prefix == SelectConditionErrorPrefix::InvalidPrefix as u8 {
+            Ok((SelectConditionError::InvalidPrefix, position))
+        } else if prefix == SelectConditionErrorPrefix::UnitKeyError as u8 {
+            let (error, offset) = UnitKeyError::parse(&data[position..])?;
+            position += offset;
+            Ok((SelectConditionError::UnitKeyError(error), position))
+        } else if prefix == SelectConditionErrorPrefix::FromUtf8Error as u8 {
+            let (error, offset) = SystemError::parse(&data[position..])?;
+            position += offset;
+            Ok((SelectConditionError::FromUtf8Error(error), position))
+        } else if prefix == SelectConditionErrorPrefix::PredicateError as u8 {
+            let (error, offset) = PredicateError::parse(&data[position..])?;
+            position += offset;
+            Ok((SelectConditionError::PredicateError(error), position))
+        } else if prefix == SelectConditionErrorPrefix::GroupingError as u8 {
+            let (error, offset) = GroupingLabelError::parse(&data[position..])?;
+            position += offset;
+            Ok((SelectConditionError::GroupingError(error), position))
+        } else if prefix == SelectConditionErrorPrefix::SystemError as u8 {
+            let (error, offset) = SystemError::parse(&data[position..])?;
+            position += offset;
+            Ok((SelectConditionError::SystemError(error), position))
+        } else {
+            Ok((
+                SelectConditionError::ParseSelectConditionErrorError,
+                position,
+            ))
+        }
+    }
+}
+
+impl fmt::Display for SelectConditionError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            SelectConditionError::InvalidPrefix => {
+                write!(f, "{}", "SelectConditionError::InvalidPrefix")
+            }
+            SelectConditionError::UnitKeyError(error) => {
+                write!(f, "{}::{}", "SelectConditionError::UnitKeyError", error)
+            }
+            SelectConditionError::FromUtf8Error(error) => {
+                write!(f, "{}::{}", "SelectConditionError::FromUtf8Error", error)
+            }
+            SelectConditionError::PredicateError(error) => {
+                write!(f, "{}::{}", "SelectConditionError::PredicateError", error)
+            }
+            SelectConditionError::GroupingError(error) => {
+                write!(f, "{}::{}", "SelectConditionError::GroupingError", error)
+            }
+            SelectConditionError::ParseSelectConditionErrorError => write!(
+                f,
+                "{}",
+                "SelectConditionError::ParseSelectConditionErrorError",
+            ),
+            SelectConditionError::SystemError(error) => {
+                write!(f, "{}::{}", "SelectConditionError::SystemError", error,)
+            }
+        }
+    }
 }
 
 impl From<FromUtf8Error> for SelectConditionError {
-    fn from(error: FromUtf8Error) -> SelectConditionError {
-        return SelectConditionError::FromUtf8Error(error);
+    fn from(_error: FromUtf8Error) -> SelectConditionError {
+        return SelectConditionError::FromUtf8Error(SystemError::FromUtf8Error);
+    }
+}
+
+impl From<SystemError> for SelectConditionError {
+    fn from(error: SystemError) -> SelectConditionError {
+        return SelectConditionError::SystemError(error);
     }
 }
 
@@ -832,66 +1088,84 @@ impl TryFrom<&Instruction> for Command {
     }
 }
 
-impl ToString for Command {
-    fn to_string(&self) -> String {
+impl fmt::Display for Command {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Command::Select {
                 condition,
             } => {
                 match condition {
                     SelectCondition::Key(grouping, key, transaction_id) => {
-                        return format!(
-                            "Command Select, grouping: {:?}, key: {:?}, transaction_id: {:?}",
-                            grouping.to_string(),
-                            key.to_string(),
-                            transaction_id,
-                        );
+                        match transaction_id {
+                            Some(transaction_id) => write!(
+                                f,
+                                "Command Select, grouping: {}, key: {}, transaction_id: {}",
+                                grouping,
+                                key,
+                                transaction_id,
+                            ),
+                            None => write!(
+                                f,
+                                "Command Select, grouping: {}, key: {}, transaction_id: None",
+                                grouping,
+                                key,
+                            ),
+                        }
                     }
                     SelectCondition::UnconditionalMatch(grouping) => {
-                        return format!("Command Select, UnconditionalMatch on grouping {:?}", grouping.to_string());
+                        write!(f, "Command Select, UnconditionalMatch on grouping {}", grouping)
                     },
                     SelectCondition::Predicate(grouping, predicate) => {
-                        return format!("grouping {}, predicate {}", grouping, predicate);
+                        write!(f, "grouping {}, predicate {}", grouping, predicate)
                     },
                     SelectCondition::AllGrouping => {
-                        return format!("List all grouping");
+                        write!(f, "List all grouping")
                     }
                 }
             },
             Command::InspectOne { grouping, key } => {
-                format!("Command InspectOne, grouping: {:?}, key: {:?}", grouping.to_string(), key.to_string())
+                write!(f, "Command InspectOne, grouping: {}, key: {}", grouping, key)
             }
-            Command::InspectAll => format!("Command InspectAll"),
-            Command::Insert { grouping, key, content } => format!(
-                "Command Insert, grouping: {:?}, key: {:?}, content: {:?}",
-                grouping.to_string(),
-                key.to_string(),
+            Command::InspectAll => write!(f, "Command InspectAll"),
+            Command::Insert { grouping, key, content } => write!(
+                f,
+                "Command Insert, grouping: {}, key: {}, content: {}",
+                grouping,
+                key,
                 content
             ),
-            Command::RevertOne { grouping, key, height } => format!(
-                "Command RevertOne, grouping: {:?}, key: {:?}, height: {:?}",
-                grouping.to_string(),
-                key.to_string(),
+            Command::RevertOne { grouping, key, height } => write!(
+                f,
+                "Command RevertOne, grouping: {}, key: {}, height: {}",
+                grouping,
+                key,
                 height
             ),
             Command::RevertAll { height } => {
-                format!("Command RevertAll, height: {:?}", height)
+                write!(f, "Command RevertAll, height: {}", height)
             }
             Command::RemoveOne { grouping, key } => {
-                format!("Command RemoveOne, grouping: {:?}, key: {:?}", grouping.to_string(), key.to_string())
+                write!(f, "Command RemoveOne, grouping: {}, key: {}", grouping, key)
             }
-            Command::RemoveAll => format!("Command RemoveAll"),
-            Command::RemoveGroupings {groupings} => format!("Command RemoveGroupings {:?}", groupings),
-            Command::CreateTransaction => format!("Command CreateTransaction"),
+            Command::RemoveAll => write!(f, "Command RemoveAll"),
+            Command::RemoveGroupings {groupings} => {
+                let grouping_str_vec: Vec<String> = groupings
+                    .into_iter()
+                    .map(|grouping| format!("{}", grouping))
+                    .collect();
+                write!(f, "Command RemoveGroupings {}", grouping_str_vec.join("\r\n"))
+            },
+            Command::CreateTransaction => write!(f, "Command CreateTransaction"),
             Command::TransactionalInsert {
                 grouping,
                 key,
                 content,
                 transaction_id,
-            } => format!(
-                "Command TransactionalInsert, grouping: {:?}, key: {:?}, content: {:?}, transaction_id: {:?}",
-                grouping.to_string(),
-                key.to_string(),
+            } => write!(
+                f,
+                "Command TransactionalInsert, grouping: {}, key: {}, content: {}, transaction_id: {}",
+                grouping,
+                key,
                 content,
                 transaction_id
             ),
@@ -900,10 +1174,11 @@ impl ToString for Command {
                 key,
                 height,
                 transaction_id,
-            } => format!(
-                "Command TransactionalRevertOne, grouping: {:?}, key: {:?}, height: {:?}, transaction_id: {:?}",
-                grouping.to_string(),
-                key.to_string(),
+            } => write!(
+                f,
+                "Command TransactionalRevertOne, grouping: {}, key: {}, height: {}, transaction_id: {}",
+                grouping,
+                key,
                 height,
                 transaction_id
             ),
@@ -911,18 +1186,21 @@ impl ToString for Command {
                 grouping,
                 key,
                 transaction_id,
-            } => format!(
-                "Command TransactionalRemoveOne, grouping: {:?}, key: {:?}, transaction_id: {:?}",
-                grouping.to_string(),
-                key.to_string(),
+            } => write!(
+                f,
+                "Command TransactionalRemoveOne, grouping: {}, key: {}, transaction_id: {}",
+                grouping,
+                key,
                 transaction_id
             ),
-            Command::TransactionCommit { transaction_id } => format!(
-                "Command TransactionCommit, transaction_id {:?}",
+            Command::TransactionCommit { transaction_id } => write!(
+                f,
+                "Command TransactionCommit, transaction_id {}",
                 transaction_id
             ),
-            Command::TransactionAbort { transaction_id } => format!(
-                "Command TransactionAbort, transaction_id {:?}",
+            Command::TransactionAbort { transaction_id } => write!(
+                f,
+                "Command TransactionAbort, transaction_id {}",
                 transaction_id
             ),
         }

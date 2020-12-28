@@ -1,8 +1,60 @@
+use std::fmt;
+
 use crate::utils::varint::{varint_decode, varint_encode, VarIntError};
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum UnitKeyError {
     VarIntError(VarIntError),
+    ParseUnitKeyErrorError,
+}
+
+enum UnitKeyErrorPrefix {
+    VarIntError = 0x01,
+    ParseUnitKeyErrorError = 0x02,
+}
+
+impl UnitKeyError {
+    pub fn marshal(&self) -> Vec<u8> {
+        match self {
+            UnitKeyError::VarIntError(error) => {
+                let mut result = vec![UnitKeyErrorPrefix::VarIntError as u8];
+                let error_bytes = error.marshal();
+                result.extend_from_slice(&error_bytes);
+                result
+            }
+            UnitKeyError::ParseUnitKeyErrorError => {
+                vec![UnitKeyErrorPrefix::ParseUnitKeyErrorError as u8]
+            }
+        }
+    }
+
+    pub fn parse(data: &[u8]) -> Result<(UnitKeyError, usize), UnitKeyError> {
+        let mut position = 0;
+        let prefix = data[position];
+        position += 1;
+
+        if prefix == UnitKeyErrorPrefix::VarIntError as u8 {
+            let (error, offset) = VarIntError::parse(&data[position..])?;
+            position += offset;
+            Ok((UnitKeyError::VarIntError(error), position))
+        } else {
+            Ok((UnitKeyError::ParseUnitKeyErrorError, position))
+        }
+    }
+}
+
+impl fmt::Display for UnitKeyError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            UnitKeyError::VarIntError(error) => {
+                let error_string = format!("{}", error);
+                write!(f, "{}::{}", "UnitKeyError::VarIntError", error_string)
+            }
+            UnitKeyError::ParseUnitKeyErrorError => {
+                write!(f, "{}", "UnitKeyError::ParseUnitKeyErrorError")
+            }
+        }
+    }
 }
 
 impl From<VarIntError> for UnitKeyError {
@@ -65,9 +117,9 @@ impl From<UnitKey> for Vec<u8> {
     }
 }
 
-impl ToString for UnitKey {
-    fn to_string(&self) -> String {
-        String::from_utf8_lossy(self.0.as_slice()).to_string()
+impl fmt::Display for UnitKey {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", String::from_utf8_lossy(self.0.as_slice()))
     }
 }
 

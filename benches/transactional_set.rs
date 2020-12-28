@@ -26,7 +26,7 @@ fn main() {
     let grouping = GroupingLabel::from("census90");
     let table = csv_to_json_table::<CensusEntry>(
         "dev_utils/src/data_models/data-raw/census90.txt",
-        &grouping.to_string(),
+        format!("{}", &grouping).as_str(),
         b',',
         row_limit,
     )

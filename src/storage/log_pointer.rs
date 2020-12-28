@@ -1,4 +1,4 @@
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct LogPointer {
     pub pos: u64,
     pub len: usize,
