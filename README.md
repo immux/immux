@@ -54,6 +54,12 @@ DELETE /grouping/.index/index-number (delete index)
 cargo test
 ```
 
+If you are using Ubuntu or Pop!_OS, remember to run this command before executing `cargo test`:
+
+```
+sudo apt-get install libssl-dev
+```
+
 #### Gather test coverage
 
 ##### 1. Prepare
