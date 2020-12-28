@@ -218,13 +218,4 @@ impl TransactionManager {
             Err(TransactionManagerError::TransactionNotAlive)
         }
     }
-
-    pub fn get_current_active_transaction_ids(&self) -> Vec<TransactionId> {
-        let current_transaction_id: Vec<TransactionId> = self
-            .affected_keys_in_transactions
-            .keys()
-            .map(|transaction_id| transaction_id.clone())
-            .collect();
-        return current_transaction_id;
-    }
 }
