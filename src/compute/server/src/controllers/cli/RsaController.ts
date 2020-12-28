@@ -5,6 +5,7 @@ import {
   Post
 } from 'routing-controllers';
 
+import { PemSchema } from '@/types/models/Pem';
 import { getPems, getRsaRawText, saveRsaRawText } from '@/services/rsa';
 import { genAccessTicket, getAccountByEmail } from '@/services/account';
 import { encryptRawText, genRawText } from '@/utils/rsa';
@@ -20,7 +21,7 @@ export default class RsaController {
   ) {
     const pems = await getPems(email, publicPem);
     const rawText = genRawText();
-    //@ts-ignore todo cli database
+    
     const signature = encryptRawText(pems.privatePem, rawText);
 
     await saveRsaRawText(email, publicPem, signature, rawText);
@@ -49,7 +50,9 @@ export default class RsaController {
       throw new HttpError(404, 'account not found');
     }
 
-    if (rawText !== (await getRsaRawText(email, publicPem, signature))) {
+    const pem: PemSchema = await getRsaRawText(email, publicPem, signature);
+
+    if (rawText !== pem.rawText) {
       throw new HttpError(403, 'rawText not match');
     }
 

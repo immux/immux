@@ -3,12 +3,16 @@ import { HttpError } from 'routing-controllers';
 import { recursiveTraversalWalk } from '@/utils/project';
 import * as fs from 'fs';
 
+import { getNameSpaceById } from './NameSpace';
+
 /**
  * get project detail
  * @param projectById
  */
-export function getProjectById(projectId: Types.ObjectId | string) {
-  return recursiveTraversalWalk('../project/demo');
+export async function getProjectById(projectId: Types.ObjectId | string) {
+  // return recursiveTraversalWalk('../project/demo');
+  const project = await getNameSpaceById(projectId);
+  return recursiveTraversalWalk(`./uploads/${project.name}`);
 }
 
 export async function saveCodeChange(

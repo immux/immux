@@ -5,6 +5,7 @@ import { Moment } from 'moment';
 import createDebugger, { Debugger } from 'debug';
 import { safeLoad } from 'js-yaml';
 import * as fs from 'fs';
+import * as path from 'path';
 
 import { EMAIL_REGEX } from '@/constants';
 import moment = require('moment');
@@ -187,4 +188,50 @@ export async function jsonTokenDecode(token: string, secret: string) {
 export async function jsonTokenSign(content: string, secret: string) {
   let result = crypto.createHmac('sha256',secret).update(content).digest('base64');
   return base64urlEscape(result);
+}
+
+
+export function getStat(path: string): Promise<false | fs.Stats> {
+  return new Promise((resolve, reject) => {
+      return fs.stat(path, (err, stats) => {
+          if(err){
+              resolve(false);
+          }else{
+              resolve(stats);
+          }
+      })
+  })
+}  
+
+export function mkdir(dir: string){
+  return new Promise((resolve, reject) => {
+      fs.mkdir(dir, err => {
+          if(err){
+              resolve(false);
+          }else{
+              resolve(true);
+          }
+      })
+  })
+}
+
+export async function dirExists(dir: string){
+  let isExists = await getStat(dir);
+
+  if(isExists && isExists.isDirectory()) {
+      return true;
+  } else if(isExists){
+      return false;
+  }
+
+  let tempDir = path.parse(dir).dir;
+
+  let status = await dirExists(tempDir);
+  let mkdirStatus;
+
+  if(status){
+      mkdirStatus = await mkdir(dir);
+  }
+
+  return mkdirStatus;
 }

@@ -14,6 +14,7 @@ export async function getNameSpaces(
     keyword?: string;
     root?: 'true' | 'false';
   },
+  account: AccountSchema,
   skip: number,
   limit: number,
   projection?: string | Dictionary<number>
@@ -24,7 +25,7 @@ export async function getNameSpaces(
     throw new HttpError(400, 'invalid keyword');
   }
 
-  const conditions = {}
+  const conditions = { creator: account.email }
 
   if (_.has(query, ['root'])) {
     _.assign(conditions, {

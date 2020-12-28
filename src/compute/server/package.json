@@ -6,7 +6,8 @@
   "license": "MIT",
   "private": true,
   "scripts": {
-    "start": "DEBUG=* nodemon --inspect --watch 'src/**/*' -e ts,tsx --exec 'node -r ts-node/register' ./src/index.ts & cd ../project/demo && npm start",
+    "start": "DEBUG=* nodemon --inspect --watch 'src/**/*' -e ts,tsx --exec 'node -r ts-node/register' ./src/index.ts",
+    "startWithDemo": "DEBUG=* nodemon --inspect --watch 'src/**/*' -e ts,tsx --exec 'node -r ts-node/register' ./src/index.ts & cd ../project/demo && npm start",
     "server": "DEBUG=* node dist/src/index.js",
     "server:beta": "NODE_ENV=production DEPLOY_ENV=beta npm run server",
     "server:release": "NODE_ENV=production DEPLOY_ENV=release npm run server",
@@ -59,6 +60,7 @@
     "utility-types": "^3.10.0"
   },
   "dependencies": {
+    "@types/multer": "^1.4.4",
     "bluebird": "^3.7.2",
     "chai-as-promised": "^7.1.1",
     "class-transformer": "^0.3.1",
@@ -69,6 +71,7 @@
     "js-yaml": "^3.13.1",
     "koa": "^2.11.0",
     "koa-bodyparser": "^4.2.1",
+    "koa-multer": "^1.0.2",
     "koa-router": "^8.0.8",
     "lodash": "^4.17.15",
     "mkdirp": "^1.0.3",

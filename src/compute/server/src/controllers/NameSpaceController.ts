@@ -35,9 +35,10 @@ export default class NameSpaceController {
   async getNameSpaces(
     @Ctx() ctx: Context,
     @State('skip') skip: number,
-    @State('limit') limit: number
+    @State('limit') limit: number,
+    @State('account') account: AccountSchema,
   ) {
-    const { total, nameSpaces } = await getNameSpaces(ctx.query, skip, limit);
+    const { total, nameSpaces } = await getNameSpaces(ctx.query, account, skip, limit);
     const accounts = await getAccountsByEmails(getEmailsSet(nameSpaces));
 
     return { total, nameSpaces, accounts };

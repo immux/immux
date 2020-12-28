@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <title>websockt</title>
+</head>
+<body>
+    <div>
+        <label style="vertical-align:top;">To Messge：</label>
+        <textarea id="message" type="text" value=""></textarea>
+    </div>
+    <div>
+        <p>Get Messge：</p>
+        <p id="result"></p>
+    </div>
+    <div>
+        <button id="btn">send</button>
+    </div>
+</body>
+<script>
+
+    if (window.WebSocket) {
+        init();
+    } else {
+        alert('this browser does not support WebSocket');
+    }
+    
+    function init() {
+        var socket = new WebSocket('ws://localhost:8082');
+      
+        socket.onopen = (event) => {
+            socket.send(JSON.stringify({
+                fn: 'wssFirst',
+                msg: 'Hello Server!',
+            }));
+        };
+       
+        socket.onmessage = (event) => {
+            var brEle = document.createElement("br");
+            var dataEle = document.createTextNode(event.data);
+            var result = document.getElementById("result");
+            result.appendChild(brEle);
+            result.appendChild(dataEle);
+        };
+        
+        socket.onerror = (event) => {
+            // debugger;
+        }
+       
+        socket.onclose = (event) => {
+            // debugger;
+        }
+        
+        var btn = document.getElementById('btn');
+        btn.onclick = function startSocket(){
+            if(socket.readyState == WebSocket.OPEN){
+                var message = document.getElementById("message").value;
+                if( message != "" ) {
+                    socket.send(JSON.stringify({
+                        fn: 'wssSec',
+                        msg: message,
+                    }));
+                }
+            }
+        }
+    }
+    
+    
+</script>
+</html>

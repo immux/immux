@@ -47,6 +47,6 @@ export async function getAccessTicket(email: string, publicPem: string) {
     signature,
     rawText
   );
-
+  
   return { ticket, account };
 }

@@ -2,6 +2,8 @@ import { PREFIX } from '@/constants';
 import { Ora } from 'ora';
 
 import { getAccessTicket, getPublicPem } from '@/services/rsa';
+import { uploadFile } from '@/services/api';
+
 import ora = require('ora');
 import chalk from 'chalk';
 import _ from 'lodash';
@@ -31,15 +33,16 @@ export class Uploader {
 
   async exec() {
     this.spinner.info(
-      `${PREFIX} The system has started and the current working directory is ${chalk.gray(this.cwd)}`
+      `${PREFIX} The system has started and the current working directory is ${chalk.gray(
+        this.cwd
+      )}`
     );
 
     await this.init();
 
-    // todo: upload file
-    // await this.uploadFiles();
+    await this.uploadFiles();
 
-    this.spinner.info(`${PREFIX} File transfer task completed`);
+    this.spinner.info(`${PREFIX} File task completed`);
   }
 
   async getPublicPem() {
@@ -50,7 +53,9 @@ export class Uploader {
     this.email = email;
     this.publicPem = publicPem;
 
-    this.spinner.succeed(`${PREFIX} Successfully obtain the public key certificate`);
+    this.spinner.succeed(
+      `${PREFIX} Successfully obtain the public key certificate`
+    );
   }
 
   async getTicket() {
@@ -64,11 +69,15 @@ export class Uploader {
     this.ticket = ticket;
 
     this.spinner.succeed(
-      `${PREFIX} ${chalk.greenBright(account.name)} Successfully exchanged ${chalk.gray(
-        'Access ticket'
-      )}`
+      `${PREFIX} ${chalk.greenBright(
+        account.name
+      )} Successfully exchanged ${chalk.gray('Access ticket')}`
     );
   }
 
-  async uploadFiles() {}
+  async uploadFiles() {
+    await uploadFile(this.ticket);
+
+    this.spinner.succeed(`${PREFIX} Successfully uploaded files`);
+  }
 }

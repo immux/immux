@@ -8,6 +8,7 @@ import { randomBytes, scrypt, createHmac } from 'crypto';
 
 interface VmOptions {
     id: string;
+    name: string;
 }
 interface FnObject {
     [key: string]: string;
@@ -68,7 +69,7 @@ export default class Runtime extends Controller {
 
     async getFn(options: VmOptions): Promise<string> {
         await this.readFiles({
-            dirname: path.resolve('./app/fns'),
+            dirname: path.join(process.cwd(), '..', 'server', 'uploads', options.name),
             onError: err => console.error(err),
         });
 
@@ -86,17 +87,17 @@ export default class Runtime extends Controller {
     async index() {
         let timer = null;
         const split: string = this.ctx.params.project;
-        const path: string = this.ctx.request.url.split(split)[1];
+        const pathUrl: string = this.ctx.request.url.split(split)[1];
 
         // An entry function
-        let fnString = await this.getFn({ id: 'main' });
+        let fnString = await this.getFn({ id: 'main', name: split });
 
         // JSON.stringify drop constructor
         let ctx = JSON.stringify(this.ctx);
         let body = JSON.stringify(this.ctx.request.body);
 
         const db = JSON.stringify({});
-        const provider = JSON.stringify({ info: 'function', path});
+        const provider = JSON.stringify({ info: 'function', path: pathUrl});
 
         // Load purchased functions, plugins
         const fns = JSON.stringify({});
@@ -129,7 +130,7 @@ export default class Runtime extends Controller {
                     Buffer,
                     require,
                     console,
-                    requirePath: process.cwd(),
+                    requirePath: path.join(process.cwd(), '..', 'server', 'uploads', split),
                     // moment,
                 };
         

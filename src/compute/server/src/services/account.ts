@@ -2,6 +2,8 @@ import { PromiseType } from 'utility-types';
 import Account from '@/models/Account';
 import { AccountPems } from '@/types';
 import config from '@/config';
+import Pem from '@/models/Pem';
+
 
 import { getGitAccountProfile } from '@/services/git';
 import { getEmailsSet, getTextHash, jsonTokenEncode } from '@/utils';
@@ -79,14 +81,7 @@ export function genAccountPems(email: string): AccountPems {
 }
 
 export async function getAccountPems(email: string) {
-  // todo cli database
-  // return JSON.parse(
-  //   await client.get(genCacheKey(CacheKeys.AccountPems)(email))
-  // ) as AccountPems;
-}
-
-export async function existsAccountPems(email: string) {
-  // return !!(await client.exists(genCacheKey(CacheKeys.AccountPems)(email)));
+  return Pem.findOne({ email });
 }
 
 export function toResAccountPems(pems?: AccountPems) {
@@ -99,28 +94,12 @@ export function toResAccountPems(pems?: AccountPems) {
 }
 
 export function destroyAccountPems(pems: AccountPems) {
-  const toKey = genCacheKey(CacheKeys.AccountPems);
-
-  // return client
-  //   .multi()
-  //   .del(toKey(pems.hash))
-  //   .del(toKey(pems.email))
-  //   .del(toKey(pems.privatePem))
-  //   .del(toKey(pems.publicPem))
-  //   .exec();
-}
+  return Pem.findOneAndDelete({ email: pems.email });
+}  
 
 export function saveAccountPems(pems: AccountPems) {
-  const pemsJson = JSON.stringify(pems);
-  const toKey = genCacheKey(CacheKeys.AccountPems);
-  
-  // return client
-  //   .multi()
-  //   .set(toKey(pems.hash), pemsJson)
-  //   .set(toKey(pems.email), pemsJson)
-  //   .set(toKey(pems.privatePem), pemsJson)
-  //   .set(toKey(pems.publicPem), pemsJson)
-  //   .exec();
+  const pem = new Pem(pems);
+  return pem.save();
 }
 
 export function toResPublicPem(pems: AccountPems) {

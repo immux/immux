@@ -35,8 +35,8 @@ export async function getGitAccountAccessToken(
 
 export async function getGitAccountProfile(accessToken: string) {
 
-  /**
-   * Git interface often hangs, temporarily Mock is convenient for debugging
+  
+    // * Git interface often hangs, temporarily Mock is convenient for debugging
    
     const response = await request({
       uri: `${config.git.api}/user?access_token=${accessToken}`,
@@ -58,12 +58,12 @@ export async function getGitAccountProfile(accessToken: string) {
       email: string;
     };
     
-   */
+  
 
-  return {
-    id: 'test',
-    avatarUrl: 'https://avatars1.githubusercontent.com/u/10594343?s=60&v=4',
-    login: 'immux',
-    email: 'anchorgoogle@163.com'
-  };
+  // return {
+  //   id: 'test',
+  //   avatarUrl: 'https://avatars1.githubusercontent.com/u/10594343?s=60&v=4',
+  //   login: 'immux',
+  //   email: 'anchorgoogle@163.com'
+  // };
 }
