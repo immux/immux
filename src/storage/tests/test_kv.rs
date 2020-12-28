@@ -86,6 +86,32 @@ mod kv_tests {
     }
 
     #[test]
+    fn incomplete_transaction_manager() {
+        let key = KVKey::new(&[0x00, 0x01, 0x03]);
+        let value = KVValue::new(&[0xff, 0xff, 0xff, 0xff]);
+        let tid_snapshot;
+        let data_dir = "/tmp/incomplete_transaction_manager";
+        {
+            let mut store_engine = get_store_engine(data_dir);
+            let tid = store_engine.start_transaction().unwrap();
+            tid_snapshot = tid.clone();
+            store_engine.set(&key, &value, Some(tid)).unwrap();
+            let output = store_engine.get(&key, Some(tid)).unwrap().unwrap();
+            assert_eq!(output, value);
+        }
+
+        {
+            let pref = DBPreferences::default_at_dir(data_dir);
+            let mut store_engine = LogKeyValueStore::open(&pref).unwrap();
+            let actual_value = store_engine.get(&key, None).unwrap();
+            assert!(actual_value.is_none());
+
+            let result = store_engine.commit_transaction(tid_snapshot);
+            assert!(result.is_err());
+        }
+    }
+
+    #[test]
     fn kv_set() {
         let mut store_engine = get_store_engine("/tmp/test_set");
 
@@ -333,7 +359,7 @@ mod kv_tests {
                 .set(&pair.0, &pair.1, Some(transaction_id))
                 .unwrap();
         }
-        store_engine.abort_transaction(transaction_id).unwrap();
+        store_engine.abort_transaction(&transaction_id).unwrap();
 
         for pair in &key_value_paris {
             let actual_value = store_engine.get(&pair.0, None).unwrap();
@@ -611,7 +637,7 @@ mod kv_tests {
         let some_random_transaction_id = 10;
 
         store_engine
-            .abort_transaction(TransactionId::new(some_random_transaction_id))
+            .abort_transaction(&TransactionId::new(some_random_transaction_id))
             .unwrap();
     }
 

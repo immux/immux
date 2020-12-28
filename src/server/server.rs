@@ -298,8 +298,8 @@ fn handle_command(command: Command, executor: &mut Executor) -> ServerResult<Out
             let outcome = executor.commit_transaction(transaction_id)?;
             return Ok(outcome);
         }
-        Command::TransactionAbort { transaction_id } => {
-            let outcome = executor.abort_transaction(transaction_id)?;
+        Command::TransactionAbort { mut transaction_id } => {
+            let outcome = executor.abort_transaction(&mut transaction_id)?;
             return Ok(outcome);
         }
         Command::TransactionalInsert {

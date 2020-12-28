@@ -43,16 +43,26 @@ impl LogKeyValueStore {
 
         let writer = LogWriter::new(&log_file_path, preferences.ecc_mode, db_version)?;
         let mut reader = LogReader::new(&log_file_path, db_version)?;
-        let (snapshot, current_height, transaction_manager) =
-            load_snapshot(&mut reader, None)?;
 
-        let engine = LogKeyValueStore {
+        let (snapshot, current_height, transaction_manager) = load_snapshot(&mut reader, None)?;
+
+        let incomplete_transaction_ids: Vec<TransactionId> = transaction_manager
+            .transactions
+            .keys()
+            .map(|transaction_id| transaction_id.clone())
+            .collect();
+
+        let mut engine = LogKeyValueStore {
             reader,
             writer,
             snapshot,
             current_height,
             transaction_manager,
         };
+
+        for transaction_id in incomplete_transaction_ids {
+            engine.abort_transaction(&transaction_id)?;
+        }
 
         return Ok(engine);
     }
@@ -342,7 +352,6 @@ impl LogKeyValueStore {
 
     pub fn inspect_one(&mut self, target_key: &KVKey) -> KVResult<Vec<(Instruction, ChainHeight)>> {
         let (instruction_iterator, _) = self.reader.read_all()?;
-
         let mut appeared_key = HashSet::new();
         let result = instruction_iterator
             .enumerate()
@@ -426,17 +435,19 @@ impl LogKeyValueStore {
         return Ok(());
     }
 
-    pub fn abort_transaction(&mut self, transaction_id: TransactionId) -> KVResult<()> {
+    pub fn abort_transaction(&mut self, transaction_id: &TransactionId) -> KVResult<()> {
         self.transaction_manager
             .validate_transaction_id(&transaction_id)?;
 
-        let instruction = Instruction::TransactionAbort { transaction_id };
+        let instruction = Instruction::TransactionAbort {
+            transaction_id: transaction_id.clone(),
+        };
         self.writer.append_instruction(&instruction)?;
 
         update_aborted_log_pointers(
             &mut self.transaction_manager,
             &mut self.snapshot,
-            transaction_id,
+            *transaction_id,
         );
 
         self.current_height.increment()?;
@@ -510,8 +521,7 @@ fn load_snapshot(
     let (instruction_iterator, header_offset) = reader.read_all()?;
     let mut current_position = header_offset as u64;
     let mut height = ChainHeight::new(0);
-    let mut snapshot: HashMap<KVKey, HashMap<Option<TransactionId>, LogPointer>> =
-        HashMap::new();
+    let mut snapshot: HashMap<KVKey, HashMap<Option<TransactionId>, LogPointer>> = HashMap::new();
     let mut transaction_manager = TransactionManager::new();
 
     for (instruction, instruction_length) in instruction_iterator {
@@ -549,12 +559,7 @@ fn load_snapshot(
                 transaction_id,
             } => {
                 let log_pointer = LogPointer::new(current_position, instruction_length);
-                update_snapshot(
-                    &key,
-                    &log_pointer,
-                    &mut snapshot,
-                    Some(transaction_id),
-                );
+                update_snapshot(&key, &log_pointer, &mut snapshot, Some(transaction_id));
                 transaction_manager.add_affected_keys(&transaction_id, &key)?;
             }
             Instruction::TransactionalRevertOne {
@@ -563,12 +568,7 @@ fn load_snapshot(
                 transaction_id,
             } => {
                 let log_pointer = LogPointer::new(current_position, instruction_length);
-                update_snapshot(
-                    &key,
-                    &log_pointer,
-                    &mut snapshot,
-                    Some(transaction_id),
-                );
+                update_snapshot(&key, &log_pointer, &mut snapshot, Some(transaction_id));
 
                 transaction_manager.add_affected_keys(&transaction_id, &key)?;
             }
@@ -577,12 +577,7 @@ fn load_snapshot(
                 transaction_id,
             } => {
                 let log_pointer = LogPointer::new(current_position, instruction_length);
-                update_snapshot(
-                    &key,
-                    &log_pointer,
-                    &mut snapshot,
-                    Some(transaction_id),
-                );
+                update_snapshot(&key, &log_pointer, &mut snapshot, Some(transaction_id));
 
                 transaction_manager.add_affected_keys(&transaction_id, &key)?;
             }
