@@ -5,30 +5,30 @@ import { catchError } from '@/utils';
 
 import _ from 'lodash';
 
-export function useNameSpaceCollection() {
+export function useFunctionCollection() {
   const [initialLoad, setInitialLoad] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<ResultError | null>(null);
   const [hasMore, setHasMore] = useState(true);
-  const total = useStoreState((state) => state.nameSpace.collection.total);
+  const total = useStoreState((state) => state.functions.total);
 
-  const nameSpaces = useStoreState(
-    (state) => state.nameSpace.collection.entries
+  const functions = useStoreState(
+    (state) => state.functions.personFunctions
+  );
+  
+  const fetchPersonFunctions = useStoreActions(
+    (actions) => actions.functions.fetchPersonFunctions
   );
 
-  const fetchNameSpaces = useStoreActions(
-    (actions) => actions.nameSpace.collection.fetchNameSpaces
-  );
-
-  const clearNameSpaces = useStoreActions(
-    (actions) => actions.nameSpace.collection.clear
+  const clearFunctions = useStoreActions(
+    (actions) => actions.functions.clear
   );
 
   const fetch = useCallback(
     async (pageNum = 1) => {
       try {
         setLoading(true);
-        await fetchNameSpaces({ pageNum, pageSize: 32 });
+        await fetchPersonFunctions({ pageNum, pageSize: 32 });
         setError(null);
         setInitialLoad(true);
       } catch (err) {
@@ -38,24 +38,24 @@ export function useNameSpaceCollection() {
         setLoading(false);
       }
     },
-    [setLoading, fetchNameSpaces, setError, setInitialLoad]
+    [setLoading, fetchPersonFunctions, setError, setInitialLoad]
   );
 
   useEffect(
     () => {
       fetch();
 
-      return () => clearNameSpaces();
+      return () => clearFunctions();
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
     []
   );
 
   useEffect(() => {
-    if (initialLoad && _.size(nameSpaces) >= total) {
+    if (initialLoad && _.size(functions) >= total) {
       setHasMore(false);
     }
-  }, [initialLoad, nameSpaces, total]);
+  }, [initialLoad, functions, total]);
 
-  return [loading, error, nameSpaces, hasMore, fetch] as const;
+  return [loading, error, functions, hasMore, fetch] as const;
 }
