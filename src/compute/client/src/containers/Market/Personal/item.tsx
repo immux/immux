@@ -71,7 +71,6 @@ export default function FunctionItem(props: {
       }
       actions={
         <>
-          <UserAddOutlined />
           <DeleteOutlined />
           <SettingOutlined />
         </>

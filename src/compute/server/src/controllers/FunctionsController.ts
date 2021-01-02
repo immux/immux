@@ -24,10 +24,10 @@ import config from '@/config';
 import _ = require('lodash');
 
 @JsonController('/functions')
-export default class NameSpaceController {
+export default class FunctionsController {
   @Get('')
   @UseBefore(AccessTokenMiddleware, PaginationMiddleware)
-  async getNameSpaces(
+  async getMyFunctions(
     @Ctx() ctx: Context,
     @State('skip') skip: number,
     @State('limit') limit: number,

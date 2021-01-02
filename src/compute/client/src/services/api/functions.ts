@@ -3,7 +3,7 @@ import { FunctionInfo } from '@/types/store/functions';
 import { createInstance } from '@/utils/axios';
 
 const instance = createInstance('/api/functions');
-const instanceMarket = createInstance('/api/market');
+const instanceMarket = createInstance('/api/marketFn');
 
 /**
  * get PersonFunctions
@@ -28,13 +28,19 @@ export async function fetchPersonFunctions(
  * get PublicFunctions
  * @param creator
  */
-export async function fetchPublicFunctions(creator: string) {
-  return instance.get<
+export async function fetchPublicFunctions(
+  params?: {
+    pageNum?: number,
+    pageSize?: number 
+  }
+) {
+  return instanceMarket.get<
     any,
     {
       functions: FunctionInfo[];
+      total: number;
     }
-  >(`/${creator}`);
+  >(`/`, { params });
 }
 
 export async function addFunctionMarket(functionId: string) {

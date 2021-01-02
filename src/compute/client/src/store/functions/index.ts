@@ -8,6 +8,8 @@ export const functions: FunctionsStoreModel = {
   // State
   // --------------------------------------------------------------------------
   total: 0,
+
+  publicTotal: 0,
   
   personFunctions: [],
 
@@ -24,7 +26,8 @@ export const functions: FunctionsStoreModel = {
     state.personFunctions = functions;
   }),
 
-  setPublicFunctions: action((state, { functions }) => {
+  setPublicFunctions: action((state, { total, functions }) => {
+    state.publicTotal = total;
     state.publicFunctions = functions;
   }),
 
@@ -38,17 +41,17 @@ export const functions: FunctionsStoreModel = {
   // --------------------------------------------------------------------------
 
   fetchPersonFunctions: thunk(async (actions, params) => {
-    const { total, functions } = await fetchPersonFunctions(
-      params
-    );
+    const { total, functions } = await fetchPersonFunctions(params);
 
     actions.setTotal(total);
 
     actions.setPersonFunctions({ total, functions });
   }),
 
-  fetchPublicFunctions: thunk(async (actions, { creator }) => {
-    actions.setPublicFunctions(await fetchPublicFunctions(creator));
+  fetchPublicFunctions: thunk(async (actions, params) => {
+    const { total, functions } = await fetchPublicFunctions(params);
+
+    actions.setPublicFunctions({ total, functions });
   }),
 
   addFunctionMarket: thunk(async (actions, { functionId }) => {

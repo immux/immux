@@ -21,6 +21,8 @@ export interface FunctionsStoreModel {
 
   total: number;
 
+  publicTotal: number;
+
   personFunctions: FunctionInfo[];
 
   publicFunctions: FunctionInfo[];
@@ -56,7 +58,8 @@ export interface FunctionsStoreModel {
 
   fetchPublicFunctions: Thunk<
     FunctionsStoreModel,
-    { creator: string },
+    { pageNum?: number,
+      pageSize?: number },
     any,
     StoreModel,
     Promise<void>

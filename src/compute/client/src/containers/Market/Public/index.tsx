@@ -1,4 +1,4 @@
-import Cards from '@/containers/NameSpace/Collection/Cards';
+import Cards from './Cards';
 import { Tabs, Badge } from 'antd';
 import React from 'react';
 
@@ -9,7 +9,7 @@ import { useStoreState } from '@/store/hooks';
  * @constructor
  */
 export default function PublicFunction() {
-  const total = useStoreState((state) => state.nameSpace.collection.total);
+  const total = useStoreState((state) => state.functions.publicTotal);
 
   return (
     <Tabs>
@@ -17,7 +17,7 @@ export default function PublicFunction() {
         key="total"
         tab={
           <>
-            All projects
+            Function Market
             <Badge count={total} />
           </>
         }

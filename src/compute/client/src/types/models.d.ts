@@ -48,3 +48,19 @@ export interface ComputedNameSpace extends NameSpace {
 
   updateAt: Moment | null;
 }
+
+export interface MarketFunction {
+  id: string;
+
+  projectId: string;
+
+  name: string;
+
+  creator: string;
+
+  price?: number;
+
+  marketStatus?: boolean;
+
+  description?: string;
+}
