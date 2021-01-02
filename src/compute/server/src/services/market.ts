@@ -1,14 +1,14 @@
-import { FunctionsDoc, FunctionsSchema } from '@/types/models/Functions';
+import { MarketFunctionsDoc, MarketFunctionsSchema } from '@/types/models/MarketFunctions';
 import { AccountSchema } from '@/types/models/Account';
 import { HttpError } from 'routing-controllers';
-import Functions from '@/models/Functions';
+import Functions from '@/models/MarketFunctions';
 import { Dictionary } from '@/types';
 import { Types } from 'mongoose';
 
 import { toObjectId } from '@/utils';
 import _ = require('lodash');
 
-export async function getFunctions(
+export async function getMarketFunctions(
   query: {
     keyword?: string;
     root?: 'true' | 'false';
@@ -24,7 +24,8 @@ export async function getFunctions(
     throw new HttpError(400, 'invalid keyword');
   }
 
-  const conditions = { creator: account.email }
+  // todo search
+  const conditions = {}
 
   const [total, functions] = await Promise.all([
     Functions.countDocuments(conditions),
@@ -38,14 +39,14 @@ export async function getFunctions(
   return { total, functions };
 }
 
-export async function createFunction(
+export async function createMarketFunction(
   creator: AccountSchema,
   data: {
-    name: FunctionsDoc['name'];
-    projectId: FunctionsDoc['projectId'];
-    description?: FunctionsDoc['description'];
-    marketStatus?: FunctionsDoc['marketStatus'];
-    price?: FunctionsDoc['price'];
+    name: MarketFunctionsDoc['name'];
+    projectId: MarketFunctionsDoc['projectId'];
+    description?: MarketFunctionsDoc['description'];
+    marketStatus?: MarketFunctionsDoc['marketStatus'];
+    price?: MarketFunctionsDoc['price'];
   }
 ) {
   const functions = new Functions(
@@ -53,16 +54,10 @@ export async function createFunction(
       {
         creator: creator.email,
         createAt: new Date(),
-        updater: creator.email,
-        updateAt: new Date()
       },
       data
     )
   );
 
   return functions.save();
-}
-
-export function getFunctionById(functionId: Types.ObjectId | string) {
-  return Functions.findById(toObjectId(functionId, 'marketFunctions'));
 }

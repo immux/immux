@@ -2,7 +2,7 @@ import { FunctionsStoreModel, FunctionInfo } from '@/types/store/functions';
 
 import { action, thunk } from 'easy-peasy';
 
-import { fetchPersonFunctions, fetchPublicFunctions } from '@/services/api/functions';
+import { fetchPersonFunctions, fetchPublicFunctions, addFunctionMarket } from '@/services/api/functions';
 
 export const functions: FunctionsStoreModel = {
   // State
@@ -34,7 +34,6 @@ export const functions: FunctionsStoreModel = {
     state.publicFunctions = [];
   }),
 
-
   // Thunk
   // --------------------------------------------------------------------------
 
@@ -50,5 +49,9 @@ export const functions: FunctionsStoreModel = {
 
   fetchPublicFunctions: thunk(async (actions, { creator }) => {
     actions.setPublicFunctions(await fetchPublicFunctions(creator));
-  })
+  }),
+
+  addFunctionMarket: thunk(async (actions, { functionId }) => {
+    await addFunctionMarket(functionId);
+  }),
 };

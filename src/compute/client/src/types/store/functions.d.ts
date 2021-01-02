@@ -61,4 +61,12 @@ export interface FunctionsStoreModel {
     StoreModel,
     Promise<void>
   >;
+
+  addFunctionMarket: Thunk<
+    FunctionsStoreModel,
+    { functionId: string },
+    any,
+    StoreModel,
+    Promise<void>
+  >;
 }

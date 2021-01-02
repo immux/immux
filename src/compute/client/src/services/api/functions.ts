@@ -3,6 +3,7 @@ import { FunctionInfo } from '@/types/store/functions';
 import { createInstance } from '@/utils/axios';
 
 const instance = createInstance('/api/functions');
+const instanceMarket = createInstance('/api/market');
 
 /**
  * get PersonFunctions
@@ -28,10 +29,16 @@ export async function fetchPersonFunctions(
  * @param creator
  */
 export async function fetchPublicFunctions(creator: string) {
-    return instance.get<
-      any,
-      {
-        functions: FunctionInfo[];
-      }
-    >(`/${creator}`);
-  }
+  return instance.get<
+    any,
+    {
+      functions: FunctionInfo[];
+    }
+  >(`/${creator}`);
+}
+
+export async function addFunctionMarket(functionId: string) {
+  return instance.post<any, number>(`/addMarket`, {
+    functionId,
+  });
+}

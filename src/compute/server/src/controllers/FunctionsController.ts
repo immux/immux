@@ -1,4 +1,5 @@
-import { getFunctions } from '@/services/functions';
+import { getFunctions, getFunctionById } from '@/services/functions';
+import { createMarketFunction } from '@/services/market';
 import { PaginationMiddleware } from '@/middlewares/pagination';
 import { AccessTokenMiddleware } from '@/middlewares/account';
 import { AccountSchema } from '@/types/models/Account';
@@ -8,6 +9,7 @@ import {
   JsonController,
   UseBefore,
   HttpError,
+  BodyParam,
   State,
   Param,
   Patch,
@@ -34,5 +36,23 @@ export default class NameSpaceController {
     const { total, functions } = await getFunctions(ctx.query, account, skip, limit);
 
     return { total, functions };
+  }
+
+  /**
+   * addMarket
+   */
+  @Post('/addMarket')
+  @UseBefore(AccessTokenMiddleware)
+  async addMarket(
+    @BodyParam('functionId') functionId: string,
+    @State('account') account: AccountSchema,
+  ) {
+    // find function
+    const addFunction = await getFunctionById(functionId);
+
+    // add function to market
+    const result = await createMarketFunction(account, addFunction);
+    
+    return result;
   }
 }

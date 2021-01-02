@@ -2,8 +2,9 @@ import { useStoreActions, useStoreState } from '@/store/hooks';
 import { useCallback, useEffect, useState } from 'react';
 import { ResultError } from '@/utils/error';
 import { catchError } from '@/utils';
+import { message } from 'antd';
 
-import _ from 'lodash';
+import _, { add } from 'lodash';
 
 export function useFunctionCollection() {
   const [initialLoad, setInitialLoad] = useState(false);
@@ -58,4 +59,31 @@ export function useFunctionCollection() {
   }, [initialLoad, functions, total]);
 
   return [loading, error, functions, hasMore, fetch] as const;
+}
+
+export function useAddMarket(id: string) {
+  const [loading, setLoading] = useState(false);
+  const addFunctionMarket = useStoreActions(
+    (actions) => actions.functions.addFunctionMarket
+  );
+
+  const addMarket = useCallback(
+    async () => {
+      const hide = message.loading('adding', 0);
+
+      try {
+        setLoading(true);
+        await addFunctionMarket({functionId: id});
+        message.success('add market succuss!');
+      } catch (err) {
+        catchError(err);
+      } finally {
+        setLoading(false);
+        hide();
+      }
+    },
+    []
+  );
+
+  return [loading, addMarket] as [boolean, () => Promise<void>];
 }
