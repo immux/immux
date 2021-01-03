@@ -64,3 +64,9 @@ export interface MarketFunction {
 
   description?: string;
 }
+
+export interface FileInfo {
+  name: string,
+  fileType: string,
+  content: Buffer,
+}

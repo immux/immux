@@ -1,6 +1,7 @@
 import { FunctionInfo } from '@/types/store/functions';
 
 import { createInstance } from '@/utils/axios';
+import { FileInfo } from '@/types/models';
 
 const instance = createInstance('/api/functions');
 const instanceMarket = createInstance('/api/marketFn');
@@ -47,4 +48,16 @@ export async function addFunctionMarket(functionId: string) {
   return instance.post<any, number>(`/addMarket`, {
     functionId,
   });
+}
+
+
+/**
+ * downloadFunction
+ * @param functionId
+ */
+export async function downloadFunction(functionId: string,) {
+  return instanceMarket.get<
+    any,
+    FileInfo
+  >(`/download?functionId=${functionId}`);
 }

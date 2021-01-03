@@ -2,6 +2,9 @@ import InfiniteScroll from 'react-infinite-scroller';
 import { Result, Row, Spin, Tooltip } from 'antd';
 import FunctionCard from '@/components/FunctionCard';
 import React, { MouseEvent } from 'react';
+import { downloadFunction } from '@/services/api/functions';
+import { saveFile } from '@/utils';
+import { FileInfo } from '@/types/models';
 
 import {
   MoneyCollectOutlined,
@@ -36,11 +39,13 @@ export default function Cards() {
     return <Result {...error.props} />;
   }
 
-  const orderFunction = (
+  const orderFunction = async(
     functionId: string,
     event: MouseEvent<HTMLDivElement>
   ) => {
     event.preventDefault();
+    const file: FileInfo = await downloadFunction(functionId);
+    saveFile(file);
   };
 
   const cards = _.map(marketFunctions, (marketFunction) => {
