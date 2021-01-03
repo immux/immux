@@ -66,7 +66,7 @@ export interface MarketFunction {
 }
 
 export interface FileInfo {
-  name: string,
-  fileType: string,
-  content: Buffer,
+  name: string;
+  fileType: string;
+  content: Buffer;
 }

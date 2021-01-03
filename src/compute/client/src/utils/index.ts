@@ -108,15 +108,15 @@ export function saveFile(file: FileInfo) {
     type: file.fileType
   });
   const filename = file.name;
-  const link = document.createElement("a");
-  const body = document.querySelector("body");
+  const link = document.createElement('a');
+  const body = document.querySelector('body');
 
   if (body) {
     link.href = window.URL.createObjectURL(blob);
     link.download = filename;
 
     // fix Firefox
-    link.style.display = "none";
+    link.style.display = 'none';
     body.appendChild(link);
 
     link.click();

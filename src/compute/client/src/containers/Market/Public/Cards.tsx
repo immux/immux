@@ -39,7 +39,7 @@ export default function Cards() {
     return <Result {...error.props} />;
   }
 
-  const orderFunction = async(
+  const orderFunction = async (
     functionId: string,
     event: MouseEvent<HTMLDivElement>
   ) => {
