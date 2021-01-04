@@ -1,14 +1,64 @@
 use crate::utils::varint::{varint_decode, varint_encode, VarIntError};
 use std::fmt;
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum GroupingLabelError {
-    VarInt(VarIntError),
+    VarIntError(VarIntError),
+    ParseGroupingLabelErrorError,
+}
+
+enum GroupingLabelErrorPrefix {
+    VarIntError = 0x01,
+    ParseGroupingLabelErrorError = 0x02,
+}
+
+impl GroupingLabelError {
+    pub fn marshal(&self) -> Vec<u8> {
+        match self {
+            GroupingLabelError::VarIntError(error) => {
+                let mut result = vec![GroupingLabelErrorPrefix::VarIntError as u8];
+                let error_bytes = error.marshal();
+                result.extend_from_slice(&error_bytes);
+                result
+            }
+            GroupingLabelError::ParseGroupingLabelErrorError => {
+                vec![GroupingLabelErrorPrefix::ParseGroupingLabelErrorError as u8]
+            }
+        }
+    }
+
+    pub fn parse(data: &[u8]) -> Result<(GroupingLabelError, usize), GroupingLabelError> {
+        let mut position = 0;
+        let prefix = data[position];
+        position += 1;
+
+        if prefix == GroupingLabelErrorPrefix::VarIntError as u8 {
+            let (error, offset) = VarIntError::parse(&data[position..])?;
+            position += offset;
+            Ok((GroupingLabelError::VarIntError(error), position))
+        } else {
+            Ok((GroupingLabelError::ParseGroupingLabelErrorError, position))
+        }
+    }
 }
 
 impl From<VarIntError> for GroupingLabelError {
     fn from(error: VarIntError) -> GroupingLabelError {
-        GroupingLabelError::VarInt(error)
+        GroupingLabelError::VarIntError(error)
+    }
+}
+
+impl fmt::Display for GroupingLabelError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            GroupingLabelError::VarIntError(error) => {
+                let error_string = format!("{}", error);
+                write!(f, "{}::{}", "GroupingLabelError::VarInt", error_string)
+            }
+            GroupingLabelError::ParseGroupingLabelErrorError => {
+                write!(f, "{}", "GroupingLabelError::ParseGroupingLabelErrorError",)
+            }
+        }
     }
 }
 

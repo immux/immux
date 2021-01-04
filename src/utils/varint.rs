@@ -2,6 +2,7 @@ use crate::utils::ints::{
     u16_to_u8_array, u32_to_u8_array, u64_to_u8_array, u8_array_to_u16, u8_array_to_u32,
     u8_array_to_u64,
 };
+use std::fmt;
 
 /// Variable-length integer encoding, using simplistic Bitcoin's varint design:
 /// https://bitcointalk.org/index.php?topic=32849.msg410480#msg410480
@@ -10,9 +11,51 @@ const VARINT_16BIT_PREFIX: u8 = 0xfd;
 const VARINT_32BIT_PREFIX: u8 = 0xfe;
 const VARINT_64BIT_PREFIX: u8 = 0xff;
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum VarIntError {
     UnexpectedFormat,
+    ParseVarIntErrorError,
+}
+
+pub enum VarIntErrorPrefix {
+    UnexpectedFormat = 0x01,
+    ParseVarIntErrorError = 0x02,
+}
+
+impl VarIntError {
+    pub fn marshal(&self) -> Vec<u8> {
+        match self {
+            VarIntError::UnexpectedFormat => vec![VarIntErrorPrefix::UnexpectedFormat as u8],
+            VarIntError::ParseVarIntErrorError => {
+                vec![VarIntErrorPrefix::ParseVarIntErrorError as u8]
+            }
+        }
+    }
+
+    pub fn parse(data: &[u8]) -> Result<(VarIntError, usize), VarIntError> {
+        let mut position = 0;
+        let prefix = data[position];
+        position += 1;
+
+        if prefix == VarIntErrorPrefix::UnexpectedFormat as u8 {
+            Ok((VarIntError::UnexpectedFormat, position))
+        } else {
+            Err(VarIntError::ParseVarIntErrorError)
+        }
+    }
+}
+
+impl fmt::Display for VarIntError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            VarIntError::UnexpectedFormat => {
+                write!(f, "{}", "VarIntError::UnexpectedFormat")
+            }
+            VarIntError::ParseVarIntErrorError => {
+                write!(f, "{}", "VarIntError::ParseVarIntErrorError")
+            }
+        }
+    }
 }
 
 pub fn varint_decode(data: &[u8]) -> Result<(u64, usize), VarIntError> {

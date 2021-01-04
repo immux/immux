@@ -61,6 +61,8 @@ pub enum OutcomePrefix {
     CreateTransactionSuccess = 0xd0,
     TransactionCommitSuccess = 0xd1,
     TransactionAbortSuccess = 0xd2,
+
+    ServerError = 0xf0,
 }
 
 #[derive(Debug, PartialEq)]
@@ -288,21 +290,21 @@ impl fmt::Display for Outcome {
             Outcome::Select(contents) => {
                 let output_vec: Vec<String> = contents
                     .into_iter()
-                    .map(|content| content.to_string())
+                    .map(|content| format!("{}", content))
                     .collect();
                 output_vec.join("\r\n")
             }
             Outcome::InspectOne(commands_with_heights) => {
                 let output_vec: Vec<String> = commands_with_heights
                     .into_iter()
-                    .map(|(command, height)| format!("{} {}", command.to_string(), height.as_u64()))
+                    .map(|(command, height)| format!("{} {}", command, height.as_u64()))
                     .collect();
                 output_vec.join("\r\n")
             }
             Outcome::InspectAll(commands_with_heights) => {
                 let output_vec: Vec<String> = commands_with_heights
                     .into_iter()
-                    .map(|(command, height)| format!("{} {}", command.to_string(), height.as_u64()))
+                    .map(|(command, height)| format!("{} {}", command, height.as_u64()))
                     .collect();
                 output_vec.join("\r\n")
             }
@@ -324,7 +326,7 @@ impl fmt::Display for Outcome {
             Outcome::GetAllGroupingsSuccess(groupings) => {
                 let output_vec: Vec<String> = groupings
                     .into_iter()
-                    .map(|grouping| grouping.to_string())
+                    .map(|grouping| format!("{}", grouping))
                     .collect();
                 output_vec.join("\r\n")
             }

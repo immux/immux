@@ -44,7 +44,7 @@ impl ImmuxDBClient<HttpClientResult> for ImmuxDBHttpClient {
         let url = format!("http://{}/{}", &self.host, Constants::URL_GROUPING_KEY_WORD,);
         let grouping_names = groupings
             .iter()
-            .map(|g| g.to_string())
+            .map(|grouping| format!("{}", &grouping))
             .collect::<Vec<String>>()
             .join("\r\n");
 
@@ -61,8 +61,8 @@ impl ImmuxDBClient<HttpClientResult> for ImmuxDBHttpClient {
         let url = format!(
             "http://{}/{}/{}",
             &self.host,
-            grouping.to_string(),
-            unit_key.to_string()
+            format!("{}", grouping),
+            format!("{}", unit_key),
         );
         let mut response = self.client.get(&url).send()?;
         let status_code = response.status();
@@ -78,11 +78,11 @@ impl ImmuxDBClient<HttpClientResult> for ImmuxDBHttpClient {
         grouping: &GroupingLabel,
         predicate: &Predicate,
     ) -> HttpClientResult {
-        let url_str = format!("http://{}/{}", &self.host, grouping.to_string());
+        let url_str = format!("http://{}/{}", &self.host, grouping);
 
-        let url = Url::parse_with_params(&url_str, &[(PREDICATE_URL_KEY, predicate.to_string())])
-            .unwrap();
-        println!("Get: {}", url);
+        let url =
+            Url::parse_with_params(&url_str, &[(PREDICATE_URL_KEY, format!("{}", predicate))])
+                .unwrap();
 
         let mut response = self.client.get(url).send()?;
         let status_code = response.status();
@@ -104,8 +104,8 @@ impl ImmuxDBClient<HttpClientResult> for ImmuxDBHttpClient {
             &self.host,
             Constants::URL_TRANSACTIONS_KEY_WORD,
             transaction_id.as_u64(),
-            grouping.to_string(),
-            unit_key.to_string(),
+            grouping,
+            unit_key,
         );
 
         let mut response = self.client.get(&url).send()?;
@@ -121,8 +121,8 @@ impl ImmuxDBClient<HttpClientResult> for ImmuxDBHttpClient {
         let url = format!(
             "http://{}/{}/{}/{}",
             &self.host,
-            grouping.to_string(),
-            unit_key.to_string(),
+            grouping,
+            unit_key,
             Constants::URL_JOURNAL_KEY_WORD,
         );
 
@@ -167,13 +167,8 @@ impl ImmuxDBClient<HttpClientResult> for ImmuxDBHttpClient {
     ) -> HttpClientResult {
         let mut response = self
             .client
-            .put(&format!(
-                "http://{}/{}/{}",
-                &self.host,
-                grouping.to_string(),
-                unit_key.to_string(),
-            ))
-            .body(unit_content.to_string())
+            .put(&format!("http://{}/{}/{}", &self.host, grouping, unit_key,))
+            .body(format!("{}", unit_content))
             .send()?;
         let status_code = response.status();
 
@@ -197,10 +192,10 @@ impl ImmuxDBClient<HttpClientResult> for ImmuxDBHttpClient {
                 &self.host,
                 Constants::URL_TRANSACTIONS_KEY_WORD,
                 transaction_id.as_u64(),
-                grouping.to_string(),
-                unit_key.to_string(),
+                grouping,
+                unit_key,
             ))
-            .body(unit_content.to_string())
+            .body(format!("{}", unit_content))
             .send()?;
         let status_code = response.status();
 
@@ -221,8 +216,8 @@ impl ImmuxDBClient<HttpClientResult> for ImmuxDBHttpClient {
             .put(&format!(
                 "http://{}/{}/{}?{}={}",
                 &self.host,
-                grouping.to_string(),
-                unit_key.to_string(),
+                grouping,
+                unit_key,
                 Constants::HEIGHT,
                 height.as_u64(),
             ))
@@ -249,8 +244,8 @@ impl ImmuxDBClient<HttpClientResult> for ImmuxDBHttpClient {
                 &self.host,
                 Constants::URL_TRANSACTIONS_KEY_WORD,
                 transaction_id.as_u64(),
-                grouping.to_string(),
-                unit_key.to_string(),
+                grouping,
+                unit_key,
                 Constants::HEIGHT,
                 height.as_u64(),
             ))
@@ -284,12 +279,7 @@ impl ImmuxDBClient<HttpClientResult> for ImmuxDBHttpClient {
     fn remove_one(&self, grouping: &GroupingLabel, unit_key: &UnitKey) -> HttpClientResult {
         let mut response = self
             .client
-            .delete(&format!(
-                "http://{}/{}/{}",
-                &self.host,
-                grouping.to_string(),
-                unit_key.to_string(),
-            ))
+            .delete(&format!("http://{}/{}/{}", &self.host, grouping, unit_key,))
             .send()?;
         let status_code = response.status();
 
@@ -312,8 +302,8 @@ impl ImmuxDBClient<HttpClientResult> for ImmuxDBHttpClient {
                 &self.host,
                 Constants::URL_TRANSACTIONS_KEY_WORD,
                 transaction_id.as_u64(),
-                grouping.to_string(),
-                unit_key.to_string(),
+                grouping,
+                unit_key,
             ))
             .send()?;
         let status_code = response.status();

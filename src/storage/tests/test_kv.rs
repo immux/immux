@@ -86,6 +86,32 @@ mod kv_tests {
     }
 
     #[test]
+    fn incomplete_transaction_manager() {
+        let key = KVKey::new(&[0x00, 0x01, 0x03]);
+        let value = KVValue::new(&[0xff, 0xff, 0xff, 0xff]);
+        let tid_snapshot;
+        let data_dir = "/tmp/incomplete_transaction_manager";
+        {
+            let mut store_engine = get_store_engine(data_dir);
+            let tid = store_engine.start_transaction().unwrap();
+            tid_snapshot = tid.clone();
+            store_engine.set(&key, &value, Some(tid)).unwrap();
+            let output = store_engine.get(&key, Some(tid)).unwrap().unwrap();
+            assert_eq!(output, value);
+        }
+
+        {
+            let pref = DBPreferences::default_at_dir(data_dir);
+            let mut store_engine = LogKeyValueStore::open(&pref).unwrap();
+            let actual_value = store_engine.get(&key, None).unwrap();
+            assert!(actual_value.is_none());
+
+            let result = store_engine.commit_transaction(tid_snapshot);
+            assert!(result.is_err());
+        }
+    }
+
+    #[test]
     fn kv_set() {
         let mut store_engine = get_store_engine("/tmp/test_set");
 
@@ -333,7 +359,7 @@ mod kv_tests {
                 .set(&pair.0, &pair.1, Some(transaction_id))
                 .unwrap();
         }
-        store_engine.abort_transaction(transaction_id).unwrap();
+        store_engine.abort_transaction(&transaction_id).unwrap();
 
         for pair in &key_value_paris {
             let actual_value = store_engine.get(&pair.0, None).unwrap();
@@ -511,8 +537,8 @@ mod kv_tests {
     }
 
     #[test]
-    fn kv_remove_all_isolation() {
-        let mut store_engine = get_store_engine("/tmp/test_remove_all_isolation");
+    fn transaction_not_alive_after_remove_all() {
+        let mut store_engine = get_store_engine("/tmp/transaction_not_alive_after_remove_all");
 
         let key_value_paris = [
             (KVKey::from("k1"), KVValue::from("a")),
@@ -559,85 +585,7 @@ mod kv_tests {
             }
         }
 
-        store_engine.commit_transaction(transaction_id).unwrap();
-
-        {
-            let actual_value_after_commit = store_engine.get(&target_kv.0, None).unwrap().unwrap();
-            let expected_value_after_commit = target_kv.1;
-
-            assert_eq!(expected_value_after_commit, actual_value_after_commit);
-        }
-    }
-
-    #[test]
-    fn kv_revert_all_isolation() {
-        let mut store_engine = get_store_engine("/tmp/test_revert_all_isolation");
-
-        let key_value_pairs = [
-            (KVKey::from("k1"), KVValue::from("a")),
-            (KVKey::from("k1"), KVValue::from("b")),
-            (KVKey::from("k1"), KVValue::from("c")),
-            (KVKey::from("k1"), KVValue::from("d")),
-            (KVKey::from("k1"), KVValue::from("e")),
-            (KVKey::from("k2"), KVValue::from("f")),
-            (KVKey::from("k3"), KVValue::from("g")),
-            (KVKey::from("k4"), KVValue::from("h")),
-            (KVKey::from("k1"), KVValue::from("i")),
-            (KVKey::from("k1"), KVValue::from("j")),
-        ];
-
-        let index = 6;
-        let target_height = ChainHeight::new(index);
-
-        for pair in &key_value_pairs {
-            store_engine.set(&pair.0, &pair.1, None).unwrap();
-        }
-
-        let transaction_id = store_engine.start_transaction().unwrap();
-
-        let target_kv = (KVKey::from("k100"), KVValue::from("z"));
-
-        {
-            store_engine
-                .set(&target_kv.0, &target_kv.1, Some(transaction_id))
-                .unwrap();
-            let expected_value_within_transaction = target_kv.1.clone();
-            let actual_value_within_transaction = store_engine
-                .get(&target_kv.0, Some(transaction_id))
-                .unwrap()
-                .unwrap();
-
-            assert_eq!(
-                expected_value_within_transaction,
-                actual_value_within_transaction
-            );
-        }
-
-        store_engine.revert_all(&target_height).unwrap();
-
-        {
-            let mut expected_hashmap = HashMap::new();
-
-            for expected_kv_pair in &key_value_pairs[..target_height.as_u64() as usize] {
-                expected_hashmap.insert(&expected_kv_pair.0, &expected_kv_pair.1);
-            }
-
-            for (key, expected_value_after_revert) in expected_hashmap {
-                let actual_value_after_revert = store_engine.get(&key, None).unwrap().unwrap();
-                assert_eq!(expected_value_after_revert, &actual_value_after_revert);
-            }
-        }
-
-        {
-            let actual_target_value_after_revert =
-                store_engine.get(&target_kv.0.clone(), None).unwrap();
-            let expected_target_value_after_revert = None;
-
-            assert_eq!(
-                expected_target_value_after_revert,
-                actual_target_value_after_revert
-            );
-        }
+        assert!(store_engine.commit_transaction(transaction_id).is_err());
     }
 
     #[test]
@@ -689,7 +637,7 @@ mod kv_tests {
         let some_random_transaction_id = 10;
 
         store_engine
-            .abort_transaction(TransactionId::new(some_random_transaction_id))
+            .abort_transaction(&TransactionId::new(some_random_transaction_id))
             .unwrap();
     }
 
@@ -806,8 +754,7 @@ mod kv_tests {
 
     // Inspired by Martin Kleppmann. “Designing Data-Intensive Applications.” Chapter 7
     #[test]
-    #[ignore]
-    fn repeatable_read() {
+    fn test_repeatable_read() {
         let mut store_engine = get_store_engine("/tmp/test_repeatable_read");
 
         let account_1 = KVKey::from("account_1");
@@ -838,6 +785,7 @@ mod kv_tests {
         store_engine
             .set(&account_1, &target_value_1, Some(transaction_id_2))
             .unwrap();
+
         store_engine
             .set(&account_2, &target_value_2, Some(transaction_id_2))
             .unwrap();

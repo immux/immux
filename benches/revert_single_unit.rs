@@ -29,7 +29,7 @@ fn main() {
     let grouping = GroupingLabel::from("census90");
     let table = csv_to_json_table::<CensusEntry>(
         "dev_utils/src/data_models/data-raw/census90.txt",
-        &grouping.to_string(),
+        format!("{}", &grouping).as_str(),
         b',',
         row_limit,
     )
@@ -65,7 +65,7 @@ fn main() {
         for (unit_key, _content) in table.iter() {
             if expected_table.contains_key(unit_key) {
                 let (code, actual_output) = client.get_by_key(&grouping, &unit_key).unwrap();
-                let expected_output = expected_table.get(&unit_key).unwrap().to_string();
+                let expected_output = format!("{}", expected_table.get(&unit_key).unwrap());
                 assert_eq!(code, 200);
                 assert_eq!(
                     UnitContent::from(expected_output.as_str()),

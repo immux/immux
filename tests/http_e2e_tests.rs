@@ -4,11 +4,15 @@ mod http_e2e_tests {
     use std::error::Error;
 
     use immuxsys::constants as Constants;
+    use immuxsys::server::errors::ServerError;
     use immuxsys::storage::chain_height::ChainHeight;
+    use immuxsys::storage::errors::KVError::TransactionManagerError;
+    use immuxsys::storage::executor::errors::ExecutorError::KVError;
     use immuxsys::storage::executor::grouping_label::GroupingLabel;
     use immuxsys::storage::executor::unit_content::UnitContent;
     use immuxsys::storage::executor::unit_key::UnitKey;
     use immuxsys::storage::transaction_manager::TransactionId;
+    use immuxsys::storage::transaction_manager::TransactionManagerError::TransactionNotAlive;
     use immuxsys_client::http_client::ImmuxDBHttpClient;
     use immuxsys_client::ImmuxDBClient;
     use immuxsys_dev_utils::data_models::{
@@ -214,7 +218,7 @@ mod http_e2e_tests {
 
         let (code, actual_output) = client.get_by_key(&grouping, &unit_key).unwrap();
 
-        assert_eq!(actual_output, expected_content.to_string());
+        assert_eq!(actual_output, format!("{}", expected_content));
         assert_eq!(code, 200);
 
         let grouping = GroupingLabel::new("the_other_grouping".as_bytes());
@@ -366,12 +370,12 @@ mod http_e2e_tests {
                 &target_height,
             )
             .unwrap();
-        let expected_output = &contents[target_height.as_u64() as usize].to_string();
+        let expected_output = format!("{}", &contents[target_height.as_u64() as usize]);
         let (status_code, actual_output) = &client
             .get_by_key(&GroupingLabel::new(&grouping.as_bytes()), &unit_key)
             .unwrap();
 
-        assert_eq!(actual_output, expected_output);
+        assert_eq!(actual_output, &expected_output);
         assert_eq!(status_code.as_u16(), 200);
     }
 
@@ -443,7 +447,7 @@ mod http_e2e_tests {
                 let (status_code, actual_output) = client
                     .get_by_key(&GroupingLabel::new(&grouping.as_bytes()), &key)
                     .unwrap();
-                let expected_output = content.to_string();
+                let expected_output = format!("{}", content);
                 assert_eq!(status_code.as_u16(), 200);
                 assert_eq!(actual_output, expected_output);
             } else {
@@ -612,7 +616,7 @@ mod http_e2e_tests {
             let (status_code, actual_output) = client
                 .get_by_key(&GroupingLabel::new(&grouping.as_bytes()), &unit_key)
                 .unwrap();
-            let expected_output = content.to_string();
+            let expected_output = format!("{}", content);
             assert_eq!(status_code.as_u16(), 200);
             assert_eq!(actual_output, expected_output);
         }
@@ -726,24 +730,29 @@ mod http_e2e_tests {
         let (status_code, actual_output) = &client
             .get_by_key(&GroupingLabel::new(&grouping.as_bytes()), &key)
             .unwrap();
-        let expected_output = &contents.last().unwrap().to_string();
+        let expected_output = format!("{}", &contents.last().unwrap());
         assert_eq!(status_code.as_u16(), 200);
-        assert_eq!(actual_output, expected_output);
+        assert_eq!(actual_output, &expected_output);
 
         client.commit_transaction(&transaction_id).unwrap();
 
         let (status_code, actual_output) = &client
             .get_by_key(&GroupingLabel::new(&grouping.as_bytes()), &key)
             .unwrap();
-        let expected_output = &contents[target_pair_index as usize].to_string();
+        let expected_output = format!("{}", &contents[target_pair_index as usize]);
         assert_eq!(status_code.as_u16(), 200);
-        assert_eq!(actual_output, expected_output);
+        assert_eq!(actual_output, &expected_output);
     }
 
     #[test]
-    fn http_e2e_remove_all_isolation() {
+    fn http_transaction_not_alive_after_remove_all() {
         let port = 10093;
-        launch_test_db_servers("http_e2e_remove_all_isolation", Some(port), None).unwrap();
+        launch_test_db_servers(
+            "http_transaction_not_alive_after_remove_all",
+            Some(port),
+            None,
+        )
+        .unwrap();
 
         let host = &format!("{}:{}", Constants::SERVER_END_POINT, port);
         let client = ImmuxDBHttpClient::new(host).unwrap();
@@ -772,60 +781,10 @@ mod http_e2e_tests {
                     &transaction_id,
                 )
                 .unwrap();
-            assert_eq!(status_code.as_u16(), 200);
-            assert_eq!(actual_output, "Nil");
-        }
-    }
-
-    #[test]
-    fn http_e2e_revert_all_isolation() {
-        let port = 10094;
-        launch_test_db_servers("http_e2e_revert_all_isolation", Some(port), None).unwrap();
-
-        let host = &format!("{}:{}", Constants::SERVER_END_POINT, port);
-        let client = ImmuxDBHttpClient::new(host).unwrap();
-        let grouping = String::from("any_grouping");
-
-        let key_content_pairs = get_key_content_pairs();
-        let target_pair_index = 4;
-        let target_height = ChainHeight::new(target_pair_index);
-
-        for (key, content) in key_content_pairs.iter() {
-            client
-                .set_unit(&GroupingLabel::new(&grouping.as_bytes()), &key, &content)
-                .unwrap();
-        }
-
-        let (status_code, transaction_id_str) = client.create_transaction().unwrap();
-        assert_eq!(status_code.as_u16(), 200);
-
-        let transaction_id = TransactionId::new(transaction_id_str.parse::<u64>().unwrap());
-
-        client.revert_all(&target_height).unwrap();
-
-        for (index, (key, content)) in key_content_pairs.iter().enumerate() {
-            if index <= target_height.as_u64() as usize {
-                let (status_code, actual_output) = client
-                    .transactional_get(
-                        &GroupingLabel::new(&grouping.as_bytes()),
-                        &key,
-                        &transaction_id,
-                    )
-                    .unwrap();
-                let expected_output = content.to_string();
-                assert_eq!(status_code.as_u16(), 200);
-                assert_eq!(actual_output, expected_output);
-            } else {
-                let (status_code, actual_output) = client
-                    .transactional_get(
-                        &GroupingLabel::new(&grouping.as_bytes()),
-                        &key,
-                        &transaction_id,
-                    )
-                    .unwrap();
-                assert_eq!(status_code.as_u16(), 200);
-                assert_eq!(actual_output, "Nil");
-            }
+            assert_eq!(status_code.as_u16(), 500);
+            let expected_error =
+                ServerError::ExecutorError(KVError(TransactionManagerError(TransactionNotAlive)));
+            assert_eq!(actual_output, format!("{}", expected_error));
         }
     }
 
@@ -859,9 +818,12 @@ mod http_e2e_tests {
 
         client.revert_all(&target_height).unwrap();
 
-        let (status_code, _) = client.commit_transaction(&transaction_id).unwrap();
-
+        let (status_code, error) = client.commit_transaction(&transaction_id).unwrap();
         assert_eq!(status_code.as_u16(), 500);
+
+        let expected_error =
+            ServerError::ExecutorError(KVError(TransactionManagerError(TransactionNotAlive)));
+        assert_eq!(error, format!("{}", expected_error));
     }
 
     #[test]
@@ -879,8 +841,12 @@ mod http_e2e_tests {
 
         let fake_transaction_id = TransactionId::new(100);
 
-        let (status_code, _) = client.commit_transaction(&fake_transaction_id).unwrap();
+        let (status_code, error) = client.commit_transaction(&fake_transaction_id).unwrap();
         assert_eq!(status_code.as_u16(), 500);
+
+        let expected_error =
+            ServerError::ExecutorError(KVError(TransactionManagerError(TransactionNotAlive)));
+        assert_eq!(error, format!("{}", expected_error));
     }
 
     #[test]
@@ -894,8 +860,12 @@ mod http_e2e_tests {
 
         let fake_transaction_id = TransactionId::new(100);
 
-        let (status_code, _) = client.abort_transaction(&fake_transaction_id).unwrap();
+        let (status_code, error) = client.abort_transaction(&fake_transaction_id).unwrap();
         assert_eq!(status_code.as_u16(), 500);
+
+        let expected_error =
+            ServerError::ExecutorError(KVError(TransactionManagerError(TransactionNotAlive)));
+        assert_eq!(error, format!("{}", expected_error));
     }
 
     #[test]
@@ -999,7 +969,7 @@ mod http_e2e_tests {
                     &transaction_id,
                 )
                 .unwrap();
-            let expected_value = value.to_string();
+            let expected_value = format!("{}", value);
             assert_eq!(status_code.as_u16(), 200);
             assert_eq!(actual_value, expected_value);
         }
@@ -1034,9 +1004,9 @@ mod http_e2e_tests {
             let (status_code, actual_value) = client
                 .get_by_key(&GroupingLabel::new(&grouping.as_bytes()), &key)
                 .unwrap();
-            let expected_value = &origin_value.to_string();
+            let expected_value = format!("{}", &origin_value);
             assert_eq!(status_code.as_u16(), 200);
-            assert_eq!(&actual_value, expected_value);
+            assert_eq!(&actual_value, &expected_value);
         }
 
         {
@@ -1052,25 +1022,26 @@ mod http_e2e_tests {
             let (status_code, actual_value) = client
                 .get_by_key(&GroupingLabel::new(&grouping.as_bytes()), &key)
                 .unwrap();
-            let expected_value = &origin_value.to_string();
+            let expected_value = format!("{}", &origin_value);
             assert_eq!(status_code.as_u16(), 200);
-            assert_eq!(&actual_value, expected_value);
+            assert_eq!(&actual_value, &expected_value);
         }
 
         client.commit_transaction(&transaction_id).unwrap();
 
         {
-            let (status_code, actual_value) = client
+            let (status_code, error) = client
                 .transactional_get(
                     &GroupingLabel::new(&grouping.as_bytes()),
                     &key,
                     &transaction_id,
                 )
                 .unwrap();
-            let expected_value = &value_in_transaction;
+            assert_eq!(status_code.as_u16(), 500);
 
-            assert_eq!(status_code.as_u16(), 200);
-            assert_eq!(&UnitContent::from(actual_value.as_str()), expected_value);
+            let expected_error =
+                ServerError::ExecutorError(KVError(TransactionManagerError(TransactionNotAlive)));
+            assert_eq!(error, format!("{}", expected_error));
         }
     }
 

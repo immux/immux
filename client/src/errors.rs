@@ -1,5 +1,6 @@
 use std::io::Error;
 
+use immuxsys::server::tcp_response::TcpResponseError;
 use immuxsys::storage::executor::outcome::OutcomeError;
 use reqwest::StatusCode;
 use std::fmt::Formatter;
@@ -33,6 +34,7 @@ pub type HttpClientResult = Result<(StatusCode, String), ImmuxDBHttpClientError>
 pub enum ImmuxDBTcpClientError {
     StreamError(Error),
     OutcomeError(OutcomeError),
+    TcpResponseError(TcpResponseError),
 }
 
 impl From<Error> for ImmuxDBTcpClientError {
@@ -44,6 +46,12 @@ impl From<Error> for ImmuxDBTcpClientError {
 impl From<OutcomeError> for ImmuxDBTcpClientError {
     fn from(error: OutcomeError) -> ImmuxDBTcpClientError {
         return ImmuxDBTcpClientError::OutcomeError(error);
+    }
+}
+
+impl From<TcpResponseError> for ImmuxDBTcpClientError {
+    fn from(error: TcpResponseError) -> ImmuxDBTcpClientError {
+        return ImmuxDBTcpClientError::TcpResponseError(error);
     }
 }
 

@@ -1,3 +1,7 @@
+use std::fmt;
+
+use crate::utils::ints::{u64_to_u8_array, u8_array_to_u64};
+
 use crate::utils::ints::{get_bit_u8, set_bit_u8};
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
@@ -6,9 +10,77 @@ pub enum ECCMode {
     TMR = 0x01,
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum ErrorCorrectionError {
     DataWidthNotDivisibleByModulus(usize),
+    ParseErrorCorrectionErrorError,
+}
+
+pub enum ErrorCorrectionErrorPrefix {
+    DataWidthNotDivisibleByModulus = 0x01,
+    ParseErrorCorrectionErrorError = 0x02,
+}
+
+impl ErrorCorrectionError {
+    pub fn marshal(&self) -> Vec<u8> {
+        match self {
+            ErrorCorrectionError::DataWidthNotDivisibleByModulus(size) => {
+                let mut result =
+                    vec![ErrorCorrectionErrorPrefix::DataWidthNotDivisibleByModulus as u8];
+                result.extend_from_slice(&u64_to_u8_array(*size as u64));
+                return result;
+            }
+            ErrorCorrectionError::ParseErrorCorrectionErrorError => {
+                vec![ErrorCorrectionErrorPrefix::ParseErrorCorrectionErrorError as u8]
+            }
+        }
+    }
+
+    pub fn parse(data: &[u8]) -> Result<(ErrorCorrectionError, usize), ErrorCorrectionError> {
+        let mut position = 0;
+        let prefix = data[position];
+        position += 1;
+
+        if prefix == ErrorCorrectionErrorPrefix::DataWidthNotDivisibleByModulus as u8 {
+            let size = u8_array_to_u64(&[
+                data[position],
+                data[position + 1],
+                data[position + 2],
+                data[position + 3],
+                data[position + 4],
+                data[position + 5],
+                data[position + 6],
+                data[position + 7],
+            ]);
+            position += 8;
+            Ok((
+                ErrorCorrectionError::DataWidthNotDivisibleByModulus(size as usize),
+                position,
+            ))
+        } else {
+            Ok((
+                ErrorCorrectionError::ParseErrorCorrectionErrorError,
+                position,
+            ))
+        }
+    }
+}
+
+impl fmt::Display for ErrorCorrectionError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            ErrorCorrectionError::DataWidthNotDivisibleByModulus(size) => write!(
+                f,
+                "{}::{}",
+                "ErrorCorrectionError::DataWidthNotDivisibleByModulus", size
+            ),
+            ErrorCorrectionError::ParseErrorCorrectionErrorError => write!(
+                f,
+                "{}",
+                "ErrorCorrectionError::ParseErrorCorrectionErrorError",
+            ),
+        }
+    }
 }
 
 pub trait ErrorCorrectionCodec {
