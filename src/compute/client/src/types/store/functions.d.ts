@@ -56,6 +56,13 @@ export interface FunctionsStoreModel {
     Promise<void>
   >;
 
+  fetchEditingFunction: Thunk<
+    FunctionsStoreModel,
+    {functionId},
+    any,
+    StoreModel,
+  >;
+
   fetchPublicFunctions: Thunk<
     FunctionsStoreModel,
     { pageNum?: number,
@@ -63,6 +70,20 @@ export interface FunctionsStoreModel {
     any,
     StoreModel,
     Promise<void>
+  >;
+
+  updateEditingFunction: Thunk<
+    FunctionsStoreModel,
+    { 
+      functionId: string; 
+      data: { 
+       title?: string; 
+       description?: string 
+       price?: number;
+      }
+    },
+    any,
+    StoreModel
   >;
 
   addFunctionMarket: Thunk<

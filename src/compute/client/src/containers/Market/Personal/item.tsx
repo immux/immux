@@ -1,5 +1,6 @@
 import ListItem from '@/components/ListItem';
-import React from 'react';
+import React, { MouseEvent } from 'react';
+import { useHistory } from 'react-router-dom';
 import { Avatar, Button, message, Modal } from 'antd';
 import { FunctionInfo } from '@/types/store/functions';
 import { ResultError } from '@/utils/error';
@@ -19,6 +20,8 @@ export default function FunctionItem(props: {
   item: FunctionInfo;
 }){
   const info = props.item;
+
+  const history = useHistory();
 
   // const [ loading, addMarket ] = useAddMarket(info.id);
 
@@ -48,6 +51,14 @@ export default function FunctionItem(props: {
     });
   }
 
+  const editFunction = async (
+    functionId: string,
+    event: MouseEvent<HTMLDivElement>
+  ) => {
+    event.preventDefault();
+    history.push(`/market/edit/${functionId}`);
+  };
+
   return (
     <ListItem
       mode="project"
@@ -71,8 +82,7 @@ export default function FunctionItem(props: {
       }
       actions={
         <>
-          <DeleteOutlined />
-          <SettingOutlined />
+          <SettingOutlined onClick={editFunction.bind(null, info.id)}/>
         </>
       }
     />

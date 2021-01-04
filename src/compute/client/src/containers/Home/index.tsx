@@ -4,6 +4,7 @@ import ListItem from '@/components/ListItem';
 import { Avatar, List } from 'antd';
 import HomeAside from './Aside';
 import React from 'react';
+import Cards from '../Market/Public/Cards';
 
 import {
   UnorderedListOutlined,
@@ -23,6 +24,10 @@ export default function Home() {
     <MiddleContainer aside={<HomeAside />}>
       <SectionCard title="Recent actions">
         <Histories />
+      </SectionCard>
+
+      <SectionCard title="Hot functions">
+        <Cards />
       </SectionCard>
     </MiddleContainer>
   );

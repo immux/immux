@@ -50,6 +50,31 @@ export async function addFunctionMarket(functionId: string) {
   });
 }
 
+export async function updateEditingFunction(
+  functionId: string,
+  data: {
+    title?: string;
+    description?: string;
+    price?: number;
+  }
+) {
+  return instance.patch<
+    any,
+    {
+      editFunction: FunctionInfo;
+    }
+  >(`/${functionId}`, data);
+}
+
+export async function fetchEditingFunction(functionId: string,) {
+  return instance.get<
+    any,
+    {
+      editFunction: FunctionInfo;
+    }
+  >(`/${functionId}`);
+}
+
 
 /**
  * downloadFunction

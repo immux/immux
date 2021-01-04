@@ -1,4 +1,4 @@
-import { getFunctions, getFunctionById } from '@/services/functions';
+import { getFunctions, getFunctionById, updateEditFunction } from '@/services/functions';
 import { createMarketFunction } from '@/services/market';
 import { PaginationMiddleware } from '@/middlewares/pagination';
 import { AccessTokenMiddleware } from '@/middlewares/account';
@@ -54,5 +54,28 @@ export default class FunctionsController {
     const result = await createMarketFunction(account, addFunction);
     
     return result;
+  }
+
+  @Get('/:functionId')
+  @UseBefore(AccessTokenMiddleware)
+  async getEditFunction(@Param('functionId') functionId: string) {
+    const editFunction = await getFunctionById(functionId);
+
+    if (!editFunction) {
+      throw new HttpError(404, 'editFunction not found');
+    }
+
+    return { editFunction };
+  }
+
+  @Patch('/:id')
+  @UseBefore(AccessTokenMiddleware)
+  async updateEditFunction(
+    @State('account') account: AccountSchema,
+    @Param('id') functionId: string,
+    @Body() data: Parameters<typeof updateEditFunction>[2]
+  ) {
+    const editFunction = await updateEditFunction(functionId, account, data);
+    return { editFunction };
   }
 }

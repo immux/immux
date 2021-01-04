@@ -3,6 +3,7 @@ import { Switch, Route, useRouteMatch } from 'react-router-dom';
 import HomeAside from '@/containers/Home/Aside';
 import PublicFunctions from './Public';
 import PersonalFunctions from './Personal';
+import EditPersonFnForm from './Personal/EditPersonFnForm';
 
 import NotMatch from '@/components/NotMatch';
 
@@ -21,6 +22,10 @@ export default function MarketIndex() {
         <MiddleContainer aside={<HomeAside />}>
           <PersonalFunctions />
         </MiddleContainer>
+      </Route>
+
+      <Route path={`${path}/edit/:id`} exact>
+        <EditPersonFnForm />
       </Route>
 
       <Route path={`${path}/public-functions`} exact>

@@ -8,6 +8,8 @@ export interface FunctionsDoc {
 
   projectId: string;
 
+  title: string;
+  
   description: string;
 
   creator: string;

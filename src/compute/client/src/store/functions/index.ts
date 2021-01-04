@@ -2,7 +2,13 @@ import { FunctionsStoreModel, FunctionInfo } from '@/types/store/functions';
 
 import { action, thunk } from 'easy-peasy';
 
-import { fetchPersonFunctions, fetchPublicFunctions, addFunctionMarket } from '@/services/api/functions';
+import { 
+  fetchPersonFunctions, 
+  fetchPublicFunctions, 
+  updateEditingFunction,
+  fetchEditingFunction,
+  addFunctionMarket,
+} from '@/services/api/functions';
 
 export const functions: FunctionsStoreModel = {
   // State
@@ -52,6 +58,18 @@ export const functions: FunctionsStoreModel = {
     const { total, functions } = await fetchPublicFunctions(params);
 
     actions.setPublicFunctions({ total, functions });
+  }),
+
+  fetchEditingFunction: thunk(async (actions, { functionId }) => {
+    const { editFunction } = await fetchEditingFunction(functionId);
+
+    return editFunction;
+  }),
+
+  updateEditingFunction: thunk(async (actions, { functionId, data }) => {
+    const { editFunction } = await updateEditingFunction(functionId, data);
+
+    // actions.setPersonFunctions({ total, functions });
   }),
 
   addFunctionMarket: thunk(async (actions, { functionId }) => {
