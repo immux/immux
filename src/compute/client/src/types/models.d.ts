@@ -56,6 +56,8 @@ export interface MarketFunction {
 
   name: string;
 
+  title?: string;
+
   creator: string;
 
   price?: number;

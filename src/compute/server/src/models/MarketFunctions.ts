@@ -11,6 +11,8 @@ const schema = new Schema<MarketFunctionsSchema>(
 
     projectId: { type: String, required: true },
 
+    title: { type: String, trim: true, default: null },
+
     description: { type: String, trim: true, default: null },
 
     creator: { type: String, required: true },

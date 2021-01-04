@@ -8,6 +8,8 @@ export interface MarketFunctionsDoc {
 
   projectId: string;
 
+  title: string;
+
   description: string;
 
   creator: string;

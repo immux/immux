@@ -25,5 +25,12 @@ export function getFunctionIcon(marketFunction: MarketFunction) {
 export function getFunctionTitle(marketFunction: MarketFunction) {
   const name = <code>{marketFunction.name}</code>;
 
-  return name;
+  return marketFunction.title ? (
+    <>
+      {marketFunction.title}
+      <small>{name}</small>
+    </>
+  ) : (
+    name
+  );
 }
