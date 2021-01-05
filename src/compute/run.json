@@ -1,0 +1,44 @@
+{
+    "apps":[
+    {
+        "name":"server",
+        "cwd":"./server",
+        "max_memory_restart":"1024M",
+        "log_date_format":"YYYY-MM-DD HH:mm:ss SSS",
+        "script":"npm start",
+        "env":{
+            "RUN_ENV": "dev"
+        }
+    },
+    {
+        "name":"client",
+        "cwd":"./client",
+        "max_memory_restart":"1024M",
+        "log_date_format":"YYYY-MM-DD HH:mm:ss SSS",
+        "script":"npm start",
+        "env":{
+            "RUN_ENV": "dev"
+        }
+    },
+    {
+        "name":"runtime",
+        "cwd":"./runtime",
+        "max_memory_restart":"1024M",
+        "log_date_format":"YYYY-MM-DD HH:mm:ss SSS",
+        "script":"npm run dev",
+        "env":{
+            "RUN_ENV": "dev"
+        }
+    },
+    {
+        "name":"websocket",
+        "cwd":"./websocket",
+        "max_memory_restart":"1024M",
+        "log_date_format":"YYYY-MM-DD HH:mm:ss SSS",
+        "script":"npm run dev",
+        "env":{
+            "RUN_ENV": "dev"
+        }
+    }
+    ]
+}
