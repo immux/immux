@@ -47,7 +47,7 @@ pub enum UnitContent {
     Map(HashMap<String, UnitContent>),
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum UnitContentError {
     UnexpectedTypePrefix(u8),
     EmptyInput,
@@ -369,6 +369,20 @@ mod unit_content_tests {
 
     use crate::storage::executor::unit_content::UnitContent;
     use crate::utils::varint::varint_encode;
+
+    use immuxsys_dev_utils::dev_utils::{get_unit_content_errors, UnitContentError};
+
+    #[test]
+    fn unit_content_error_reversibility() {
+        let errors = get_unit_content_errors();
+
+        for expected_error in errors {
+            let error_bytes = expected_error.marshal();
+            let (actual_error, _) = UnitContentError::parse(&error_bytes).unwrap();
+
+            assert_eq!(expected_error, actual_error);
+        }
+    }
 
     fn permutation<T: Clone>(array: &[T]) -> Vec<Vec<T>> {
         if array.len() == 0 {

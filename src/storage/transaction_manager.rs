@@ -39,7 +39,7 @@ impl fmt::Display for TransactionId {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum TransactionManagerError {
     TransactionIdOutOfRange,
     TransactionNotAlive,
@@ -216,6 +216,22 @@ impl TransactionManager {
             Ok(())
         } else {
             Err(TransactionManagerError::TransactionNotAlive)
+        }
+    }
+}
+
+#[cfg(test)]
+mod transaction_manager_test {
+    use immuxsys_dev_utils::dev_utils::{get_transaction_manager_errors, TransactionManagerError};
+
+    #[test]
+    fn transaction_manager_error_reversibility() {
+        let errors = get_transaction_manager_errors();
+
+        for expected_error in errors {
+            let error_bytes = expected_error.marshal();
+            let (actual_error, _) = TransactionManagerError::parse(&error_bytes).unwrap();
+            assert_eq!(expected_error, actual_error);
         }
     }
 }

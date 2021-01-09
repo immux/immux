@@ -13,14 +13,25 @@ pub use serde::ser::Serialize;
 
 use immuxsys::server::errors::ServerResult;
 use immuxsys::server::server::run_db_servers;
-use immuxsys::storage::executor::grouping_label::GroupingLabel;
-use immuxsys::storage::executor::unit_content::UnitContent;
-use immuxsys::storage::executor::unit_key::UnitKey;
-use immuxsys::storage::preferences::DBPreferences;
-
-use immuxsys::storage::executor::predicate::{
-    CompoundPredicate, FieldPath, Predicate, PrimitivePredicate,
+pub use immuxsys::storage::chain_height::ChainHeightError;
+pub use immuxsys::storage::ecc::ErrorCorrectionError;
+pub use immuxsys::storage::errors::KVError;
+pub use immuxsys::storage::executor::command::{CommandError, SelectConditionError};
+pub use immuxsys::storage::executor::errors::ExecutorError;
+pub use immuxsys::storage::executor::grouping_label::{GroupingLabel, GroupingLabelError};
+pub use immuxsys::storage::executor::predicate::{
+    CompoundPredicate, FieldPath, Predicate, PredicateError, PrimitivePredicate,
 };
+pub use immuxsys::storage::executor::unit_content::{UnitContent, UnitContentError};
+pub use immuxsys::storage::executor::unit_key::{UnitKey, UnitKeyError};
+pub use immuxsys::storage::instruction::InstructionError;
+pub use immuxsys::storage::kvkey::KVKeyError;
+pub use immuxsys::storage::log_version::LogVersionError;
+use immuxsys::storage::preferences::DBPreferences;
+pub use immuxsys::storage::transaction_manager::TransactionManagerError;
+use immuxsys::system_error::SystemError;
+pub use immuxsys::utils::varint::VarIntError;
+
 use immuxsys_client::http_client::ImmuxDBHttpClient;
 use immuxsys_client::ImmuxDBClient;
 
@@ -217,6 +228,343 @@ pub fn e2e_verify_correctness(
     }
 
     return true;
+}
+
+pub fn get_executor_errors() -> Vec<ExecutorError> {
+    let command_errors = get_command_errors();
+    let executor_command_errors: Vec<ExecutorError> = command_errors
+        .iter()
+        .map(|command_error| ExecutorError::CommandError(command_error.clone()))
+        .collect();
+
+    let predicate_errors = get_predicate_errors();
+    let executor_predicate_errors: Vec<ExecutorError> = predicate_errors
+        .iter()
+        .map(|predicate_error| ExecutorError::PredicateError(predicate_error.clone()))
+        .collect();
+
+    let unit_content_errors = get_unit_content_errors();
+    let executor_unit_content_errors: Vec<ExecutorError> = unit_content_errors
+        .iter()
+        .map(|unit_content_error| ExecutorError::UnitContentError(unit_content_error.clone()))
+        .collect();
+
+    let kv_key_errors = get_kvkey_errors();
+    let executor_kv_key_errors: Vec<ExecutorError> = kv_key_errors
+        .iter()
+        .map(|kv_key_error| ExecutorError::KVKeyError(kv_key_error.clone()))
+        .collect();
+
+    let kv_errors = get_kv_errors();
+    let executor_kv_errors: Vec<ExecutorError> = kv_errors
+        .iter()
+        .map(|kv_error| ExecutorError::KVError(kv_error.clone()))
+        .collect();
+
+    let system_errors = get_system_errors();
+    let executor_system_errors: Vec<ExecutorError> = system_errors
+        .iter()
+        .map(|system_error| ExecutorError::SystemError(system_error.clone()))
+        .collect();
+
+    let mut result = vec![
+        ExecutorError::ParseIntError(SystemError::ParseIntError),
+        ExecutorError::UnexpectedOutcome,
+        ExecutorError::ParseExecutorErrorToStringError,
+    ];
+
+    result.extend_from_slice(&executor_command_errors);
+    result.extend_from_slice(&executor_predicate_errors);
+    result.extend_from_slice(&executor_unit_content_errors);
+    result.extend_from_slice(&executor_kv_key_errors);
+    result.extend_from_slice(&executor_kv_errors);
+    result.extend_from_slice(&executor_system_errors);
+
+    result
+}
+
+pub fn get_kv_errors() -> Vec<KVError> {
+    let system_errors = get_system_errors();
+    let kv_system_errors: Vec<KVError> = system_errors
+        .iter()
+        .map(|system_error| KVError::SystemError(system_error.clone()))
+        .collect();
+
+    let log_version_errors = get_log_version_errors();
+    let kv_log_version_errors: Vec<KVError> = log_version_errors
+        .iter()
+        .map(|log_version_error| KVError::LogVersionError(log_version_error.clone()))
+        .collect();
+
+    let chain_height_errors = get_chain_height_errors();
+    let executor_chain_height_errors: Vec<KVError> = chain_height_errors
+        .iter()
+        .map(|chain_height_error| KVError::ChainHeightError(chain_height_error.clone()))
+        .collect();
+
+    let instruction_errors = get_instruction_errors();
+    let executor_instruction_errors: Vec<KVError> = instruction_errors
+        .iter()
+        .map(|instruction_error| KVError::InstructionError(instruction_error.clone()))
+        .collect();
+
+    let mut result = vec![
+        KVError::PointToUnexpectedInstruction,
+        KVError::ParseKVErrorError,
+        KVError::RevertOutOfRange,
+        KVError::ParseIntError(SystemError::ParseIntError),
+        KVError::IOError(SystemError::IOError),
+    ];
+
+    result.extend_from_slice(&kv_system_errors);
+    result.extend_from_slice(&kv_log_version_errors);
+    result.extend_from_slice(&executor_chain_height_errors);
+    result.extend_from_slice(&executor_instruction_errors);
+
+    result
+}
+
+pub fn get_chain_height_errors() -> Vec<ChainHeightError> {
+    vec![
+        ChainHeightError::NegativeChainHeight,
+        ChainHeightError::ChainHeightOutOfRange,
+        ChainHeightError::ParseChainHeightErrorError,
+    ]
+}
+
+pub fn get_transaction_manager_errors() -> Vec<TransactionManagerError> {
+    vec![
+        TransactionManagerError::TransactionNotAlive,
+        TransactionManagerError::TransactionIdOutOfRange,
+        TransactionManagerError::ParseTransactionManagerErrorError,
+    ]
+}
+
+pub fn get_error_correction_errors() -> Vec<ErrorCorrectionError> {
+    vec![
+        ErrorCorrectionError::ParseErrorCorrectionErrorError,
+        ErrorCorrectionError::DataWidthNotDivisibleByModulus(3),
+    ]
+}
+
+pub fn get_command_errors() -> Vec<CommandError> {
+    let unit_key_errors = get_unit_key_errors();
+    let command_unit_key_errors: Vec<CommandError> = unit_key_errors
+        .iter()
+        .map(|unit_key_error| CommandError::UnitKeyError(unit_key_error.clone()))
+        .collect();
+
+    let varint_errors = get_varint_errors();
+    let command_varint_errors: Vec<CommandError> = varint_errors
+        .iter()
+        .map(|varint_error| CommandError::VarIntError(varint_error.clone()))
+        .collect();
+
+    let grouping_errors = get_grouping_label_errors();
+    let command_grouping_errors: Vec<CommandError> = grouping_errors
+        .iter()
+        .map(|grouping_error| CommandError::GroupingErr(grouping_error.clone()))
+        .collect();
+
+    let unit_content_errors = get_unit_content_errors();
+    let command_unit_content_errors: Vec<CommandError> = unit_content_errors
+        .iter()
+        .map(|unit_content_error| CommandError::UnitContentErr(unit_content_error.clone()))
+        .collect();
+
+    let select_condition_errors = get_select_condition_errors();
+    let command_select_condition_errors: Vec<CommandError> = select_condition_errors
+        .iter()
+        .map(|select_condition_error| {
+            CommandError::SelectConditionErr(select_condition_error.clone())
+        })
+        .collect();
+
+    let mut result = vec![
+        CommandError::InvalidPrefix,
+        CommandError::ParseCommandErrorToStringError,
+    ];
+
+    result.extend_from_slice(&command_unit_key_errors);
+    result.extend_from_slice(&command_varint_errors);
+    result.extend_from_slice(&command_grouping_errors);
+    result.extend_from_slice(&command_unit_content_errors);
+    result.extend_from_slice(&command_select_condition_errors);
+
+    result
+}
+
+pub fn get_grouping_label_errors() -> Vec<GroupingLabelError> {
+    let varint_errors = get_varint_errors();
+
+    let grouping_label_varint_errors: Vec<GroupingLabelError> = varint_errors
+        .iter()
+        .map(|varint_error| GroupingLabelError::VarIntError(varint_error.clone()))
+        .collect();
+
+    let mut result = vec![GroupingLabelError::ParseGroupingLabelErrorError];
+    result.extend_from_slice(&grouping_label_varint_errors);
+
+    result
+}
+
+pub fn get_predicate_errors() -> Vec<PredicateError> {
+    let unit_content_error = get_unit_content_errors();
+    let predicate_unit_content_errors: Vec<PredicateError> = unit_content_error
+        .iter()
+        .map(|content_error| PredicateError::UnitContent(content_error.clone()))
+        .collect();
+
+    let varint_errors = get_varint_errors();
+    let predicate_malformedbytes_error: Vec<PredicateError> = varint_errors
+        .iter()
+        .map(|varint_error| PredicateError::MalformedBytes(varint_error.clone()))
+        .collect();
+
+    let mut result = vec![
+        PredicateError::MalformedTokens,
+        PredicateError::UnexpectedToken,
+        PredicateError::UnexpectedPrefix(2),
+        PredicateError::InsufficientBytes,
+        PredicateError::ParsePredicateErrorError,
+    ];
+
+    result.extend_from_slice(&predicate_unit_content_errors);
+    result.extend_from_slice(&predicate_malformedbytes_error);
+
+    result
+}
+
+pub fn get_instruction_errors() -> Vec<InstructionError> {
+    let error_correction_errors = get_error_correction_errors();
+    let instruction_error_correction_errors: Vec<InstructionError> = error_correction_errors
+        .iter()
+        .map(|error_correction_error| {
+            InstructionError::ErrorCorrection(error_correction_error.clone())
+        })
+        .collect();
+
+    let varint_errors = get_varint_errors();
+    let instruction_varint_errors: Vec<InstructionError> = varint_errors
+        .iter()
+        .map(|varint_error| InstructionError::VarIntError(varint_error.clone()))
+        .collect();
+
+    let mut result = vec![
+        InstructionError::PackTooShort(1),
+        InstructionError::UnknownPrefix(1),
+        InstructionError::MissingPrefixByte,
+        InstructionError::UnexpectedECCMode(1),
+        InstructionError::KeyExceedsMaxLength,
+        InstructionError::UnexpectedMagicNumber([0x01, 0x02, 0x03, 0x04]),
+        InstructionError::UnexpectedPackVersion(0x01),
+        InstructionError::ParseInstructionErrorError,
+    ];
+
+    result.extend_from_slice(&instruction_error_correction_errors);
+    result.extend_from_slice(&instruction_varint_errors);
+
+    result
+}
+
+pub fn get_unit_content_errors() -> Vec<UnitContentError> {
+    vec![
+        UnitContentError::EmptyInput,
+        UnitContentError::MissingDataBytes,
+        UnitContentError::UnexpectedTypePrefix(2),
+        UnitContentError::UnexpectedLengthBytes,
+        UnitContentError::ParseUnitContentErrorError,
+    ]
+}
+
+pub fn get_unit_key_errors() -> Vec<UnitKeyError> {
+    let varint_errors = get_varint_errors();
+    let mut result = vec![UnitKeyError::ParseUnitKeyErrorError];
+
+    for varint_error in varint_errors {
+        let unit_key_error = UnitKeyError::VarIntError(varint_error);
+        result.push(unit_key_error);
+    }
+
+    return result;
+}
+
+pub fn get_select_condition_errors() -> Vec<SelectConditionError> {
+    let unit_key_errors = get_unit_key_errors();
+    let select_condition_unit_key_errors: Vec<SelectConditionError> = unit_key_errors
+        .iter()
+        .map(|unit_key_error| SelectConditionError::UnitKeyError(unit_key_error.clone()))
+        .collect();
+
+    let system_errors = get_system_errors();
+    let select_condition_system_errors: Vec<SelectConditionError> = system_errors
+        .iter()
+        .map(|system_error| SelectConditionError::SystemError(system_error.clone()))
+        .collect();
+
+    let predicate_errors = get_predicate_errors();
+    let select_condition_predicate_errors: Vec<SelectConditionError> = predicate_errors
+        .iter()
+        .map(|predicate_error| SelectConditionError::PredicateError(predicate_error.clone()))
+        .collect();
+
+    let grouping_errors = get_grouping_label_errors();
+    let select_condition_grouping_errors: Vec<SelectConditionError> = grouping_errors
+        .iter()
+        .map(|grouping_error| SelectConditionError::GroupingError(grouping_error.clone()))
+        .collect();
+
+    let mut result = vec![
+        SelectConditionError::InvalidPrefix,
+        SelectConditionError::ParseSelectConditionErrorError,
+        SelectConditionError::FromUtf8Error(SystemError::FromUtf8Error),
+    ];
+
+    result.extend_from_slice(&select_condition_unit_key_errors);
+    result.extend_from_slice(&select_condition_system_errors);
+    result.extend_from_slice(&select_condition_predicate_errors);
+    result.extend_from_slice(&select_condition_grouping_errors);
+
+    result
+}
+
+pub fn get_system_errors() -> Vec<SystemError> {
+    vec![
+        SystemError::IOError,
+        SystemError::FromUtf8Error,
+        SystemError::ParseIntError,
+        SystemError::ReceiverError,
+        SystemError::ParseSystemErrorError,
+    ]
+}
+
+pub fn get_varint_errors() -> Vec<VarIntError> {
+    vec![
+        VarIntError::UnexpectedFormat,
+        VarIntError::ParseVarIntErrorError,
+    ]
+}
+
+pub fn get_kvkey_errors() -> Vec<KVKeyError> {
+    let mut result = vec![KVKeyError::ParseKVKeyErrorError];
+
+    let varint_errors = get_varint_errors();
+
+    for varint_error in varint_errors {
+        result.push(KVKeyError::VarIntError(varint_error));
+    }
+
+    result
+}
+
+pub fn get_log_version_errors() -> Vec<LogVersionError> {
+    vec![
+        LogVersionError::InvalidString,
+        LogVersionError::UnexpectedLogVersion,
+        LogVersionError::LogVersionParsingError,
+        LogVersionError::ParseLogVersionErrorError,
+        LogVersionError::ParseIntError(SystemError::ParseIntError),
+    ]
 }
 
 pub fn get_key_content_pairs() -> UnitList {

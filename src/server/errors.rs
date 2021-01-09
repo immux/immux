@@ -61,7 +61,7 @@ impl ServerError {
             ServerError::BodyExtractionError(error) => {
                 let mut result = vec![ServerErrorPrefix::BodyExtractionError as u8];
                 let error_bytes = error.marshal();
-                result.push(error_bytes);
+                result.extend_from_slice(&error_bytes);
                 return result;
             }
             ServerError::UrlParsingError => vec![ServerErrorPrefix::UrlParsingError as u8],
@@ -69,13 +69,13 @@ impl ServerError {
             ServerError::ParseIntError(error) => {
                 let mut result = vec![ServerErrorPrefix::ParseIntError as u8];
                 let error_bytes = error.marshal();
-                result.push(error_bytes);
+                result.extend_from_slice(&error_bytes);
                 return result;
             }
             ServerError::HttpResponseError(error) => {
                 let mut result = vec![ServerErrorPrefix::HttpResponseError as u8];
                 let error_bytes = error.marshal();
-                result.push(error_bytes);
+                result.extend_from_slice(&error_bytes);
                 return result;
             }
             ServerError::PredicateError(predicate_error) => {
@@ -88,13 +88,13 @@ impl ServerError {
             ServerError::ReceiverError(_error) => {
                 let mut result = vec![ServerErrorPrefix::ReceiverError as u8];
                 let error_byte = SystemError::ReceiverError.marshal();
-                result.push(error_byte);
+                result.extend_from_slice(&error_byte);
                 return result;
             }
             ServerError::TCPServerError(error) => {
                 let mut result = vec![ServerErrorPrefix::TCPServerError as u8];
                 let error_bytes = error.marshal();
-                result.push(error_bytes);
+                result.extend_from_slice(&error_bytes);
                 return result;
             }
             ServerError::CommandError(error) => {
@@ -109,8 +109,8 @@ impl ServerError {
             }
             ServerError::SystemError(error) => {
                 let mut result = vec![ServerErrorPrefix::SystemError as u8];
-                let error_byte = error.marshal();
-                result.push(error_byte);
+                let error_bytes = error.marshal();
+                result.extend_from_slice(&error_bytes);
                 return result;
             }
         }

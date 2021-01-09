@@ -2,7 +2,7 @@ use std::fmt;
 
 use crate::utils::varint::{varint_decode, varint_encode, VarIntError};
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum UnitKeyError {
     VarIntError(VarIntError),
     ParseUnitKeyErrorError,
@@ -126,6 +126,18 @@ impl fmt::Display for UnitKey {
 #[cfg(test)]
 mod unit_key_tests {
     use crate::storage::executor::unit_key::UnitKey;
+    use immuxsys_dev_utils::dev_utils::{get_unit_key_errors, UnitKeyError};
+
+    #[test]
+    fn unit_key_error_reversibility() {
+        let unit_key_errors = get_unit_key_errors();
+
+        for expected_error in unit_key_errors {
+            let error_bytes = expected_error.marshal();
+            let (actual_error, _) = UnitKeyError::parse(&error_bytes).unwrap();
+            assert_eq!(actual_error, expected_error);
+        }
+    }
 
     #[test]
     fn test_unit_key_marshal_parse() {

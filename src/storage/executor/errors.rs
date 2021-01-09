@@ -10,7 +10,7 @@ use crate::system_error::SystemError;
 use crate::utils::varint::VarIntError;
 use std::string::FromUtf8Error;
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum ExecutorError {
     KVError(KVError),
     UnitContentError(UnitContentError),
@@ -53,8 +53,8 @@ impl ExecutorError {
             }
             ExecutorError::ParseIntError(error) => {
                 let mut result = vec![ExecutorErrorPrefix::ParseIntError as u8];
-                let error_byte = error.marshal();
-                result.push(error_byte);
+                let error_bytes = error.marshal();
+                result.extend_from_slice(&error_bytes);
                 return result;
             }
             ExecutorError::CommandError(error) => {
@@ -79,7 +79,7 @@ impl ExecutorError {
             ExecutorError::SystemError(error) => {
                 let mut result = vec![ExecutorErrorPrefix::SystemError as u8];
                 let error_bytes = error.marshal();
-                result.push(error_bytes);
+                result.extend_from_slice(&error_bytes);
                 return result;
             }
             ExecutorError::ParseExecutorErrorToStringError => {
@@ -224,3 +224,20 @@ impl std::fmt::Display for ExecutorError {
 }
 
 pub type ExecutorResult<T> = Result<T, ExecutorError>;
+
+#[cfg(test)]
+mod executor_error_tests {
+    use immuxsys_dev_utils::dev_utils::{get_executor_errors, ExecutorError};
+
+    #[test]
+    fn executor_error_reversibility() {
+        let errors = get_executor_errors();
+
+        for expected_error in errors {
+            let error_bytes = expected_error.marshal();
+            let (actual_error, _) = ExecutorError::parse(&error_bytes).unwrap();
+
+            assert_eq!(expected_error, actual_error);
+        }
+    }
+}

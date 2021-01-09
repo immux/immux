@@ -13,7 +13,7 @@ use crate::system_error::SystemError;
 use crate::utils::ints::{u64_to_u8_array, u8_array_to_u64};
 use crate::utils::varint::{varint_decode, varint_encode, VarIntError};
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum CommandError {
     GroupingErr(GroupingLabelError),
     UnitContentErr(UnitContentError),
@@ -198,7 +198,7 @@ pub enum SelectConditionPrefix {
     AllGrouping = 0x04,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum SelectConditionError {
     InvalidPrefix,
     UnitKeyError(UnitKeyError),
@@ -233,8 +233,8 @@ impl SelectConditionError {
             }
             SelectConditionError::FromUtf8Error(error) => {
                 let mut result = vec![SelectConditionErrorPrefix::FromUtf8Error as u8];
-                let error_byte = error.marshal();
-                result.push(error_byte);
+                let error_bytes = error.marshal();
+                result.extend_from_slice(&error_bytes);
                 result
             }
             SelectConditionError::PredicateError(error) => {
@@ -255,7 +255,7 @@ impl SelectConditionError {
             SelectConditionError::SystemError(error) => {
                 let mut result = vec![SelectConditionErrorPrefix::SystemError as u8];
                 let error_bytes = error.marshal();
-                result.push(error_bytes);
+                result.extend_from_slice(&error_bytes);
                 result
             }
         }
@@ -1216,6 +1216,20 @@ mod command_tests {
     use crate::storage::executor::unit_content::UnitContent;
     use crate::storage::executor::unit_key::UnitKey;
     use crate::storage::transaction_manager::TransactionId;
+    use immuxsys_dev_utils::dev_utils::{
+        get_command_errors, get_select_condition_errors, CommandError, SelectConditionError,
+    };
+
+    #[test]
+    fn command_error_reversibility() {
+        let command_errors = get_command_errors();
+
+        for expected_error in command_errors {
+            let error_bytes = expected_error.marshal();
+            let (actual_error, _) = CommandError::parse(&error_bytes).unwrap();
+            assert_eq!(expected_error, actual_error);
+        }
+    }
 
     #[test]
     fn select_condition_reversibility() {
@@ -1237,6 +1251,17 @@ mod command_tests {
             let (actual_output, offset) = SelectCondition::parse(&condition_bytes).unwrap();
             assert_eq!(condition, &actual_output);
             assert_eq!(condition_bytes.len(), offset);
+        }
+    }
+
+    #[test]
+    fn select_condition_error_reversibility() {
+        let select_condition_errors = get_select_condition_errors();
+
+        for expected_error in select_condition_errors {
+            let error_bytes = expected_error.marshal();
+            let (actual_error, _) = SelectConditionError::parse(&error_bytes).unwrap();
+            assert_eq!(expected_error, actual_error);
         }
     }
 
