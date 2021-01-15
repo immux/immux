@@ -1,5 +1,6 @@
 import { AnimatedSwitch } from 'react-router-transition';
 import NameSpaceIndex from './containers/NameSpace';
+import MarketIndex from './containers/Market';
 import { Router, Route } from 'react-router-dom';
 import Login from './containers/Account/Login';
 import SystemLayout from './containers/Layout';
@@ -35,6 +36,11 @@ function App() {
           <Route path="/toolbox">
             <Toolbox />
           </Route>
+
+          <Route path="/market">
+            <MarketIndex />
+          </Route>
+
         </SystemLayout>
       </AnimatedSwitch>
     </Router>

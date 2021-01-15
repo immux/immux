@@ -4,6 +4,7 @@ import ListItem from '@/components/ListItem';
 import { Avatar, List } from 'antd';
 import HomeAside from './Aside';
 import React from 'react';
+import Cards from '../Market/Public/Cards';
 
 import {
   UnorderedListOutlined,
@@ -25,48 +26,8 @@ export default function Home() {
         <Histories />
       </SectionCard>
 
-      <SectionCard
-        className={styles.section}
-        title="Recent projects"
-        extra={
-          <>
-            <UnorderedListOutlined />
-            <SortAscendingOutlined />
-          </>
-        }
-      >
-        <List<string>
-          dataSource={[
-            'test1',
-            'test12',
-            'test13',
-            'test14',
-            'test15',
-            'test16'
-          ]}
-          renderItem={(item) => (
-            <ListItem
-              mode="project"
-              href="#"
-              avatar={
-                <Avatar
-                  shape="square"
-                  icon={<ProjectOutlined />}
-                  size="large"
-                />
-              }
-              title={item}
-              extra={<StarOutlined />}
-              actions={
-                <>
-                  <UserAddOutlined />
-                  <DeleteOutlined />
-                  <SettingOutlined />
-                </>
-              }
-            />
-          )}
-        />
+      <SectionCard title="Hot functions">
+        <Cards />
       </SectionCard>
     </MiddleContainer>
   );

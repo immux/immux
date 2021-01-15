@@ -1,7 +1,7 @@
 import { Document, DocumentToObjectOptions, Types } from 'mongoose';
 import { Assign } from 'utility-types';
 
-export interface FunctionsDoc {
+export interface MarketFunctionsDoc {
   id: Types.ObjectId;
 
   name: string;
@@ -9,7 +9,7 @@ export interface FunctionsDoc {
   projectId: string;
 
   title: string;
-  
+
   description: string;
 
   creator: string;
@@ -21,8 +21,8 @@ export interface FunctionsDoc {
   updateAt: Date;
 }
 
-export interface FunctionsSchema extends Document, Omit<FunctionsDoc, 'id'> {
-  toJSON(options?: DocumentToObjectOptions): FunctionsDoc;
+export interface MarketFunctionsSchema extends Document, Omit<MarketFunctionsDoc, 'id'> {
+  toJSON(options?: DocumentToObjectOptions): MarketFunctionsDoc;
 
   validateAsync(): Promise<void>;
 }

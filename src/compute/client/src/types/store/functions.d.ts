@@ -1,0 +1,96 @@
+import { NameSpace, Account, ComputedNameSpace } from '@/types/models';
+import { NonUndefined, PromiseType } from 'utility-types';
+import { Action, Computed, Thunk } from 'easy-peasy';
+import { StoreModel } from '@/types/store';
+
+import { fetchPersonFunctions, fetchPublicFunctions } from '@/services/api/functions';
+
+export interface FunctionInfo {
+  id: string;
+  projectId: string;
+  name: string;
+  marketStatus: boolean;
+  creator: string;
+  price?: number;
+  description?: string;
+}
+
+export interface FunctionsStoreModel {
+  // State
+  // --------------------------------------------------------------------------
+
+  total: number;
+
+  publicTotal: number;
+
+  personFunctions: FunctionInfo[];
+
+  publicFunctions: FunctionInfo[];
+
+  // Action
+  // --------------------------------------------------------------------------
+
+  setTotal: Action<FunctionsStoreModel, number>;
+
+  setPersonFunctions: Action<
+    FunctionsStoreModel,
+    PromiseType<ReturnType<typeof fetchPersonFunctions>>
+  >;
+
+  setPublicFunctions: Action<
+    FunctionsStoreModel,
+    PromiseType<ReturnType<typeof fetchPublicFunctions>>
+  >;
+
+  clear: Action<FunctionsStoreModel>;
+
+  // Thunk
+  // --------------------------------------------------------------------------
+
+  fetchPersonFunctions: Thunk<
+    FunctionsStoreModel,
+    { pageNum?: number,
+      pageSize?: number },
+    any,
+    StoreModel,
+    Promise<void>
+  >;
+
+  fetchEditingFunction: Thunk<
+    FunctionsStoreModel,
+    {functionId},
+    any,
+    StoreModel,
+  >;
+
+  fetchPublicFunctions: Thunk<
+    FunctionsStoreModel,
+    { pageNum?: number,
+      pageSize?: number },
+    any,
+    StoreModel,
+    Promise<void>
+  >;
+
+  updateEditingFunction: Thunk<
+    FunctionsStoreModel,
+    { 
+      functionId: string; 
+      data: { 
+       title?: string; 
+       description?: string 
+       price?: number;
+      }
+    },
+    any,
+    StoreModel
+  >;
+
+  addFunctionMarket: Thunk<
+    FunctionsStoreModel,
+    { functionId: string },
+    any,
+    StoreModel,
+    Promise<void>
+  >;
+}

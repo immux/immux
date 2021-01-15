@@ -6,6 +6,7 @@ import { createBrowserHistory } from 'history';
 import { message } from 'antd';
 import _ from 'lodash';
 import qs from 'qs';
+import { FileInfo } from '@/types/models';
 
 /**
  * get query hook
@@ -97,15 +98,30 @@ export function catchError(err: any, prefix?: ReactNode, msg?: ReactNode) {
   console.error(err);
 }
 
-/**
- * @example
- * // returns 'kirino'
- * trimStringValue('   kirino ')
- *
- * @example
- * // returns { name: ' kirino ' }
- * trimStringValue({ name: ' kirino ' })
- */
 export function trimStringValue(value: any) {
   return _.isString(value) ? _.trim(value) : value;
+}
+
+export function saveFile(file: FileInfo) {
+  let ab = Buffer.from(file.content);
+  const blob = new Blob([ab], {
+    type: file.fileType
+  });
+  const filename = file.name;
+  const link = document.createElement('a');
+  const body = document.querySelector('body');
+
+  if (body) {
+    link.href = window.URL.createObjectURL(blob);
+    link.download = filename;
+
+    // fix Firefox
+    link.style.display = 'none';
+    body.appendChild(link);
+
+    link.click();
+    body.removeChild(link);
+
+    window.URL.revokeObjectURL(link.href);
+  }
 }

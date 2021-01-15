@@ -17,6 +17,7 @@ import { AccessTicketMiddleware } from '@/middlewares/account';
 import { AccountSchema } from '@/types/models/Account';
 import { createNameSpace } from '@/services/nameSpace';
 import { createFunction } from '@/services/functions';
+import { IGNORE_EXT } from '@/constants';
 import _ = require('lodash');
 
 import requestPromise = require('request-promise-native');
@@ -39,6 +40,9 @@ export default class FileHistoryController {
 
     for (let i = 0; i < files.length; i++) {
       const fileName = files[i].originalname;
+
+      const ext = fileName.substr(fileName.lastIndexOf(".") + 1);
+      if (IGNORE_EXT.includes(ext)) { continue; }
 
       createFunction(
         account,

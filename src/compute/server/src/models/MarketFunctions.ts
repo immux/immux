@@ -1,11 +1,11 @@
-import { FunctionsSchema } from '@/types/models/Functions';
+import { MarketFunctionsSchema } from '@/types/models/MarketFunctions';
 import { Schema, connection } from 'mongoose';
 
 import { validateMongooseDocument } from '@/utils';
 import { genJsonHandler } from '@/models/utils';
 import _ = require('lodash');
 
-const schema = new Schema<FunctionsSchema>(
+const schema = new Schema<MarketFunctionsSchema>(
   {
     name: { type: String, required: true },
 
@@ -17,7 +17,7 @@ const schema = new Schema<FunctionsSchema>(
 
     creator: { type: String, required: true },
 
-    marketStatus: { type: String, default: false },
+    marketStatus: { type: Boolean, default: true },
 
     price: { type: Number, default: 0 },
 
@@ -29,6 +29,4 @@ const schema = new Schema<FunctionsSchema>(
 
 schema.methods.validateAsync = validateMongooseDocument;
 
-schema.index({ name: -1 }, { unique: true });
-
-export default connection.model<FunctionsSchema>('Functions', schema);
+export default connection.model<MarketFunctionsSchema>('MarketFunctions', schema);

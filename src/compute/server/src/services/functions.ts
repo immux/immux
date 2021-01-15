@@ -62,3 +62,25 @@ export async function createFunction(
 
   return functions.save();
 }
+
+export function getFunctionById(functionId: Types.ObjectId | string) {
+  return Functions.findById(toObjectId(functionId, 'marketFunctions'));
+}
+
+export async function updateEditFunction(
+  functionId: string | Types.ObjectId,
+  updater: AccountSchema,
+  data: Partial<
+    Pick<FunctionsDoc, 'price' | 'title' | 'description'>
+  >
+) {
+  const editFunction = await getFunctionById(functionId);
+
+  if (!editFunction) {
+    throw new HttpError(404, 'editFunction not found');
+  }
+
+  editFunction.set({ ...data, updater: updater.email, updateAt: new Date() });
+  await editFunction.validateAsync();
+  return editFunction.save();
+}

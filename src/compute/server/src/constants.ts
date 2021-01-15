@@ -69,3 +69,5 @@ export const PRE_DIRECTORY = 'DIRECTORY';
  */
 export const EXTRA_FOLDERS = ['node_modules'];
 
+export const IGNORE_EXT = ['DS_Store'];
+
