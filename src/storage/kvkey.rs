@@ -4,7 +4,7 @@ use crate::storage::executor::grouping_label::GroupingLabel;
 use crate::storage::executor::unit_key::UnitKey;
 use crate::utils::varint::{varint_decode, varint_encode, VarIntError};
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum KVKeyError {
     VarIntError(VarIntError),
     ParseKVKeyErrorError,
@@ -130,6 +130,18 @@ impl From<KVKey> for Vec<u8> {
 #[cfg(test)]
 mod kvkey_tests {
     use super::KVKey;
+    use immuxsys_dev_utils::dev_utils::{get_kvkey_errors, KVKeyError};
+
+    #[test]
+    fn kvkey_error_reversibility() {
+        let kvkey_errors = get_kvkey_errors();
+
+        for expected_error in kvkey_errors {
+            let error_bytes = expected_error.marshal();
+            let (actual_error, _) = KVKeyError::parse(&error_bytes).unwrap();
+            assert_eq!(actual_error, expected_error);
+        }
+    }
 
     #[test]
     fn test_from_vec() {

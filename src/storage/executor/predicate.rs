@@ -33,7 +33,7 @@ enum Token {
     Not,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum PredicateError {
     UnexpectedToken,
     MalformedTokens,
@@ -841,8 +841,22 @@ mod predicate_tests {
         tokenize, CompoundPredicate, FieldPath, Predicate, PrimitivePredicate, Token,
     };
     use crate::storage::executor::unit_content::UnitContent;
-    use immuxsys_dev_utils::dev_utils::{get_phone_mode_test_predicates, get_phone_model_fixture};
+    use immuxsys_dev_utils::dev_utils::{
+        get_phone_mode_test_predicates, get_phone_model_fixture, get_predicate_errors,
+        PredicateError,
+    };
     use std::collections::HashMap;
+
+    #[test]
+    fn predicate_error_reversibility() {
+        let predicate_errors = get_predicate_errors();
+
+        for expected_error in predicate_errors {
+            let error_bytes = expected_error.marshal();
+            let (actual_error, _) = PredicateError::parse(&error_bytes).unwrap();
+            assert_eq!(expected_error, actual_error);
+        }
+    }
 
     #[test]
     fn test_tokenizer() {

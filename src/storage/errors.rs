@@ -8,7 +8,7 @@ use crate::storage::log_version::LogVersionError;
 use crate::storage::transaction_manager::TransactionManagerError;
 use crate::system_error::SystemError;
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum KVError {
     IOError(SystemError),
     InstructionError(InstructionError),
@@ -41,7 +41,7 @@ impl KVError {
             KVError::IOError(error) => {
                 let mut result = vec![KVErrorPrefix::IOError as u8];
                 let error_bytes = error.marshal();
-                result.push(error_bytes);
+                result.extend_from_slice(&error_bytes);
                 result
             }
             KVError::InstructionError(error) => {
@@ -54,7 +54,7 @@ impl KVError {
             KVError::ParseIntError(error) => {
                 let mut result = vec![KVErrorPrefix::ParseIntError as u8];
                 let error_bytes = error.marshal();
-                result.push(error_bytes);
+                result.extend_from_slice(&error_bytes);
                 result
             }
             KVError::ChainHeightError(error) => {
@@ -81,7 +81,7 @@ impl KVError {
             KVError::SystemError(error) => {
                 let mut result = vec![KVErrorPrefix::SystemError as u8];
                 let error_byte = error.marshal();
-                result.push(error_byte);
+                result.extend_from_slice(&error_byte);
                 result
             }
             KVError::ParseKVErrorError => vec![KVErrorPrefix::ParseKVErrorError as u8],
@@ -217,3 +217,20 @@ impl From<LogVersionError> for KVError {
 }
 
 pub type KVResult<T> = Result<T, KVError>;
+
+#[cfg(test)]
+mod kv_error_tests {
+    use immuxsys_dev_utils::dev_utils::{get_kv_errors, KVError};
+
+    #[test]
+    fn kv_error_reversibility() {
+        let errors = get_kv_errors();
+
+        for expected_error in errors {
+            let error_bytes = expected_error.marshal();
+            let (actual_error, _) = KVError::parse(&error_bytes).unwrap();
+
+            assert_eq!(expected_error, actual_error);
+        }
+    }
+}

@@ -11,7 +11,7 @@ use crate::storage::transaction_manager::TransactionId;
 use crate::utils::ints::{byte_slice_to_u32, u32_to_u8_array, u64_to_u8_array, u8_array_to_u64};
 use crate::utils::varint::{varint_decode, VarIntError};
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum InstructionError {
     MissingPrefixByte,
     KeyExceedsMaxLength,
@@ -500,6 +500,18 @@ mod instruction_tests {
     use crate::storage::instruction::Instruction;
     use crate::storage::kvkey::KVKey;
     use crate::storage::kvvalue::KVValue;
+    use immuxsys_dev_utils::dev_utils::{get_instruction_errors, InstructionError};
+
+    #[test]
+    fn instruction_error_reversibility() {
+        let instruction_errors = get_instruction_errors();
+
+        for expected_error in instruction_errors {
+            let error_bytes = expected_error.marshal();
+            let (actual_error, _) = InstructionError::parse(&error_bytes).unwrap();
+            assert_eq!(expected_error, actual_error);
+        }
+    }
 
     #[test]
     fn parse_set_instruction() {

@@ -1,7 +1,7 @@
 use crate::utils::varint::{varint_decode, varint_encode, VarIntError};
 use std::fmt;
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum GroupingLabelError {
     VarIntError(VarIntError),
     ParseGroupingLabelErrorError,
@@ -132,7 +132,19 @@ impl fmt::Display for GroupingLabel {
 
 #[cfg(test)]
 mod grouping_tests {
-    use crate::storage::executor::grouping_label::GroupingLabel;
+    use super::GroupingLabel;
+    use immuxsys_dev_utils::dev_utils::{get_grouping_label_errors, GroupingLabelError};
+
+    #[test]
+    fn grouping_label_error_reversibility() {
+        let grouping_label_errors = get_grouping_label_errors();
+
+        for expected_error in grouping_label_errors {
+            let error_bytes = expected_error.marshal();
+            let (actual_error, _) = GroupingLabelError::parse(&error_bytes).unwrap();
+            assert_eq!(expected_error, actual_error);
+        }
+    }
 
     #[test]
     fn test_marshal() {

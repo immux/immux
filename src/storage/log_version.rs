@@ -87,7 +87,7 @@ impl std::fmt::Display for LogVersion {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum LogVersionError {
     LogVersionParsingError,
     InvalidString,
@@ -113,8 +113,8 @@ impl LogVersionError {
             LogVersionError::InvalidString => vec![LogVersionErrorPrefix::InvalidString as u8],
             LogVersionError::ParseIntError(error) => {
                 let mut result = vec![LogVersionErrorPrefix::ParseIntError as u8];
-                let error_byte = error.marshal();
-                result.push(error_byte);
+                let error_bytes = error.marshal();
+                result.extend_from_slice(&error_bytes);
                 result
             }
             LogVersionError::UnexpectedLogVersion => {
@@ -172,5 +172,21 @@ impl fmt::Display for LogVersionError {
 impl From<ParseIntError> for LogVersionError {
     fn from(_error: ParseIntError) -> LogVersionError {
         LogVersionError::ParseIntError(SystemError::ParseIntError)
+    }
+}
+
+#[cfg(test)]
+mod log_version_tests {
+    use immuxsys_dev_utils::dev_utils::{get_log_version_errors, LogVersionError};
+
+    #[test]
+    fn log_version_error_reversibility() {
+        let errors = get_log_version_errors();
+
+        for expected_error in errors {
+            let error_bytes = expected_error.marshal();
+            let (actual_error, _) = LogVersionError::parse(&error_bytes).unwrap();
+            assert_eq!(expected_error, actual_error);
+        }
     }
 }

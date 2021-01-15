@@ -11,7 +11,7 @@ const VARINT_16BIT_PREFIX: u8 = 0xfd;
 const VARINT_32BIT_PREFIX: u8 = 0xfe;
 const VARINT_64BIT_PREFIX: u8 = 0xff;
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum VarIntError {
     UnexpectedFormat,
     ParseVarIntErrorError,
@@ -40,7 +40,7 @@ impl VarIntError {
         if prefix == VarIntErrorPrefix::UnexpectedFormat as u8 {
             Ok((VarIntError::UnexpectedFormat, position))
         } else {
-            Err(VarIntError::ParseVarIntErrorError)
+            Ok((VarIntError::ParseVarIntErrorError, position))
         }
     }
 }
@@ -112,6 +112,17 @@ pub fn varint_encode(i: u64) -> Vec<u8> {
 #[cfg(test)]
 mod varint_utils_tests {
     use crate::utils::varint::{varint_decode, varint_encode};
+    use immuxsys_dev_utils::dev_utils::{get_varint_errors, VarIntError};
+
+    #[test]
+    fn varint_error_reversibility() {
+        let errors = get_varint_errors();
+        for expected_error in errors {
+            let error_bytes = expected_error.marshal();
+            let (actual_error, _) = VarIntError::parse(&error_bytes).unwrap();
+            assert_eq!(actual_error, expected_error);
+        }
+    }
 
     #[test]
     fn test_varint_8bit_encode() {

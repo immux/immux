@@ -5,7 +5,7 @@ use crate::utils::varint::varint_encode;
 #[derive(Debug, Clone, PartialEq, PartialOrd)]
 pub struct ChainHeight(u64);
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum ChainHeightError {
     NegativeChainHeight,
     ChainHeightOutOfRange,
@@ -38,9 +38,9 @@ impl ChainHeightError {
         let prefix = data[position];
         position += 1;
 
-        if prefix == ChainHeightError::NegativeChainHeight as u8 {
+        if prefix == ChainHeightErrorPrefix::NegativeChainHeight as u8 {
             Ok((ChainHeightError::NegativeChainHeight, position))
-        } else if prefix == ChainHeightError::ChainHeightOutOfRange as u8 {
+        } else if prefix == ChainHeightErrorPrefix::ChainHeightOutOfRange as u8 {
             Ok((ChainHeightError::ChainHeightOutOfRange, position))
         } else {
             Ok((ChainHeightError::ParseChainHeightErrorError, position))
@@ -93,5 +93,21 @@ impl ChainHeight {
 impl fmt::Display for ChainHeight {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "ChainHeight : {}", self.0)
+    }
+}
+
+#[cfg(test)]
+mod chain_height_test {
+    use immuxsys_dev_utils::dev_utils::{get_chain_height_errors, ChainHeightError};
+
+    #[test]
+    fn test_error_reversibility() {
+        let errors = get_chain_height_errors();
+
+        for expected_error in errors {
+            let error_bytes = expected_error.marshal();
+            let (acutal_error, _) = ChainHeightError::parse(&error_bytes).unwrap();
+            assert_eq!(acutal_error, expected_error);
+        }
     }
 }

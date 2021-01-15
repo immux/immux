@@ -10,7 +10,7 @@ pub enum ECCMode {
     TMR = 0x01,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum ErrorCorrectionError {
     DataWidthNotDivisibleByModulus(usize),
     ParseErrorCorrectionErrorError,
@@ -154,6 +154,22 @@ impl ErrorCorrectionCodec for TripleRedundancyCode {
             i += 1;
         }
         return Ok(result);
+    }
+}
+
+#[cfg(test)]
+mod ecc_error_tests {
+    use immuxsys_dev_utils::dev_utils::{get_error_correction_errors, ErrorCorrectionError};
+
+    #[test]
+    fn test_error_reversibility() {
+        let expected_errors = get_error_correction_errors();
+
+        for error in expected_errors {
+            let error_bytes = error.marshal();
+            let (actual_error, _) = ErrorCorrectionError::parse(&error_bytes).unwrap();
+            assert_eq!(error, actual_error);
+        }
     }
 }
 
