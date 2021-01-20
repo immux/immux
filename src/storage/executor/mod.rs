@@ -1,3 +1,6 @@
+//! Executor is a wrapper around the underlayer storage engine. Executor provide more rich types,
+//! simple DML(index), the concept of grouping, etc.
+
 pub mod command;
 pub mod errors;
 pub mod executor;

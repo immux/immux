@@ -106,7 +106,7 @@ impl ErrorCorrectionCodec for IdentityCode {
     }
 }
 
-// Triple modular redundancy, see https://en.wikipedia.org/wiki/Triple_modular_redundancy
+/// Triple modular redundancy, see [Triple Modular Redundancy](https://en.wikipedia.org/wiki/Triple_modular_redundancy)
 pub struct TripleRedundancyCode {}
 
 impl TripleRedundancyCode {

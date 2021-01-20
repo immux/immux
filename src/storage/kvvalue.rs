@@ -1,6 +1,7 @@
 use crate::storage::executor::unit_content::UnitContent;
 use crate::utils::varint::varint_encode;
 
+/// The raw value of the storage engine.
 #[derive(Clone, Debug, PartialEq)]
 pub struct KVValue(Vec<u8>);
 
