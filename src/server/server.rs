@@ -76,6 +76,7 @@ fn spawn_db_thread(
     })
 }
 
+/// Launch http server or tcp server based on the configuration.
 pub fn run_db_servers(prefs: &DBPreferences) -> Vec<ServerResult<()>> {
     let (server_db_sender, server_db_receiver) = mpsc::channel::<AnnotatedCommand>();
     let (db_http_sender, db_http_receiver) = mpsc::channel::<ServerResult<Outcome>>();
@@ -107,7 +108,7 @@ pub fn run_db_servers(prefs: &DBPreferences) -> Vec<ServerResult<()>> {
     return server_results;
 }
 
-pub fn run_http_server(
+fn run_http_server(
     http_port: u16,
     server_db_sender: Sender<AnnotatedCommand>,
     db_http_receiver: Receiver<ServerResult<Outcome>>,

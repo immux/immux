@@ -3,6 +3,8 @@ use std::cmp::Ordering;
 use std::fmt;
 use std::num::ParseIntError;
 
+/// ImmuxDB use [Semantic Versioning](https://semver.org/) as our log version, as well as our
+/// database version.
 #[derive(Debug, Clone, Copy)]
 pub struct LogVersion {
     major: u8,

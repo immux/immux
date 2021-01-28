@@ -63,6 +63,7 @@ impl From<VarIntError> for KVKeyError {
     }
 }
 
+/// The raw key of the storage engine.
 #[derive(Debug, Eq, PartialEq, Hash, Clone)]
 pub struct KVKey(Vec<u8>);
 

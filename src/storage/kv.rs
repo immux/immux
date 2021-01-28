@@ -15,6 +15,10 @@ use crate::storage::log_writer::LogWriter;
 use crate::storage::preferences::DBPreferences;
 use crate::storage::transaction_manager::{Snapshot, TransactionId, TransactionManager};
 
+/// The core of ImmuxDB storage engine.
+/// Log file sequentially writes down all the instructions, we maintain a hashmap index in our
+/// memory. The key is the KVKey type, value is the LogPointer type.
+
 pub struct LogKeyValueStore {
     reader: LogReader,
     writer: LogWriter,
@@ -24,6 +28,7 @@ pub struct LogKeyValueStore {
 }
 
 impl LogKeyValueStore {
+    /// Load the entire log file, initialize ImmuxDB storage engine.
     pub fn open(preferences: &DBPreferences) -> KVResult<LogKeyValueStore> {
         create_dir_all(&preferences.log_dir)?;
 
@@ -67,6 +72,7 @@ impl LogKeyValueStore {
         return Ok(engine);
     }
 
+    /// Set a key value pair within/without a transaction.
     pub fn set(
         &mut self,
         key: &KVKey,
@@ -113,6 +119,7 @@ impl LogKeyValueStore {
         return Ok(());
     }
 
+    /// Get value of a specific key within/without a transaction.
     pub fn get(
         &mut self,
         key: &KVKey,
@@ -174,11 +181,13 @@ impl LogKeyValueStore {
         }
     }
 
+    /// Get all the keys in the current storage engine.
     pub fn get_current_keys(&mut self) -> KVResult<Vec<KVKey>> {
         let keys: Vec<KVKey> = self.snapshot.keys().map(|key| key.clone()).collect();
         return Ok(keys);
     }
 
+    /// Get all the key value pairs in the current storage engine.
     pub fn get_all_current(&mut self) -> KVResult<Vec<(KVKey, KVValue)>> {
         let mut result = vec![];
 
@@ -206,6 +215,7 @@ impl LogKeyValueStore {
         return Ok(result);
     }
 
+    /// Revert a specific key to certain height within/without a transaction.
     pub fn revert_one(
         &mut self,
         key: &KVKey,
@@ -279,6 +289,7 @@ impl LogKeyValueStore {
         return Ok(());
     }
 
+    /// Remove a specific key within/without a transaciton.
     pub fn remove_one(
         &mut self,
         key: &KVKey,
@@ -323,6 +334,7 @@ impl LogKeyValueStore {
         return Ok(());
     }
 
+    /// Clear the entire storage engine.
     pub fn remove_all(&mut self) -> KVResult<()> {
         let instruction = Instruction::RemoveAll;
 
@@ -340,6 +352,7 @@ impl LogKeyValueStore {
         return Ok(());
     }
 
+    /// Get all the historical instructions with their corresponding heights.
     pub fn inspect_all(&mut self) -> KVResult<Vec<(Instruction, ChainHeight)>> {
         let (instruction_iterator, _) = self.reader.read_all()?;
 
@@ -350,6 +363,8 @@ impl LogKeyValueStore {
         return Ok(instructions_with_height);
     }
 
+    /// Get all the historical instructions with their corresponding heights regarding to a specific
+    /// key.
     pub fn inspect_one(&mut self, target_key: &KVKey) -> KVResult<Vec<(Instruction, ChainHeight)>> {
         let (instruction_iterator, _) = self.reader.read_all()?;
         let mut appeared_key = HashSet::new();
@@ -403,6 +418,7 @@ impl LogKeyValueStore {
         return Ok(result);
     }
 
+    /// Start a transaction.
     pub fn start_transaction(&mut self) -> KVResult<TransactionId> {
         let transaction_id = self.transaction_manager.generate_new_transaction_id()?;
         let instruction = Instruction::TransactionStart { transaction_id };
@@ -417,6 +433,7 @@ impl LogKeyValueStore {
         return Ok(transaction_id);
     }
 
+    /// Commit a transaction.
     pub fn commit_transaction(&mut self, transaction_id: TransactionId) -> KVResult<()> {
         self.transaction_manager
             .validate_transaction_id(&transaction_id)?;
@@ -435,6 +452,7 @@ impl LogKeyValueStore {
         return Ok(());
     }
 
+    /// Abort a transaction.
     pub fn abort_transaction(&mut self, transaction_id: &TransactionId) -> KVResult<()> {
         self.transaction_manager
             .validate_transaction_id(&transaction_id)?;

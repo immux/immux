@@ -1,3 +1,5 @@
+//! This mod contains all the project constants.
+
 pub const COMMAND_VERSION_FLAGS: &str = "-V";
 
 pub const SUBCOMMAND_GET: &str = "get";

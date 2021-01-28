@@ -105,7 +105,10 @@ impl fmt::Display for TransactionManagerError {
 
 #[derive(Debug, Clone)]
 pub struct TransactionMetaData {
+    /// Affected keys for each transaction.
     pub affected_keys: Vec<KVKey>,
+    /// Current isolation level is snapshot isolation. Each transaction takes a snapshot when it
+    /// begins.
     pub snapshot: Snapshot,
 }
 

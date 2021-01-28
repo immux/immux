@@ -7,6 +7,7 @@ use crate::storage::instruction::{pack_instruction, Instruction};
 use crate::storage::log_pointer::LogPointer;
 use crate::storage::log_version::LogVersion;
 
+/// A wrapper of the system buffer writer.
 pub struct LogWriter {
     buf_writer: BufWriter<File>,
     ecc_mode: ECCMode,

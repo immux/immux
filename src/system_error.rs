@@ -1,3 +1,4 @@
+//! This mod is wrapper of the system errors. So we can marshal and parse it.
 use std::fmt;
 
 #[derive(Debug, Clone, PartialEq)]

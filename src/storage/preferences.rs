@@ -19,7 +19,6 @@ pub struct DBPreferences {
 }
 
 impl DBPreferences {
-    // Same as default(), except dir is changed
     pub fn default_at_dir(log_dir: &str) -> Self {
         let mut prefs = Self::default();
         prefs.log_dir = PathBuf::from(log_dir);

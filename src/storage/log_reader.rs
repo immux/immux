@@ -9,6 +9,7 @@ use crate::storage::log_pointer::LogPointer;
 use crate::storage::log_version::LogVersion;
 use crate::storage::log_version::LogVersionError::UnexpectedLogVersion;
 
+/// A wrapper of the system buffer reader.
 pub struct LogReader {
     buf_reader: BufReader<File>,
     log_version: LogVersion,

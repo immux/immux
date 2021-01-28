@@ -226,44 +226,49 @@ enum InstructionPrefix {
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Instruction {
-    Set {
-        key: KVKey,
-        value: KVValue,
-    },
-    RevertOne {
-        key: KVKey,
-        height: ChainHeight,
-    },
-    RevertAll {
-        height: ChainHeight,
-    },
-    RemoveOne {
-        key: KVKey,
-    },
+    /// Set a key value pair.
+    Set { key: KVKey, value: KVValue },
+
+    /// Revert a single key to a specific height.
+    RevertOne { key: KVKey, height: ChainHeight },
+
+    /// Revert the whole storage engine to a specific height.
+    RevertAll { height: ChainHeight },
+
+    /// Remove a single key from the storage engine.
+    RemoveOne { key: KVKey },
+
+    /// Clear the whole storage engine, while previous history still being preserved.
     RemoveAll,
-    TransactionStart {
-        transaction_id: TransactionId,
-    },
+
+    /// Start a transaction.
+    TransactionStart { transaction_id: TransactionId },
+
+    /// Set a key value pair within a specific transaction.
     TransactionalSet {
         key: KVKey,
         value: KVValue,
         transaction_id: TransactionId,
     },
+
+    /// Revert a single key to a specific height within a specific transaction.
     TransactionalRevertOne {
         key: KVKey,
         height: ChainHeight,
         transaction_id: TransactionId,
     },
+
+    /// Remove a single key winthin a specific trnsaction.
     TransactionalRemoveOne {
         key: KVKey,
         transaction_id: TransactionId,
     },
-    TransactionCommit {
-        transaction_id: TransactionId,
-    },
-    TransactionAbort {
-        transaction_id: TransactionId,
-    },
+
+    /// Commit a transaction.
+    TransactionCommit { transaction_id: TransactionId },
+
+    /// Abort a transaction.
+    TransactionAbort { transaction_id: TransactionId },
 }
 
 impl Instruction {
@@ -594,6 +599,7 @@ const ECC_WIDTH_LENGTH: usize = 4;
 const ECC_MODE_BYTE_POS: usize = 9;
 const ECC_DATA_BYTE_POS: usize = 10;
 
+/// Serialize instruction with corresponding ecc mode.
 pub fn pack_instruction(instruction: &Instruction, ecc_mode: ECCMode) -> Vec<u8> {
     let instruction_bytes = instruction.serialize();
     let mut pack_bytes = Vec::new();
@@ -614,6 +620,7 @@ pub fn pack_instruction(instruction: &Instruction, ecc_mode: ECCMode) -> Vec<u8>
     return pack_bytes;
 }
 
+/// Deserialize instruction with corresponding ecc mode.
 pub fn unpack_instruction(pack_bytes: &[u8]) -> Result<(Instruction, usize), InstructionError> {
     if pack_bytes.len() < ECC_MODE_BYTE_POS {
         return Err(InstructionError::PackTooShort(pack_bytes.len()));
