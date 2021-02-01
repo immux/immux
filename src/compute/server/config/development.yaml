@@ -1,5 +1,0 @@
----
-# MongoDB
-mongo:
-  uris: mongodb://localhost/compute-engine
-  options: {}
