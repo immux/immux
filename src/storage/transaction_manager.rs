@@ -176,6 +176,35 @@ impl TransactionManager {
         };
     }
 
+    pub fn check_lost_update(
+        &mut self,
+        transaction_id: &TransactionId,
+        current_snapshot: &Snapshot,
+    ) -> bool {
+        if let Some(transaction_meta_data) = self.transactions.get(transaction_id) {
+            let old_snapshot = &transaction_meta_data.snapshot;
+            let affected_keys = self.get_affected_keys(&transaction_id);
+
+            for key in affected_keys.iter() {
+                if let Some(old_versions) = old_snapshot.get(key) {
+                    let old_snapshot_value = old_versions.get(&None);
+                    if let Some(current_versions) = &current_snapshot.get(key) {
+                    } else {
+                        // the transaction might be not doing anything
+                        // so shouldn't return error.
+                    }
+                // we need to get the current snapshot_value;
+                } else {
+                    // it might be that we are creating a new value inside a transaction.
+                }
+            }
+            return true;
+        } else {
+            // should return error about not finding transaction meta data.
+            return false;
+        }
+    }
+
     pub fn get_affected_keys(&self, transaction_id: &TransactionId) -> Vec<KVKey> {
         if let Some(transaction_meta_data) = self.transactions.get(&transaction_id) {
             let keys = &transaction_meta_data.affected_keys;
