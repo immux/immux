@@ -441,11 +441,19 @@ impl LogKeyValueStore {
         let instruction = Instruction::TransactionCommit { transaction_id };
         self.writer.append_instruction(&instruction)?;
 
-        update_committed_log_pointers(
-            &mut self.transaction_manager,
-            &mut self.snapshot,
-            transaction_id.clone(),
-        );
+        let current_snapshot = &self.snapshot;
+        if self
+            .transaction_manager
+            .validate_commit(&transaction_id, current_snapshot)
+        {
+            update_committed_log_pointers(
+                &mut self.transaction_manager,
+                &mut self.snapshot,
+                transaction_id.clone(),
+            );
+        } else {
+            self.abort_transaction(&transaction_id)?;
+        }
 
         self.current_height.increment()?;
 

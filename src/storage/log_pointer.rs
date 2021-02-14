@@ -1,4 +1,4 @@
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct LogPointer {
     /// The starting position of the instruction in the log file.
     pub pos: u64,

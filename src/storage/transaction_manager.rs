@@ -176,7 +176,7 @@ impl TransactionManager {
         };
     }
 
-    pub fn check_lost_update(
+    pub fn validate_commit(
         &mut self,
         transaction_id: &TransactionId,
         current_snapshot: &Snapshot,
@@ -188,7 +188,11 @@ impl TransactionManager {
             for key in affected_keys.iter() {
                 if let Some(old_versions) = old_snapshot.get(key) {
                     let old_snapshot_value = old_versions.get(&None);
-                    if let Some(current_versions) = &current_snapshot.get(key) {
+                    if let Some(current_versions) = current_snapshot.get(key) {
+                        let current_snapshot_value = current_versions.get(&None);
+                        if current_snapshot_value != old_snapshot_value {
+                            return false;
+                        }
                     } else {
                         // the transaction might be not doing anything
                         // so shouldn't return error.
@@ -196,6 +200,7 @@ impl TransactionManager {
                 // we need to get the current snapshot_value;
                 } else {
                     // it might be that we are creating a new value inside a transaction.
+                    // so shouldn't return an error,
                 }
             }
             return true;
