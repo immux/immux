@@ -1,6 +1,10 @@
 import * as fs from 'fs'
 import * as path from 'path'
+import * as url from 'url'
+import * as querystring from 'querystring'
 import * as vm from 'vm'
+import * as http from 'http';
+import client from '../../src/db';
 
 import { Controller } from '../../src/base/controller';
 import { router } from '../../src/router';
@@ -80,6 +84,9 @@ export default class Runtime extends Controller {
 
     @router.get('/vm/:project/:fn')
     @router.get('/vm/:project/:fn/:param')
+    @router.get('/vm/:project/:fn/:param/:param')
+    @router.post('/vm/:project/:fn/:param/:param')
+    @router.post('/vm/:project/:fn/:param/:param/:param')
     @router.post('/vm/:project/:fn')
     @router.post('/vm/:project/:fn/:param')
     @router.del('/vm/:project/:fn')
@@ -88,7 +95,7 @@ export default class Runtime extends Controller {
         let timer = null;
         const split: string = this.ctx.params.project;
         const pathUrl: string = this.ctx.request.url.split(split)[1];
-
+        const pathInfo = url.parse(pathUrl);
         // An entry function
         let fnString = await this.getFn({ id: 'main', name: split });
 
@@ -97,7 +104,12 @@ export default class Runtime extends Controller {
         let body = JSON.stringify(this.ctx.request.body);
 
         const db = JSON.stringify({});
-        const provider = JSON.stringify({ info: 'function', path: pathUrl});
+        const provider = JSON.stringify({ 
+          info: 'function', 
+          path: pathUrl,
+          pathname: pathInfo.pathname,
+          query: pathInfo.query ? querystring.parse(pathInfo.query) : '',
+        });
 
         // Load purchased functions, plugins
         const fns = JSON.stringify({});
@@ -131,6 +143,10 @@ export default class Runtime extends Controller {
                     require,
                     console,
                     requirePath: path.join(process.cwd(), '..', 'server', 'uploads', split),
+                    client,
+                    http,
+                    querystring,
+                    Promise,
                     // moment,
                 };
         

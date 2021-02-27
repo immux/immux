@@ -1,0 +1,24 @@
+{
+    "apps": [
+      {
+        "name": "server",
+        "cwd": "./server",
+        "max_memory_restart": "1024M",
+        "log_date_format": "YYYY-MM-DD HH:mm:ss SSS",
+        "script": "npm run server:release",
+        "env": {
+          "RUN_ENV": "release"
+        }
+      },
+      {
+        "name": "runtime",
+        "cwd": "./runtime",
+        "max_memory_restart": "1024M",
+        "log_date_format": "YYYY-MM-DD HH:mm:ss SSS",
+        "script": "npm run server:release",
+        "env": {
+          "RUN_ENV": "release"
+        }
+      }
+    ]
+  }

@@ -5,7 +5,8 @@
   "scripts": {
     "test": "mocha ./test",
     "start-ts": "tsc && NODE_ENV=development node ./dist/src/start.js ",
-    "dev": "./node_modules/nodemon/bin/nodemon.js"
+    "dev": "./node_modules/nodemon/bin/nodemon.js",
+    "server:release": "NODE_ENV=production node ./dist/src/start.js"
   },
   "dependencies": {
     "@types/koa": "^2.0.43",
@@ -23,9 +24,11 @@
     "mocha": "^5.0.0",
     "nodemon": "^1.14.11",
     "request": "^2.83.0",
-    "server-destroy": "^1.0.1"
+    "server-destroy": "^1.0.1",
+    "ioredis": "^4.22.0"
   },
   "devDependencies": {
+    "@types/ioredis": "^4.19.4",
     "ts-node": "^9.0.0",
     "typescript": "^4.0.5"
   }
