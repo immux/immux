@@ -1,7 +1,6 @@
 #!/usr/bin/env node
 
 require('module-alias').addAliases({ '@': __dirname });
-require('module-alias')({ base: process.cwd() });
 
 import program = require('commander');
 import upload from '@/upload';

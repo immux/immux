@@ -3,16 +3,13 @@ import * as path from 'path';
 export function getConfig() {
     const configDir = getAppPath() + '/config';
 
-    const configDef = configDir + '/config.default';
-    const configEnv = configDir
-        + (process.env.NODE_ENV === 'production' ? '/config.pro' : '/config.dev');
-    
-    const conf = require(configEnv).default;
-    const confDef = require(configDef).default;
+    const configDef = configDir + '/config';
 
-    return Object.assign({}, conf, confDef);
+    const confDef = require(configDef);
+
+    return confDef
 }
 
 export function getAppPath() {
-    return path.join(process.cwd(), '..', 'app')
+    return process.cwd()
 }

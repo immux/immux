@@ -6,7 +6,7 @@ export const PREFIX = chalk.blue('[Compute CLI]');
 
 export const INI_FILENAME = 'compute.ini';
 
-export const INI_FILEPATH = path.join(process.cwd(), INI_FILENAME);
+// export const INI_FILEPATH = path.join(__dirname, INI_FILENAME);
 
 export const PUBLIC_PEM_REGEXP = /^-----EMAIL\s+([^\n]+)\n(-----BEGIN\s+RSA\s+PUBLIC\s+KEY-----\n[^-]+\n-----END\s+RSA\s+PUBLIC\s+KEY-----)$/;
 
@@ -22,7 +22,7 @@ export const apiOrigin = (() => {
     }
 
     default: {
-      return 'http://immux.com/api';
+      return 'https://comptest.immux.dev/api';
     }
   }
 })();

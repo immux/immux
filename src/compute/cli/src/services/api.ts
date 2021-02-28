@@ -39,7 +39,7 @@ export function verifyRsaSignature(
 }
 
 export function uploadFile(ticket: string) {
-  const pathName = `${process.cwd()}/../app/fns`;
+  const pathName = `${process.cwd()}/fns`;
   const form = new FormData();
 
   const config = getConfig();

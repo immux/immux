@@ -1,17 +1,19 @@
 {
-  "name": "compute-cli",
-  "version": "0.1.0",
-  "description": "compute cli tool",
+  "name": "immux-compute-cli",
+  "version": "0.2.2",
+  "description": "immux compute cli tool",
   "main": "lib/src/index.js",
   "files": [
     "lib",
-    "src"
+    "src",
+    "compute.ini"
   ],
   "bin": {
     "compute-cli": "./lib/index.js"
   },
   "scripts": {
     "start": "COMPUTE_ENV=development nodemon --watch 'src/**/*.ts' --exec 'ts-node' src/index.ts upload",
+    "upload": "nodemon --watch 'src/**/*.ts' --exec 'ts-node' src/index.ts upload",
     "tsc": "rimraf lib && tsc",
     "ts-node": "ts-node",
     "test": "jest --coverage"
